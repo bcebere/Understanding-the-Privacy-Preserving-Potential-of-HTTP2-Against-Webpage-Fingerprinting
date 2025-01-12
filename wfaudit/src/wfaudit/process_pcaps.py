@@ -268,7 +268,9 @@ def _prepare_time_series(
     return static_data, ts_data_clean
 
 
-def prepare_datasets(workspace=Path("workspace"), ID_COL="file_order"):  # id, full_id
+def prepare_wefde_datasets(
+    workspace=Path("workspace"), ID_COL="file_order"
+):  # id, full_id
     in_workspace = Path("output_csv_full")
     output = Path("output_wefde")
     output.mkdir(parents=True, exist_ok=True)
@@ -349,3 +351,22 @@ def prepare_datasets(workspace=Path("workspace"), ID_COL="file_order"):  # id, f
         new_local_data.to_csv(output / outfile, sep=" ", index=False, header=False)
 
         real_idx += 1
+
+
+def create_datasets(
+    traces=Path("traces"),
+    workspace=Path("workspace"),
+    unlink_after_processing=True,
+):
+    # Parse raw pcaps
+    process_raw_pcaps(
+        traces=traces,
+        workspace=workspace,
+        unlink_after_processing=unlink_after_processing,
+    )
+
+    # Merge CSV in a single dataset
+    merge_pcap_csvs(workspace=workspace)
+
+    # Create WeFDE datasets
+    prepare_wefde_datasets(workspace=workspace)
