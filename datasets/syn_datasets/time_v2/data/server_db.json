@@ -1,0 +1,1026 @@
+{
+    "/label0000": {
+        "data_delay": 0.0005,
+        "data_size": 512
+    },
+    "/label0001": {
+        "data_delay": 0.001,
+        "data_size": 512
+    },
+    "/label0002": {
+        "data_delay": 0.0015,
+        "data_size": 512
+    },
+    "/label0003": {
+        "data_delay": 0.002,
+        "data_size": 512
+    },
+    "/label0004": {
+        "data_delay": 0.0025,
+        "data_size": 512
+    },
+    "/label0005": {
+        "data_delay": 0.003,
+        "data_size": 512
+    },
+    "/label0006": {
+        "data_delay": 0.0035,
+        "data_size": 512
+    },
+    "/label0007": {
+        "data_delay": 0.004,
+        "data_size": 512
+    },
+    "/label0008": {
+        "data_delay": 0.0045000000000000005,
+        "data_size": 512
+    },
+    "/label0009": {
+        "data_delay": 0.005,
+        "data_size": 512
+    },
+    "/label0010": {
+        "data_delay": 0.0055,
+        "data_size": 512
+    },
+    "/label0011": {
+        "data_delay": 0.006,
+        "data_size": 512
+    },
+    "/label0012": {
+        "data_delay": 0.006500000000000001,
+        "data_size": 512
+    },
+    "/label0013": {
+        "data_delay": 0.007,
+        "data_size": 512
+    },
+    "/label0014": {
+        "data_delay": 0.0075,
+        "data_size": 512
+    },
+    "/label0015": {
+        "data_delay": 0.008,
+        "data_size": 512
+    },
+    "/label0016": {
+        "data_delay": 0.0085,
+        "data_size": 512
+    },
+    "/label0017": {
+        "data_delay": 0.009000000000000001,
+        "data_size": 512
+    },
+    "/label0018": {
+        "data_delay": 0.0095,
+        "data_size": 512
+    },
+    "/label0019": {
+        "data_delay": 0.01,
+        "data_size": 512
+    },
+    "/label0020": {
+        "data_delay": 0.0105,
+        "data_size": 512
+    },
+    "/label0021": {
+        "data_delay": 0.011,
+        "data_size": 512
+    },
+    "/label0022": {
+        "data_delay": 0.0115,
+        "data_size": 512
+    },
+    "/label0023": {
+        "data_delay": 0.012,
+        "data_size": 512
+    },
+    "/label0024": {
+        "data_delay": 0.0125,
+        "data_size": 512
+    },
+    "/label0025": {
+        "data_delay": 0.013000000000000001,
+        "data_size": 512
+    },
+    "/label0026": {
+        "data_delay": 0.0135,
+        "data_size": 512
+    },
+    "/label0027": {
+        "data_delay": 0.014,
+        "data_size": 512
+    },
+    "/label0028": {
+        "data_delay": 0.0145,
+        "data_size": 512
+    },
+    "/label0029": {
+        "data_delay": 0.015,
+        "data_size": 512
+    },
+    "/label0030": {
+        "data_delay": 0.0155,
+        "data_size": 512
+    },
+    "/label0031": {
+        "data_delay": 0.016,
+        "data_size": 512
+    },
+    "/label0032": {
+        "data_delay": 0.0165,
+        "data_size": 512
+    },
+    "/label0033": {
+        "data_delay": 0.017,
+        "data_size": 512
+    },
+    "/label0034": {
+        "data_delay": 0.0175,
+        "data_size": 512
+    },
+    "/label0035": {
+        "data_delay": 0.018000000000000002,
+        "data_size": 512
+    },
+    "/label0036": {
+        "data_delay": 0.0185,
+        "data_size": 512
+    },
+    "/label0037": {
+        "data_delay": 0.019,
+        "data_size": 512
+    },
+    "/label0038": {
+        "data_delay": 0.0195,
+        "data_size": 512
+    },
+    "/label0039": {
+        "data_delay": 0.02,
+        "data_size": 512
+    },
+    "/label0040": {
+        "data_delay": 0.0205,
+        "data_size": 512
+    },
+    "/label0041": {
+        "data_delay": 0.021,
+        "data_size": 512
+    },
+    "/label0042": {
+        "data_delay": 0.021500000000000002,
+        "data_size": 512
+    },
+    "/label0043": {
+        "data_delay": 0.022,
+        "data_size": 512
+    },
+    "/label0044": {
+        "data_delay": 0.0225,
+        "data_size": 512
+    },
+    "/label0045": {
+        "data_delay": 0.023,
+        "data_size": 512
+    },
+    "/label0046": {
+        "data_delay": 0.0235,
+        "data_size": 512
+    },
+    "/label0047": {
+        "data_delay": 0.024,
+        "data_size": 512
+    },
+    "/label0048": {
+        "data_delay": 0.0245,
+        "data_size": 512
+    },
+    "/label0049": {
+        "data_delay": 0.025,
+        "data_size": 512
+    },
+    "/label0050": {
+        "data_delay": 0.025500000000000002,
+        "data_size": 512
+    },
+    "/label0051": {
+        "data_delay": 0.026000000000000002,
+        "data_size": 512
+    },
+    "/label0052": {
+        "data_delay": 0.0265,
+        "data_size": 512
+    },
+    "/label0053": {
+        "data_delay": 0.027,
+        "data_size": 512
+    },
+    "/label0054": {
+        "data_delay": 0.0275,
+        "data_size": 512
+    },
+    "/label0055": {
+        "data_delay": 0.028,
+        "data_size": 512
+    },
+    "/label0056": {
+        "data_delay": 0.0285,
+        "data_size": 512
+    },
+    "/label0057": {
+        "data_delay": 0.029,
+        "data_size": 512
+    },
+    "/label0058": {
+        "data_delay": 0.029500000000000002,
+        "data_size": 512
+    },
+    "/label0059": {
+        "data_delay": 0.03,
+        "data_size": 512
+    },
+    "/label0060": {
+        "data_delay": 0.0305,
+        "data_size": 512
+    },
+    "/label0061": {
+        "data_delay": 0.031,
+        "data_size": 512
+    },
+    "/label0062": {
+        "data_delay": 0.0315,
+        "data_size": 512
+    },
+    "/label0063": {
+        "data_delay": 0.032,
+        "data_size": 512
+    },
+    "/label0064": {
+        "data_delay": 0.0325,
+        "data_size": 512
+    },
+    "/label0065": {
+        "data_delay": 0.033,
+        "data_size": 512
+    },
+    "/label0066": {
+        "data_delay": 0.0335,
+        "data_size": 512
+    },
+    "/label0067": {
+        "data_delay": 0.034,
+        "data_size": 512
+    },
+    "/label0068": {
+        "data_delay": 0.0345,
+        "data_size": 512
+    },
+    "/label0069": {
+        "data_delay": 0.035,
+        "data_size": 512
+    },
+    "/label0070": {
+        "data_delay": 0.035500000000000004,
+        "data_size": 512
+    },
+    "/label0071": {
+        "data_delay": 0.036000000000000004,
+        "data_size": 512
+    },
+    "/label0072": {
+        "data_delay": 0.0365,
+        "data_size": 512
+    },
+    "/label0073": {
+        "data_delay": 0.037,
+        "data_size": 512
+    },
+    "/label0074": {
+        "data_delay": 0.0375,
+        "data_size": 512
+    },
+    "/label0075": {
+        "data_delay": 0.038,
+        "data_size": 512
+    },
+    "/label0076": {
+        "data_delay": 0.0385,
+        "data_size": 512
+    },
+    "/label0077": {
+        "data_delay": 0.039,
+        "data_size": 512
+    },
+    "/label0078": {
+        "data_delay": 0.0395,
+        "data_size": 512
+    },
+    "/label0079": {
+        "data_delay": 0.04,
+        "data_size": 512
+    },
+    "/label0080": {
+        "data_delay": 0.0405,
+        "data_size": 512
+    },
+    "/label0081": {
+        "data_delay": 0.041,
+        "data_size": 512
+    },
+    "/label0082": {
+        "data_delay": 0.0415,
+        "data_size": 512
+    },
+    "/label0083": {
+        "data_delay": 0.042,
+        "data_size": 512
+    },
+    "/label0084": {
+        "data_delay": 0.0425,
+        "data_size": 512
+    },
+    "/label0085": {
+        "data_delay": 0.043000000000000003,
+        "data_size": 512
+    },
+    "/label0086": {
+        "data_delay": 0.043500000000000004,
+        "data_size": 512
+    },
+    "/label0087": {
+        "data_delay": 0.044,
+        "data_size": 512
+    },
+    "/label0088": {
+        "data_delay": 0.0445,
+        "data_size": 512
+    },
+    "/label0089": {
+        "data_delay": 0.045,
+        "data_size": 512
+    },
+    "/label0090": {
+        "data_delay": 0.0455,
+        "data_size": 512
+    },
+    "/label0091": {
+        "data_delay": 0.046,
+        "data_size": 512
+    },
+    "/label0092": {
+        "data_delay": 0.0465,
+        "data_size": 512
+    },
+    "/label0093": {
+        "data_delay": 0.047,
+        "data_size": 512
+    },
+    "/label0094": {
+        "data_delay": 0.0475,
+        "data_size": 512
+    },
+    "/label0095": {
+        "data_delay": 0.048,
+        "data_size": 512
+    },
+    "/label0096": {
+        "data_delay": 0.0485,
+        "data_size": 512
+    },
+    "/label0097": {
+        "data_delay": 0.049,
+        "data_size": 512
+    },
+    "/label0098": {
+        "data_delay": 0.0495,
+        "data_size": 512
+    },
+    "/label0099": {
+        "data_delay": 0.05,
+        "data_size": 512
+    },
+    "/label0100": {
+        "data_delay": 0.0505,
+        "data_size": 512
+    },
+    "/label0101": {
+        "data_delay": 0.051000000000000004,
+        "data_size": 512
+    },
+    "/label0102": {
+        "data_delay": 0.051500000000000004,
+        "data_size": 512
+    },
+    "/label0103": {
+        "data_delay": 0.052000000000000005,
+        "data_size": 512
+    },
+    "/label0104": {
+        "data_delay": 0.0525,
+        "data_size": 512
+    },
+    "/label0105": {
+        "data_delay": 0.053,
+        "data_size": 512
+    },
+    "/label0106": {
+        "data_delay": 0.0535,
+        "data_size": 512
+    },
+    "/label0107": {
+        "data_delay": 0.054,
+        "data_size": 512
+    },
+    "/label0108": {
+        "data_delay": 0.0545,
+        "data_size": 512
+    },
+    "/label0109": {
+        "data_delay": 0.055,
+        "data_size": 512
+    },
+    "/label0110": {
+        "data_delay": 0.0555,
+        "data_size": 512
+    },
+    "/label0111": {
+        "data_delay": 0.056,
+        "data_size": 512
+    },
+    "/label0112": {
+        "data_delay": 0.0565,
+        "data_size": 512
+    },
+    "/label0113": {
+        "data_delay": 0.057,
+        "data_size": 512
+    },
+    "/label0114": {
+        "data_delay": 0.0575,
+        "data_size": 512
+    },
+    "/label0115": {
+        "data_delay": 0.058,
+        "data_size": 512
+    },
+    "/label0116": {
+        "data_delay": 0.0585,
+        "data_size": 512
+    },
+    "/label0117": {
+        "data_delay": 0.059000000000000004,
+        "data_size": 512
+    },
+    "/label0118": {
+        "data_delay": 0.059500000000000004,
+        "data_size": 512
+    },
+    "/label0119": {
+        "data_delay": 0.06,
+        "data_size": 512
+    },
+    "/label0120": {
+        "data_delay": 0.0605,
+        "data_size": 512
+    },
+    "/label0121": {
+        "data_delay": 0.061,
+        "data_size": 512
+    },
+    "/label0122": {
+        "data_delay": 0.0615,
+        "data_size": 512
+    },
+    "/label0123": {
+        "data_delay": 0.062,
+        "data_size": 512
+    },
+    "/label0124": {
+        "data_delay": 0.0625,
+        "data_size": 512
+    },
+    "/label0125": {
+        "data_delay": 0.063,
+        "data_size": 512
+    },
+    "/label0126": {
+        "data_delay": 0.0635,
+        "data_size": 512
+    },
+    "/label0127": {
+        "data_delay": 0.064,
+        "data_size": 512
+    },
+    "/label0128": {
+        "data_delay": 0.0645,
+        "data_size": 512
+    },
+    "/label0129": {
+        "data_delay": 0.065,
+        "data_size": 512
+    },
+    "/label0130": {
+        "data_delay": 0.0655,
+        "data_size": 512
+    },
+    "/label0131": {
+        "data_delay": 0.066,
+        "data_size": 512
+    },
+    "/label0132": {
+        "data_delay": 0.0665,
+        "data_size": 512
+    },
+    "/label0133": {
+        "data_delay": 0.067,
+        "data_size": 512
+    },
+    "/label0134": {
+        "data_delay": 0.0675,
+        "data_size": 512
+    },
+    "/label0135": {
+        "data_delay": 0.068,
+        "data_size": 512
+    },
+    "/label0136": {
+        "data_delay": 0.0685,
+        "data_size": 512
+    },
+    "/label0137": {
+        "data_delay": 0.069,
+        "data_size": 512
+    },
+    "/label0138": {
+        "data_delay": 0.0695,
+        "data_size": 512
+    },
+    "/label0139": {
+        "data_delay": 0.07,
+        "data_size": 512
+    },
+    "/label0140": {
+        "data_delay": 0.07050000000000001,
+        "data_size": 512
+    },
+    "/label0141": {
+        "data_delay": 0.07100000000000001,
+        "data_size": 512
+    },
+    "/label0142": {
+        "data_delay": 0.07150000000000001,
+        "data_size": 512
+    },
+    "/label0143": {
+        "data_delay": 0.07200000000000001,
+        "data_size": 512
+    },
+    "/label0144": {
+        "data_delay": 0.0725,
+        "data_size": 512
+    },
+    "/label0145": {
+        "data_delay": 0.073,
+        "data_size": 512
+    },
+    "/label0146": {
+        "data_delay": 0.0735,
+        "data_size": 512
+    },
+    "/label0147": {
+        "data_delay": 0.074,
+        "data_size": 512
+    },
+    "/label0148": {
+        "data_delay": 0.0745,
+        "data_size": 512
+    },
+    "/label0149": {
+        "data_delay": 0.075,
+        "data_size": 512
+    },
+    "/label0150": {
+        "data_delay": 0.0755,
+        "data_size": 512
+    },
+    "/label0151": {
+        "data_delay": 0.076,
+        "data_size": 512
+    },
+    "/label0152": {
+        "data_delay": 0.0765,
+        "data_size": 512
+    },
+    "/label0153": {
+        "data_delay": 0.077,
+        "data_size": 512
+    },
+    "/label0154": {
+        "data_delay": 0.0775,
+        "data_size": 512
+    },
+    "/label0155": {
+        "data_delay": 0.078,
+        "data_size": 512
+    },
+    "/label0156": {
+        "data_delay": 0.0785,
+        "data_size": 512
+    },
+    "/label0157": {
+        "data_delay": 0.079,
+        "data_size": 512
+    },
+    "/label0158": {
+        "data_delay": 0.0795,
+        "data_size": 512
+    },
+    "/label0159": {
+        "data_delay": 0.08,
+        "data_size": 512
+    },
+    "/label0160": {
+        "data_delay": 0.0805,
+        "data_size": 512
+    },
+    "/label0161": {
+        "data_delay": 0.081,
+        "data_size": 512
+    },
+    "/label0162": {
+        "data_delay": 0.0815,
+        "data_size": 512
+    },
+    "/label0163": {
+        "data_delay": 0.082,
+        "data_size": 512
+    },
+    "/label0164": {
+        "data_delay": 0.0825,
+        "data_size": 512
+    },
+    "/label0165": {
+        "data_delay": 0.083,
+        "data_size": 512
+    },
+    "/label0166": {
+        "data_delay": 0.0835,
+        "data_size": 512
+    },
+    "/label0167": {
+        "data_delay": 0.084,
+        "data_size": 512
+    },
+    "/label0168": {
+        "data_delay": 0.0845,
+        "data_size": 512
+    },
+    "/label0169": {
+        "data_delay": 0.085,
+        "data_size": 512
+    },
+    "/label0170": {
+        "data_delay": 0.0855,
+        "data_size": 512
+    },
+    "/label0171": {
+        "data_delay": 0.08600000000000001,
+        "data_size": 512
+    },
+    "/label0172": {
+        "data_delay": 0.08650000000000001,
+        "data_size": 512
+    },
+    "/label0173": {
+        "data_delay": 0.08700000000000001,
+        "data_size": 512
+    },
+    "/label0174": {
+        "data_delay": 0.08750000000000001,
+        "data_size": 512
+    },
+    "/label0175": {
+        "data_delay": 0.088,
+        "data_size": 512
+    },
+    "/label0176": {
+        "data_delay": 0.0885,
+        "data_size": 512
+    },
+    "/label0177": {
+        "data_delay": 0.089,
+        "data_size": 512
+    },
+    "/label0178": {
+        "data_delay": 0.0895,
+        "data_size": 512
+    },
+    "/label0179": {
+        "data_delay": 0.09,
+        "data_size": 512
+    },
+    "/label0180": {
+        "data_delay": 0.0905,
+        "data_size": 512
+    },
+    "/label0181": {
+        "data_delay": 0.091,
+        "data_size": 512
+    },
+    "/label0182": {
+        "data_delay": 0.0915,
+        "data_size": 512
+    },
+    "/label0183": {
+        "data_delay": 0.092,
+        "data_size": 512
+    },
+    "/label0184": {
+        "data_delay": 0.0925,
+        "data_size": 512
+    },
+    "/label0185": {
+        "data_delay": 0.093,
+        "data_size": 512
+    },
+    "/label0186": {
+        "data_delay": 0.0935,
+        "data_size": 512
+    },
+    "/label0187": {
+        "data_delay": 0.094,
+        "data_size": 512
+    },
+    "/label0188": {
+        "data_delay": 0.0945,
+        "data_size": 512
+    },
+    "/label0189": {
+        "data_delay": 0.095,
+        "data_size": 512
+    },
+    "/label0190": {
+        "data_delay": 0.0955,
+        "data_size": 512
+    },
+    "/label0191": {
+        "data_delay": 0.096,
+        "data_size": 512
+    },
+    "/label0192": {
+        "data_delay": 0.0965,
+        "data_size": 512
+    },
+    "/label0193": {
+        "data_delay": 0.097,
+        "data_size": 512
+    },
+    "/label0194": {
+        "data_delay": 0.0975,
+        "data_size": 512
+    },
+    "/label0195": {
+        "data_delay": 0.098,
+        "data_size": 512
+    },
+    "/label0196": {
+        "data_delay": 0.0985,
+        "data_size": 512
+    },
+    "/label0197": {
+        "data_delay": 0.099,
+        "data_size": 512
+    },
+    "/label0198": {
+        "data_delay": 0.0995,
+        "data_size": 512
+    },
+    "/label0199": {
+        "data_delay": 0.1,
+        "data_size": 512
+    },
+    "/label0200": {
+        "data_delay": 0.1005,
+        "data_size": 512
+    },
+    "/label0201": {
+        "data_delay": 0.101,
+        "data_size": 512
+    },
+    "/label0202": {
+        "data_delay": 0.1015,
+        "data_size": 512
+    },
+    "/label0203": {
+        "data_delay": 0.10200000000000001,
+        "data_size": 512
+    },
+    "/label0204": {
+        "data_delay": 0.10250000000000001,
+        "data_size": 512
+    },
+    "/label0205": {
+        "data_delay": 0.10300000000000001,
+        "data_size": 512
+    },
+    "/label0206": {
+        "data_delay": 0.10350000000000001,
+        "data_size": 512
+    },
+    "/label0207": {
+        "data_delay": 0.10400000000000001,
+        "data_size": 512
+    },
+    "/label0208": {
+        "data_delay": 0.1045,
+        "data_size": 512
+    },
+    "/label0209": {
+        "data_delay": 0.105,
+        "data_size": 512
+    },
+    "/label0210": {
+        "data_delay": 0.1055,
+        "data_size": 512
+    },
+    "/label0211": {
+        "data_delay": 0.106,
+        "data_size": 512
+    },
+    "/label0212": {
+        "data_delay": 0.1065,
+        "data_size": 512
+    },
+    "/label0213": {
+        "data_delay": 0.107,
+        "data_size": 512
+    },
+    "/label0214": {
+        "data_delay": 0.1075,
+        "data_size": 512
+    },
+    "/label0215": {
+        "data_delay": 0.108,
+        "data_size": 512
+    },
+    "/label0216": {
+        "data_delay": 0.1085,
+        "data_size": 512
+    },
+    "/label0217": {
+        "data_delay": 0.109,
+        "data_size": 512
+    },
+    "/label0218": {
+        "data_delay": 0.1095,
+        "data_size": 512
+    },
+    "/label0219": {
+        "data_delay": 0.11,
+        "data_size": 512
+    },
+    "/label0220": {
+        "data_delay": 0.1105,
+        "data_size": 512
+    },
+    "/label0221": {
+        "data_delay": 0.111,
+        "data_size": 512
+    },
+    "/label0222": {
+        "data_delay": 0.1115,
+        "data_size": 512
+    },
+    "/label0223": {
+        "data_delay": 0.112,
+        "data_size": 512
+    },
+    "/label0224": {
+        "data_delay": 0.1125,
+        "data_size": 512
+    },
+    "/label0225": {
+        "data_delay": 0.113,
+        "data_size": 512
+    },
+    "/label0226": {
+        "data_delay": 0.1135,
+        "data_size": 512
+    },
+    "/label0227": {
+        "data_delay": 0.114,
+        "data_size": 512
+    },
+    "/label0228": {
+        "data_delay": 0.1145,
+        "data_size": 512
+    },
+    "/label0229": {
+        "data_delay": 0.115,
+        "data_size": 512
+    },
+    "/label0230": {
+        "data_delay": 0.1155,
+        "data_size": 512
+    },
+    "/label0231": {
+        "data_delay": 0.116,
+        "data_size": 512
+    },
+    "/label0232": {
+        "data_delay": 0.1165,
+        "data_size": 512
+    },
+    "/label0233": {
+        "data_delay": 0.117,
+        "data_size": 512
+    },
+    "/label0234": {
+        "data_delay": 0.11750000000000001,
+        "data_size": 512
+    },
+    "/label0235": {
+        "data_delay": 0.11800000000000001,
+        "data_size": 512
+    },
+    "/label0236": {
+        "data_delay": 0.11850000000000001,
+        "data_size": 512
+    },
+    "/label0237": {
+        "data_delay": 0.11900000000000001,
+        "data_size": 512
+    },
+    "/label0238": {
+        "data_delay": 0.11950000000000001,
+        "data_size": 512
+    },
+    "/label0239": {
+        "data_delay": 0.12,
+        "data_size": 512
+    },
+    "/label0240": {
+        "data_delay": 0.1205,
+        "data_size": 512
+    },
+    "/label0241": {
+        "data_delay": 0.121,
+        "data_size": 512
+    },
+    "/label0242": {
+        "data_delay": 0.1215,
+        "data_size": 512
+    },
+    "/label0243": {
+        "data_delay": 0.122,
+        "data_size": 512
+    },
+    "/label0244": {
+        "data_delay": 0.1225,
+        "data_size": 512
+    },
+    "/label0245": {
+        "data_delay": 0.123,
+        "data_size": 512
+    },
+    "/label0246": {
+        "data_delay": 0.1235,
+        "data_size": 512
+    },
+    "/label0247": {
+        "data_delay": 0.124,
+        "data_size": 512
+    },
+    "/label0248": {
+        "data_delay": 0.1245,
+        "data_size": 512
+    },
+    "/label0249": {
+        "data_delay": 0.125,
+        "data_size": 512
+    },
+    "/label0250": {
+        "data_delay": 0.1255,
+        "data_size": 512
+    },
+    "/label0251": {
+        "data_delay": 0.126,
+        "data_size": 512
+    },
+    "/label0252": {
+        "data_delay": 0.1265,
+        "data_size": 512
+    },
+    "/label0253": {
+        "data_delay": 0.127,
+        "data_size": 512
+    },
+    "/label0254": {
+        "data_delay": 0.1275,
+        "data_size": 512
+    },
+    "/label0255": {
+        "data_delay": 0.128,
+        "data_size": 512
+    }
+}
