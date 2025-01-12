@@ -1,9 +1,9 @@
 # stdlib
+from datetime import datetime
+from pathlib import Path
 import socket
 import ssl
 import time
-from datetime import datetime
-from pathlib import Path
 
 # third party
 import OpenSSL

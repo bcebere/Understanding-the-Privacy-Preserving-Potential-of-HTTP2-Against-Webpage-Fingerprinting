@@ -1,18 +1,14 @@
-"""
-    Setup file for wfaudit.
-    Use setup.cfg to configure your project.
-
-    This file was generated with PyScaffold 4.6.
-    PyScaffold helps you to put up the scaffold of your new Python project.
-    Learn more under: https://pyscaffold.org/
-"""
-
 # third party
 from setuptools import setup
 
+
+def find_version() -> str:
+    return "0.0.1"
+
+
 if __name__ == "__main__":
     try:
-        setup(use_scm_version={"version_scheme": "no-guess-dev"})
+        setup(version=find_version())
     except:  # noqa
         print(
             "\n\nAn error occurred while building the project, "
@@ -20,4 +16,3 @@ if __name__ == "__main__":
             "setuptools_scm and wheel with:\n"
             "   pip install -U setuptools setuptools_scm wheel\n\n"
         )
-        raise
