@@ -358,6 +358,8 @@ def create_datasets(
     workspace=Path("workspace"),
     unlink_after_processing=True,
 ):
+    workspace.mkdir(parents=True, exist_ok=True)
+
     # Parse raw pcaps
     process_raw_pcaps(
         traces=traces,
