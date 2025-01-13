@@ -11,6 +11,7 @@ import pandas as pd
 from tqdm import tqdm
 
 # wfaudit absolute
+import wfaudit.logger as log
 from wfaudit.processing import process_pcap
 
 
@@ -25,6 +26,9 @@ def process_raw_pcaps(
         - workspace : Folder where to store intermediary and final CSVs.
         - unlink_after_processing: Delete the PCAP after processing. Useful for low-space devices.
     """
+    if not traces.exists():
+        log.error("missing traces folder")
+        return
     workspace.mkdir(parents=True, exist_ok=True)
     output = workspace / "output_csv_single"
     output.mkdir(parents=True, exist_ok=True)
@@ -40,15 +44,16 @@ def process_raw_pcaps(
             continue
 
         if output_csv_temporal.exists():
-            print("already cached", output_csv_temporal)
             if unlink_after_processing:
-                print("dropping ", filename)
+                log.debug(f"dropping  {filename}")
                 filename.unlink()
             continue
         try:
             session = process_pcap(filename)
         except BaseException as e:
-            print("failed to parse pcap. moving to graveyard", filename, e)
+            log.error(
+                f"failed to parse pcap. moving to graveyard {filename}, error = {e}"
+            )
             filename.unlink()
             time.sleep(0.1)
             continue
@@ -56,17 +61,15 @@ def process_raw_pcaps(
         label = stem.split("_")[1]
         static_data, temporal_data = session.temporal_stats_per_flow()
         if len(static_data) == 0:
-            print("empty dataset", filename)
+            log.error(f"empty dataset {filename}")
             filename.unlink()
             continue
 
         static_data["label"] = label
-        # print(filename, len(static_data), len(temporal_data))
         static_data.to_csv(output_csv_static, index=False)
         temporal_data.to_csv(output_csv_temporal, index=False)
 
         if unlink_after_processing:
-            print("dropping ", filename)
             filename.unlink()
 
 
@@ -77,6 +80,10 @@ def merge_pcap_csvs(workspace=Path("workspace"), pd_lim: int = 3000) -> None:
         pd_lim: how often to batch the CSVs.
     """
     in_workspace = workspace / Path("output_csv_single")
+    if not in_workspace.exists():
+        log.error("Missing output_csv_single folder")
+        return
+
     output = workspace / Path("output_csv_full")
     output.mkdir(parents=True, exist_ok=True)
 
@@ -90,7 +97,6 @@ def merge_pcap_csvs(workspace=Path("workspace"), pd_lim: int = 3000) -> None:
         base = static_filename.name.split("static_")[1]
         temporal_base = "temporal_" + base
         temporal_filename = in_workspace / temporal_base
-        print(temporal_filename, static_filename)
 
         assert static_filename.exists()
         assert temporal_filename.exists()
@@ -103,7 +109,6 @@ def merge_pcap_csvs(workspace=Path("workspace"), pd_lim: int = 3000) -> None:
         original_ids = local_static_csv["id"].values[0]
         original_label = local_static_csv["label"].values[0]
         total_duration = local_temporal_csv["relative_timestamp"].sum()
-        print(original_ids, original_label, total_duration, fidx)
         new_id = f"{original_ids}-{original_label}-{total_duration}-{fidx}"
         hashed_id = hashlib.sha1(new_id.encode())
         hashed_id = hashed_id.hexdigest()
@@ -126,10 +131,9 @@ def merge_pcap_csvs(workspace=Path("workspace"), pd_lim: int = 3000) -> None:
             )
 
         if cnt % 100 == 0:
-            print("merge ", cnt, full_static_csv.shape)
+            log.debug(f"merge  batch {cnt}, {full_static_csv.shape}")
 
         if len(full_static_csv) > pd_lim:
-            print("!!! merge batch done", batch_idx)
             assert full_static_csv is not None
             assert full_temporal_csv is not None
 
@@ -161,7 +165,6 @@ def merge_pcap_csvs(workspace=Path("workspace"), pd_lim: int = 3000) -> None:
     full_data_temporal = None
 
     for batch in range(0, 100):
-        print(batch)
         static_batch = Path(output / f"static_data_batch{batch}.csv")
         temporal_batch = Path(output / f"temporal_data_batch{batch}.csv")
         if not static_batch.exists():
@@ -217,26 +220,15 @@ def _prepare_time_series(
 ):
     ts_data_clean = []
 
-    servers_hellos = ts_data[ts_data["relative_timestamp"] != 0].drop_duplicates(
-        subset=[ID_COL]
-    )
-    cert_sizes = servers_hellos["length"].value_counts()
-    outliers = list(cert_sizes[cert_sizes < 10].index.values)
-    ignore_ids = servers_hellos[servers_hellos["length"].isin(outliers)][ID_COL].values
-
     groups = ts_data.groupby(ID_COL)
     ids = []
 
     static_data = static_data.drop_duplicates(ID_COL)
     static_ids = set(static_data[ID_COL].values)
-    print(len(static_ids))
 
     lens = []
-    print("count of groups ", len(groups))
     for idx, group in tqdm(groups):
         if idx not in static_ids:
-            continue
-        if idx in ignore_ids:
             continue
 
         # patch ID collisions
@@ -259,7 +251,7 @@ def _prepare_time_series(
 
     static_data = static_data.set_index(ID_COL)
     static_data = static_data.reindex(ids)
-    print(
+    log.debug(
         f"""
             TS info total={len(lens)}, mean len={np.mean(lens)}, median len{np.median(lens)},
               min len={np.min(lens)}, max len={np.max(lens)}
@@ -271,8 +263,12 @@ def _prepare_time_series(
 def prepare_wefde_datasets(
     workspace=Path("workspace"), ID_COL="file_order"
 ):  # id, full_id
-    in_workspace = Path("output_csv_full")
-    output = Path("output_wefde")
+    in_workspace = workspace / Path("output_csv_full")
+    if not workspace.exists():
+        log.error("Missing output_csv_full data")
+        return
+
+    output = workspace / Path("output_wefde")
     output.mkdir(parents=True, exist_ok=True)
 
     full_data_static = pd.read_csv(in_workspace / "static_data.csv")
@@ -300,7 +296,6 @@ def prepare_wefde_datasets(
         temporal_data_no_cache_no_blacklists,
         ID_COL=ID_COL,
     )
-    clean_static_data.to_csv(output / "selected_static_data.csv", index=None)
 
     real_idx = 0
     domain_repeats = {}
@@ -317,7 +312,6 @@ def prepare_wefde_datasets(
     for ridx, static_row in clean_static_data.iterrows():
         local_token = static_row["label"]
         encoded_label = experiment_labels.index(local_token)
-        print(local_token, encoded_label)
 
         if local_token not in domain_repeats:
             if len(domain_repeats) > class_cnt_limit:

@@ -3,10 +3,16 @@ from pathlib import Path
 import shutil
 
 # third party
+import pandas as pd
 import pytest
 
 # wfaudit absolute
-from wfaudit import process_raw_pcaps
+from wfaudit import (
+    create_datasets,
+    merge_pcap_csvs,
+    prepare_wefde_datasets,
+    process_raw_pcaps,
+)
 
 
 def test_process_raw_pcaps_sanity():
@@ -62,3 +68,64 @@ def test_process_raw_pcaps_unlink(tmp_path, setup_and_teardown):
 
     num_files = sum(1 for file in traces.iterdir() if file.is_file())
     assert num_files == 0
+
+
+def test_merge_csv_pcaps(tmp_path):
+    process_raw_pcaps(
+        traces=Path("traces"),
+        workspace=tmp_path,
+        unlink_after_processing=False,
+    )
+
+    merge_pcap_csvs(workspace=tmp_path)
+    output = tmp_path / "output_csv_full"
+
+    assert output.exists()
+    assert (output / "static_data.csv").exists()
+    assert (output / "temporal_data.csv").exists()
+
+    static_data = pd.read_csv(output / "static_data.csv")
+    assert len(static_data) == 6
+    assert "file_order" in static_data.columns
+
+    temporal_data = pd.read_csv(output / "temporal_data.csv")
+    assert "file_order" in temporal_data.columns
+    assert len(temporal_data["file_order"].unique()) == 6
+
+
+def test_prepare_wefde_datasets(tmp_path):
+    process_raw_pcaps(
+        traces=Path("traces"),
+        workspace=tmp_path,
+        unlink_after_processing=False,
+    )
+
+    merge_pcap_csvs(workspace=tmp_path)
+
+    prepare_wefde_datasets(workspace=tmp_path)
+
+    output = tmp_path / "output_wefde"
+    assert output.exists()
+
+    num_files = sum(1 for file in output.iterdir() if file.is_file())
+    assert num_files == 6
+
+
+def test_e2e(tmp_path):
+    create_datasets(
+        traces=Path("traces"),
+        workspace=tmp_path,
+        unlink_after_processing=False,
+    )
+
+    output = tmp_path / "output_csv_single"
+    assert output.exists()
+
+    output = tmp_path / "output_csv_full"
+    assert output.exists()
+
+    output = tmp_path / "output_wefde"
+    assert output.exists()
+
+    num_files = sum(1 for file in output.iterdir() if file.is_file())
+    assert num_files == 6
