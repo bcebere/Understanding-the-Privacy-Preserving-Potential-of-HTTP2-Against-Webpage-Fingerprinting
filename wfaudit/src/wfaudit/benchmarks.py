@@ -9,8 +9,8 @@ from wfaudit.helpers_ml import (
     print_score,
     save_to_file,
 )
-from wfaudit.helpers_wefde.preprocess.analysis.info_leakage import evaluate_info_leakage
-from wfaudit.helpers_wefde.preprocess.analysis.utils import load_wefde_features
+from wfaudit.helpers_wefde.analysis.data_utils import load_wefde_features
+from wfaudit.helpers_wefde.analysis.info_leak import evaluate_info_leakage
 from wfaudit.helpers_wefde.preprocess.extract import prepare_wefde_features
 import wfaudit.logger as log
 

@@ -5,10 +5,10 @@ import math
 
 # third party
 import numpy as np
-import wfaudt.logger as log
 
 # wfaudit absolute
 from wfaudit.helpers_wefde.analysis.kde_wrapper import KDE
+import wfaudit.logger as log
 
 
 class WebsiteFingerprintModeler(object):

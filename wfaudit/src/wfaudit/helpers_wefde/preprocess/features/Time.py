@@ -1,6 +1,8 @@
 # third party
-from features.common import X
 import numpy
+
+# wfaudit absolute
+from wfaudit.helpers_wefde.preprocess.features.common import X
 
 
 # max, mean, std, quartile
