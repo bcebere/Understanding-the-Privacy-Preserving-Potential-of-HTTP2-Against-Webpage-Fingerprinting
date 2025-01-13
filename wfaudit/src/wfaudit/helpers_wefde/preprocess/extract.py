@@ -8,6 +8,7 @@ import itertools
 import json
 from multiprocessing import Pool
 import os
+from pathlib import Path
 import re
 
 # third party
@@ -17,7 +18,6 @@ from tqdm import tqdm
 # wfaudit absolute
 import wfaudit.helpers_wefde.preprocess.features.Burst as Burst
 import wfaudit.helpers_wefde.preprocess.features.Cumul as Cumul
-import wfaudit.helpers_wefde.preprocess.features.PktLen as PktLen
 import wfaudit.helpers_wefde.preprocess.features.PktNum as PktNum
 import wfaudit.helpers_wefde.preprocess.features.PktSec as PktSec
 import wfaudit.helpers_wefde.preprocess.features.Time as Time
@@ -55,10 +55,6 @@ def extract(times, sizes, debug_path="./"):
     # inter packet time + transmission time feature
     features.extend(Time.TimeFeature(times, sizes))
     feature_pos["PKT_TIME"] = len(features)
-
-    # Unique packet lengths
-    features.extend(PktLen.PktLenFeature(times, sizes))
-    feature_pos["UNIQUE_PACKET_LENGTH"] = len(features)
 
     # Bursts (knn)
     features.extend(Burst.BurstFeature(times, sizes))
@@ -127,3 +123,6 @@ def prepare_wefde_features(trace_path, out_path):
         total=len(file_list),
     ):
         pass
+
+    features = json.load(open(Path(out_path) / "FeaturePositions.json"))
+    return features

@@ -5,6 +5,7 @@ import os
 # third party
 import dill
 import numpy as np
+import pandas as pd
 from pathos.multiprocessing import ProcessPool as Pool, cpu_count
 
 # wfaudit absolute
@@ -80,9 +81,35 @@ def _individual_measure(modeler, pool, checkpoint):
     return leakage_indiv
 
 
+def print_leakage(
+    features_range: dict,  # offsets for leakage types
+    indiv_file: str,  # path to individual leakages,
+    joint_file: str,  # path to joint leakages,
+):
+    # read independent leakage information from files
+    with open(indiv_file, "rb") as fi:
+        leakages = dill.load(fi)
+    with open(joint_file, "rb") as fi:
+        joint_leakages = dill.load(fi)
+
+    summary = {}
+    offset = 0
+    for category in features_range:
+        next_off = features_range[category]
+        y = leakages[offset:next_off]
+        summary[category] = [np.max(y)]
+        offset = next_off
+
+    summary["joint"] = joint_leakages[0]
+
+    summary = pd.DataFrame(summary)
+    return summary
+
+
 def evaluate_info_leakage(
-    features_path,
-    output_path,
+    features_path: str,  # the folder with output of the feature extraction
+    output_path: str,  # where to save the leakages
+    features_range: dict,  # the offsets of each feature
     n_procs=0,
     n_samples=50000,
     topn=100,
@@ -180,20 +207,23 @@ def evaluate_info_leakage(
             cleaned = dill.load(fi)
     else:
         log.info("Begin feature pruning.")
-        cleaned, pruned = analyzer.prune(
-            features=sorted_features,
-            nmi_threshold=nmi_threshold,
-            topn=topn,
-            checkpoint=chk_path,
-        )
-        with open(cln_path, "wb") as fi:
-            dill.dump(cleaned, fi)
-        with open(rdn_path, "wb") as fi:
-            dill.dump(pruned, fi)
+        try:
+            cleaned, pruned = analyzer.prune(
+                features=sorted_features,
+                nmi_threshold=nmi_threshold,
+                topn=topn,
+                checkpoint=chk_path,
+            )
+            with open(cln_path, "wb") as fi:
+                dill.dump(cleaned, fi)
+            with open(rdn_path, "wb") as fi:
+                dill.dump(pruned, fi)
+        except BaseException:
+            cleaned = sorted_features
+            pruned = []
 
     log.info(f"cleaned features = {cleaned} total = {len(cleaned)}")
     # cluster non-redundant features
-    dst_path = os.path.join(outdir, "distance_matrix.pkl")
     cst_path = os.path.join(outdir, "clusters.pkl")
     if os.path.exists(cst_path):
         log.info("Loading clusters from file.")
@@ -201,11 +231,12 @@ def evaluate_info_leakage(
             clusters = dill.load(fi)
     else:
         log.info("Begin feature clustering.")
-        clusters, distance_matrix = analyzer.cluster(cleaned, checkpoint=chk_path)
-        with open(dst_path, "wb") as fi:
-            dill.dump(distance_matrix, fi)
-        with open(cst_path, "wb") as fi:
-            dill.dump(clusters, fi)
+        try:
+            clusters, _ = analyzer.cluster(cleaned, checkpoint=chk_path)
+            with open(cst_path, "wb") as fi:
+                dill.dump(clusters, fi)
+        except BaseException:
+            clusters = [cleaned]
 
     max_info_leakage = modeler.max_information_leakage()
     with open(os.path.join(outdir, "max_entropy.pkl"), "wb") as fi:
@@ -266,4 +297,8 @@ def evaluate_info_leakage(
             dill.dump(leakage_joint, fi)
 
     log.info("Finished execution.")
-    return joint_leakage
+    return print_leakage(
+        features_range=features_range,  # offsets for leakage types
+        indiv_file=indiv_path,  # path to individual leakages,
+        joint_file=joint_path,  # path to joint leakages,
+    )

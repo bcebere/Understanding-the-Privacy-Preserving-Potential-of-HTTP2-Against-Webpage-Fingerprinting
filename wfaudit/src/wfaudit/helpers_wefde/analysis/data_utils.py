@@ -89,7 +89,7 @@ def load_wefde_features(
     delimiter=" ",
     split_at="-",
     max_classes=99999,
-    min_instances=10,
+    min_instances=2,
     max_instances=500,
     pack_dataset=False,
 ):
@@ -156,7 +156,6 @@ def load_wefde_features(
             # read each feature file as CSV
             class_counter = dict()  # track number of instances per class
             for file in files:
-
                 # feature files are of name
                 cls, ins = file.split(split_at)
                 cls = int(cls)

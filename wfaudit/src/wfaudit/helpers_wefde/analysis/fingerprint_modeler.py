@@ -134,10 +134,6 @@ class WebsiteFingerprintModeler(object):
                 return None
             mkdes.append(local_kde)
 
-        print(
-            "Got KDEs",
-            len(mkdes),
-        )
         # performing sampling for monte-carlo evaluation of H(C|f)
         samples = self._sample(mkdes, self.website_priors, self.sample_size)
 
@@ -241,7 +237,9 @@ class WebsiteFingerprintModeler(object):
 
         # compute information leakage for each cluster (or combined cluster if joint)
         leakages = []
-        print("prob_sets", prob_sets)
+        if len(np.asarray(prob_sets).shape) < 2:
+            prob_sets = [prob_sets]
+
         for i, prob_set in enumerate(prob_sets):
 
             # weight the probability predictions by the website priors
@@ -258,6 +256,9 @@ class WebsiteFingerprintModeler(object):
             # (as should be expected for conditional probabilities)
             probs_norm = []
             for probs in probs_weighted:
+                probs = np.asarray(probs)
+                if len(probs.shape) < 1:
+                    probs = [probs]
                 norm = probs / sum(probs) if sum(probs) > 0 else probs
                 probs_norm.append(norm)
 

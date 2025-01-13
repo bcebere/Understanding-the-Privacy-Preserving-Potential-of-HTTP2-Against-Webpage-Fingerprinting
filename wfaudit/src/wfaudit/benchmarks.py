@@ -18,7 +18,8 @@ import wfaudit.logger as log
 def prepare_features(
     time_series_traces=Path("output_wefde"), output=Path("output_features")
 ):
-    prepare_wefde_features(
+    output.mkdir(parents=True, exist_ok=True)
+    return prepare_wefde_features(
         trace_path=time_series_traces,
         out_path=output,
     )
@@ -27,74 +28,55 @@ def prepare_features(
 def evaluate_ml(
     workspace=Path("output_ml"),
     wefde_features_dir=Path("output_features"),
+    metric_key="f1_score_macro",
 ):
     if not wefde_features_dir.exists():
         log.error("WeFDE features not extracted")
-        return
+        return None
 
     workspace.mkdir(parents=True, exist_ok=True)
 
-    metric_key = "f1_score_macro"
+    arch = "xgboost"
 
-    for sample_limit in [None]:
-        for arch in ["xgboost"]:
-            if sample_limit is None:
-                bkp_file = workspace / f"eval_ts_full_{arch}_{metric_key}.json"
-            else:
-                bkp_file = (
-                    workspace
-                    / f"eval_ts_full_{arch}_{metric_key}_samplelimit{sample_limit}.json"
-                )
-            if bkp_file.exists():
-                scores = load_from_file(bkp_file)
-                if len(scores) == 0:
-                    bkp_file.unlink()
-                    continue
+    bkp_file = workspace / f"eval_ts_full_{arch}_{metric_key}.json"
+    if bkp_file.exists():
+        scores = load_from_file(bkp_file)
+        return scores
 
-            if not bkp_file.exists():
-                if sample_limit is None:
-                    X, y = load_wefde_features(wefde_features_dir)
-                    scores = _evaluate_by_domain(
-                        arch,
-                        "full_data",
-                        X,
-                        y,
-                        metric_key=metric_key,
-                        workspace=workspace,
-                    )
-                else:
-                    X, y = load_wefde_features(
-                        wefde_features_dir, max_instances=sample_limit
-                    )
-                    scores = _evaluate_by_domain(
-                        arch,
-                        f"full_data_samplelim{sample_limit}",
-                        X,
-                        y,
-                        metric_key=metric_key,
-                        workspace=workspace,
-                    )
-                if len(scores) == 0:
-                    continue
-                save_to_file(bkp_file, scores)
-            else:
-                scores = load_from_file(bkp_file)
+    if not bkp_file.exists():
+        X, y = load_wefde_features(wefde_features_dir)
+        scores = _evaluate_by_domain(
+            arch,
+            "full_data",
+            X,
+            y,
+            metric_key=metric_key,
+            workspace=workspace,
+        )
+        save_to_file(bkp_file, scores)
+    else:
+        scores = load_from_file(bkp_file)
 
-            final_score = generate_score(scores)
-            log.info(f"[ML perf] arch = {arch}, score={print_score(final_score)}")
+    final_score = generate_score(scores)
+    log.info(f"[ML perf] arch = {arch}, F1 score={print_score(final_score)}")
+
+    return final_score
 
 
 def evaluate_leakage(
+    features_range: dict,
     workspace=Path("output_leakage"),
     wefde_features_dir=Path("output_features"),
 ):
     if not wefde_features_dir.exists():
         log.error("WeFDE features not extracted")
         return
+    workspace.mkdir(parents=True, exist_ok=True)
 
-    evaluate_info_leakage(
+    return evaluate_info_leakage(
         features_path=wefde_features_dir,
         output_path=workspace,
+        features_range=features_range,
     )
 
 
@@ -104,8 +86,14 @@ def evaluate_all(
     output_leakage=Path("output_leakage"),
     output_ml=Path("output_ml"),
 ):
-    prepare_features(time_series_traces=time_series_traces, output=output_features)
+    features_range = prepare_features(
+        time_series_traces=time_series_traces, output=output_features
+    )
 
-    evaluate_leakage(workspace=output_leakage, wefde_features_dir=output_features)
+    leakage = evaluate_leakage(
+        features_range, workspace=output_leakage, wefde_features_dir=output_features
+    )
 
-    evaluate_ml(workspace=output_ml, wefde_features_dir=output_features)
+    score = evaluate_ml(workspace=output_ml, wefde_features_dir=output_features)
+
+    return features_range, leakage, score
