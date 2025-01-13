@@ -1,10 +1,12 @@
+# stdlib
 import asyncio
 import hashlib
 import json
-import time
 from pathlib import Path
+import time
 from urllib.parse import urlparse
 
+# third party
 from playwright.async_api import async_playwright
 
 workspace = Path("data")

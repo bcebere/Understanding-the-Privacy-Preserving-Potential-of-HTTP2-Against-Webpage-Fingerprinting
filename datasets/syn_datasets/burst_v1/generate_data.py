@@ -1,8 +1,8 @@
 # synthetic_datasets_burst_variations/syn_2res
 
-import json
-import sys
+# stdlib
 from argparse import ArgumentParser
+import json
 from pathlib import Path
 
 parser = ArgumentParser()

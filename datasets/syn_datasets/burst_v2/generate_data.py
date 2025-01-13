@@ -1,8 +1,9 @@
 # orig : ../../synthetic_datasets/synthetic_datasets_mixtures_wikipat/wikipat_small_mixres_3
 
+# stdlib
 import json
-import random
 from pathlib import Path
+import random
 
 data_path = Path("data")
 data_path.mkdir(parents=True, exist_ok=True)

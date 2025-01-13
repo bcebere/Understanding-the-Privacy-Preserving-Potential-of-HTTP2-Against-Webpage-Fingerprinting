@@ -22,7 +22,6 @@ from sklearn.metrics import (
 )
 from sklearn.model_selection import StratifiedGroupKFold, StratifiedKFold
 from sklearn.preprocessing import LabelEncoder, label_binarize
-import torch
 from tqdm import tqdm
 from xgboost import XGBClassifier
 
@@ -466,10 +465,6 @@ class classifier_metrics:
 
 def enable_reproducible_results(random_state: int = 0) -> None:
     np.random.seed(random_state)
-    try:
-        torch.manual_seed(random_state)
-    except BaseException:
-        pass
     random.seed(random_state)
 
 

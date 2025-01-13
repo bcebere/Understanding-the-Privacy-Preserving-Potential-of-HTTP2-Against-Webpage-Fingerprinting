@@ -19,7 +19,7 @@ class WebsiteData(object):
 
     def __init__(self, directory, **kwargs):
         print(kwargs)
-        self._X, self._Y = load_data(directory, **kwargs)
+        self._X, self._Y = load_wefde_features(directory, **kwargs)
         self.features = list(range(self._X.shape[1]))
         self.sites = list(range(len(np.unique(self._Y))))
         log.info(f"total samples = {len(self._X)} unique labels = {len(self.sites)}")
@@ -83,7 +83,7 @@ class WebsiteData(object):
         return self._X[:, feature]
 
 
-def load_data(
+def load_wefde_features(
     directory,
     extension=".features",
     delimiter=" ",

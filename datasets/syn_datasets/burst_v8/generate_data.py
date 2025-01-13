@@ -1,7 +1,8 @@
 # orig: wikipat_small_sameres
+# stdlib
 import json
-import random
 from pathlib import Path
+import random
 
 data_path = Path("data")
 data_path.mkdir(parents=True, exist_ok=True)

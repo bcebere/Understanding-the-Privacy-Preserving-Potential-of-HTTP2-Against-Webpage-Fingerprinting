@@ -1,7 +1,7 @@
 # bursts/syn1
-import json
-import sys
+# stdlib
 from argparse import ArgumentParser
+import json
 from pathlib import Path
 
 parser = ArgumentParser()

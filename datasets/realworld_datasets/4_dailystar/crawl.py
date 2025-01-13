@@ -1,7 +1,9 @@
+# stdlib
 import time
 
-import pandas as pd
+# third party
 from download_page import capture
+import pandas as pd
 
 urls = pd.read_csv("dailystar_daily_news.csv")["urls"].drop_duplicates()
 urls = urls.sample(frac=1, random_state=1).head(1024).values

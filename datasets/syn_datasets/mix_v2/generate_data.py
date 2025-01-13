@@ -1,9 +1,9 @@
 # burst_1res2dummy_rand
-import json
-import random
-import sys
+# stdlib
 from argparse import ArgumentParser
+import json
 from pathlib import Path
+import random
 
 parser = ArgumentParser()
 parser.add_argument(

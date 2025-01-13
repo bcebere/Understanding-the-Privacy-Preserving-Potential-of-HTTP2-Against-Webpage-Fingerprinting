@@ -10,7 +10,7 @@ import pytest
 from wfaudit import (
     create_datasets,
     merge_pcap_csvs,
-    prepare_wefde_datasets,
+    prepare_ts_datasets,
     process_raw_pcaps,
 )
 
@@ -102,7 +102,7 @@ def test_prepare_wefde_datasets(tmp_path):
 
     merge_pcap_csvs(workspace=tmp_path)
 
-    prepare_wefde_datasets(workspace=tmp_path)
+    prepare_ts_datasets(workspace=tmp_path)
 
     output = tmp_path / "output_wefde"
     assert output.exists()

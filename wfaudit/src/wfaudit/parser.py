@@ -260,7 +260,7 @@ def _prepare_time_series(
     return static_data, ts_data_clean
 
 
-def prepare_wefde_datasets(
+def prepare_ts_datasets(
     workspace=Path("workspace"), ID_COL="file_order"
 ):  # id, full_id
     in_workspace = workspace / Path("output_csv_full")
@@ -364,5 +364,5 @@ def create_datasets(
     # Merge CSV in a single dataset
     merge_pcap_csvs(workspace=workspace)
 
-    # Create WeFDE datasets
-    prepare_wefde_datasets(workspace=workspace)
+    # Create Time-Series datasets
+    prepare_ts_datasets(workspace=workspace)
