@@ -11,7 +11,7 @@ import numpy as np
 from scipy import stats
 
 # wfaudit absolute
-from wfaudit.hemlpers_wefde.kde_wrapper import KDE
+from wfaudit.helpers_wefde.analysis.kde_wrapper import KDE
 import wfaudit.logger as log
 
 

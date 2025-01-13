@@ -8,9 +8,9 @@ import numpy as np
 from pathos.multiprocessing import ProcessPool as Pool, cpu_count
 
 # wfaudit absolute
-from wfaudit.helpers_wefde.data_utils import WebsiteData
-from wfaudit.helpers_wefde.fingerprint_modeler import WebsiteFingerprintModeler
-from wfaudit.helpers_wefde.mi_analyzer import MutualInformationAnalyzer
+from wfaudit.helpers_wefde.analysis.data_utils import WebsiteData
+from wfaudit.helpers_wefde.analysis.fingerprint_modeler import WebsiteFingerprintModeler
+from wfaudit.helpers_wefde.analysis.mi_analyzer import MutualInformationAnalyzer
 import wfaudit.logger as log
 
 

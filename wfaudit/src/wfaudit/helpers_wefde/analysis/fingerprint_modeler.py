@@ -4,9 +4,11 @@ from collections.abc import Iterable
 import math
 
 # third party
-from kde_wrapper import KDE
 import numpy as np
 import wfaudt.logger as log
+
+# wfaudit absolute
+from wfaudit.helpers_wefde.analysis.kde_wrapper import KDE
 
 
 class WebsiteFingerprintModeler(object):
