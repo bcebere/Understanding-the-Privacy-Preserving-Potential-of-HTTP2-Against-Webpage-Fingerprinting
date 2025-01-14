@@ -43,7 +43,7 @@ parser.add_argument(
     "-use_random_window",
     "--use_random_window",
     dest="use_random_window",
-    default=False,
+    default=0,
     help="Enable Control Flow Randomization",
 )
 
@@ -69,7 +69,7 @@ IFACE = args.ifname  # "lo"
 SERVER_PORT = args.dst_port  # 8443
 SERVER_IP = args.dst_ip  # "127.0.0.1"
 REPEATS = int(args.repeats)
-USE_RANDOM_WINDOW = bool(args.use_random_window)
+USE_RANDOM_WINDOW = int(args.use_random_window)
 
 TRACE_PATH.mkdir(parents=True, exist_ok=True)
 
@@ -297,7 +297,7 @@ class H2Protocol(asyncio.Protocol):
         self.exit_event.set()
 
     async def send_ping(self):
-        while self.exit_event.wait():
+        while not self.exit_event.is_set():
             await asyncio.sleep(0.1)  # Send a ping every 10 seconds
             ping_data = b"\x00" * 8  # 8 bytes of arbitrary data
             self.conn.ping(ping_data)
