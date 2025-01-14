@@ -5,7 +5,6 @@ import collections
 import copy
 import io
 import json
-import os
 from pathlib import Path
 import random
 import ssl
@@ -34,6 +33,36 @@ import numpy as np
 
 parser = ArgumentParser()
 parser.add_argument("-dst_port", "--dst_port", dest="dst_port", help="Destination Port")
+parser.add_argument(
+    "-use_server_push",
+    "--use_server_push",
+    dest="use_server_push",
+    help="Use server push",
+    default=0,
+)
+parser.add_argument(
+    "-use_rnd_multiplexing",
+    "--use_rnd_multiplexing",
+    dest="use_rnd_multiplexing",
+    help="Use randomized multiplexing",
+    default=0,
+)
+parser.add_argument(
+    "-use_rnd_hpack",
+    "--use_rnd_hpack",
+    dest="use_rnd_hpack",
+    help="Use randomized HPACK",
+    default=0,
+)
+parser.add_argument(
+    "-use_hints103",
+    "--use_hints103",
+    dest="use_hints103",
+    help="Use Early Hints 103",
+    default=0,
+)
+
+
 args = parser.parse_args()
 
 assert args.dst_port is not None
@@ -44,26 +73,10 @@ DATA_PATH = Path("data")
 SERVER_PATH = Path(__file__).resolve().parent
 print(SERVER_PATH)
 
-try:
-    USE_SERVER_PUSH = int(os.environ.get("HTTP2_WF_USE_SERVER_PUSH", 0))
-except BaseException:
-    USE_SERVER_PUSH = 0
-
-try:
-    USE_MULTIPLEXING_RANDOM = int(os.environ.get("HTTP2_WF_USE_MULTIPLEXING_RANDOM", 0))
-except BaseException:
-    USE_MULTIPLEXING_RANDOM = 0
-
-try:
-    USE_RANDOM_HPACK = int(os.environ.get("HTTP2_WF_USE_RANDOM_HPACK", 0))
-except BaseException:
-    USE_RANDOM_HPACK = 0
-
-try:
-    USE_HINTS103 = int(os.environ.get("HTTP2_WF_USE_HINTS103", 0))
-except BaseException:
-    USE_HINTS103 = 0
-
+USE_SERVER_PUSH = int(args.use_server_push)
+USE_MULTIPLEXING_RANDOM = int(args.use_rnd_multiplexing)
+USE_RANDOM_HPACK = int(args.use_rnd_hpack)
+USE_HINTS103 = int(args.use_hints103)
 
 RequestData = collections.namedtuple("RequestData", ["headers", "data"])
 
