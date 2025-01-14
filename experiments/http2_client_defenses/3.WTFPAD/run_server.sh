@@ -1,0 +1,1 @@
+../core/run_server.sh
