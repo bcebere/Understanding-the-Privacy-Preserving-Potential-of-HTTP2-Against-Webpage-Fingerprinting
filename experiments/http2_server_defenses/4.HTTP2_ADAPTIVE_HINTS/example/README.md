@@ -1,6 +1,6 @@
 # Example usage
 
-1. Start server with the Traffic Morphing defense
+1. Start server with the HTTP2 adaptive defense
 ```bash
 bash ./run_server.sh 9999
 ```

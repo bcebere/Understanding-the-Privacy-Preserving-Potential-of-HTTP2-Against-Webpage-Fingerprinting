@@ -75,6 +75,7 @@ parser.add_argument(
     help="Activate pad defense with constant value. used for Tamaraw",
     default=0,
 )
+
 parser.add_argument(
     "-defense_morph",
     "--defense_morph",
@@ -83,6 +84,21 @@ parser.add_argument(
     default=0,
 )
 
+parser.add_argument(
+    "-defense_adaptive",
+    "--defense_adaptive",
+    dest="defense_adaptive",
+    help="Activate adaptive defense.",
+    default=0,
+)
+
+parser.add_argument(
+    "-defense_adaptive_hints",
+    "--defense_adaptive_hints",
+    dest="defense_adaptive_hints",
+    help="Activate adaptive defense with early padding hints.",
+    default=0,
+)
 args = parser.parse_args()
 
 assert args.dst_port is not None
@@ -93,11 +109,6 @@ DATA_PATH = Path("data")
 SERVER_PATH = Path(__file__).resolve().parent
 
 
-# Server defenses:
-#  1. Tamaraw: defense_delay_constant + defense_pad_constant
-#  1. WTFPAD: defense_delay_random + defense_pad_random
-#  1. FRONT + Hints: defense_inject
-
 DEFENSE_BATCH = int(args.defense_batch)  # int(os.environ.get("SRV_DEFENSE_BATCH", 0))
 DEFENSE_INJECT = int(
     args.defense_inject
@@ -107,6 +118,8 @@ DEFENSE_DELAY_CONSTANT = int(args.defense_delay_constant)
 DEFENSE_PAD_RANDOM = int(args.defense_pad_random)
 DEFENSE_PAD_CONSTANT = int(args.defense_pad_constant)
 DEFENSE_MORPH = int(args.defense_morph)
+DEFENSE_ADAPTIVE = int(args.defense_adaptive)
+DEFENSE_ADAPTIVE_HINTS = int(args.defense_adaptive_hints)
 
 RequestData = collections.namedtuple("RequestData", ["headers", "data"])
 
@@ -125,13 +138,15 @@ print(
         Defense 5 Response padding random: {DEFENSE_PAD_RANDOM}
         Defense 6 Response padding constant: {DEFENSE_PAD_CONSTANT}
         Defense 7 Response morphing: {DEFENSE_MORPH}
+        Defense 8 Adaptive defense: {DEFENSE_ADAPTIVE}
+        Defense 9 Adaptive Hints defense: {DEFENSE_ADAPTIVE_HINTS}
 """
 )
 
 
-def _add_injection_hints(database):
+def _add_injection_hints(database, low=100, high=5000, step=517):
     hints = []
-    for padding_size in range(100, 50000, 517):
+    for padding_size in range(low, high, step):
         key = f"inject_{padding_size}B"
         database[key] = {
             "data_delay": 0,
@@ -146,7 +161,25 @@ def _add_injection_hints(database):
     return hints, database
 
 
-INJECT_HINTS, SERVER_DB = _add_injection_hints(SERVER_DB)
+def _generate_noise(data: list, epsilon=0.5, delta=1e-5, use_gaussian=False):
+    # Calculate the running mean
+    cumulative_sum = np.sum(data)
+    mean_N = cumulative_sum / len(data)
+
+    # Calculate sensitivity based on the deviation from the mean
+    sensitivity = abs(data[-1] - mean_N)
+
+    if use_gaussian:
+        # Gaussian noise
+        sigma = (sensitivity / epsilon) * np.sqrt(2 * np.log(1.25 / delta))
+        noise = np.random.normal(0, sigma)
+    else:
+        # Laplace noise
+        scale = sensitivity / epsilon
+        noise = np.random.laplace(0, scale)
+
+    # Ensure noise results in a non-negative delay
+    return max(0, noise)
 
 
 class H2Protocol(asyncio.Protocol):
@@ -161,11 +194,30 @@ class H2Protocol(asyncio.Protocol):
         self.pending_streams_flushed = False
         self.table_size = 4096
         self.server_name = "http2-mock;"
+        self.server_db = SERVER_DB
+
+        self.response_start = {}
+        self.response_done = {}
 
         # constants
         self.delay_constant = None
         self.pad_constant = None
 
+        if DEFENSE_INJECT:
+            self.inject_hints, self.server_db = _add_injection_hints(self.server_db)
+
+        if DEFENSE_ADAPTIVE:
+            self.pad_constant = random.randint(128, 1024)
+            print(f"[DEFENSE ADAPTIVE] pad_constant = {self.pad_constant}. ")
+
+        if DEFENSE_ADAPTIVE_HINTS:
+            self.inject_hints, self.server_db = _add_injection_hints(
+                self.server_db,
+                low=4 * self.pad_constant,
+                high=8 * self.pad_constant,
+                step=self.pad_constant,
+            )
+            print(f"[DEFENSE ADAPTIVE_HINTS] hints = {len(self.inject_hints)}")
         # print("Headers", self.table_size, self.server_name)
 
     def connection_made(self, transport: asyncio.Transport):
@@ -223,6 +275,7 @@ class H2Protocol(asyncio.Protocol):
         self.transport.write(self.conn.data_to_send())
 
     def request_received(self, headers: List[Tuple[str, str]], stream_id: int):
+        self.response_start[stream_id] = time.time()
         headers = collections.OrderedDict(headers)
 
         # Store off the request data.
@@ -232,11 +285,11 @@ class H2Protocol(asyncio.Protocol):
         path = headers[":path"]
         if stream_id == 1:
             self._check_prepare_multiplexing(stream_id, path)
-            if DEFENSE_INJECT:
+            if DEFENSE_INJECT or DEFENSE_ADAPTIVE_HINTS:
                 self._generate_103_early_hints(stream_id, path)
 
     def _generate_response_data(self, path: str, headers={}):
-        if path not in SERVER_DB:
+        if path not in self.server_db:
             print("missing path", path)
             return {}
 
@@ -246,7 +299,7 @@ class H2Protocol(asyncio.Protocol):
             start, end = range_bytes.split("-")
             response_size = int(end) - int(start)
 
-        db_data = SERVER_DB[path]
+        db_data = self.server_db[path]
         timeout = 0
         if "data_delay" in db_data:
             if isinstance(db_data["data_delay"], (int, float)):
@@ -256,20 +309,28 @@ class H2Protocol(asyncio.Protocol):
             else:
                 timeout = 0
         if DEFENSE_DELAY_RANDOM:
-            should_delay = random.choice([True, False])
-            if should_delay:
-                # Insert additional small delay
-                add_delay = random.uniform(0, 0.1)
-                timeout += add_delay
-                print(f"[DEFENSE_DELAY_RANDOM] : insert rnd delay {add_delay}")
+            # Insert additional small delay
+            add_delay = random.uniform(0, 0.1)
+            timeout += add_delay
+            print(f"[DEFENSE_DELAY_RANDOM] : insert rnd delay {add_delay}")
         elif DEFENSE_DELAY_CONSTANT:
             if self.delay_constant is None:
                 self.delay_constant = random.uniform(0, 0.1)
             add_delay = self.delay_constant
             timeout += add_delay
             print(f"[DEFENSE_DELAY_CONSTANT] : insert constant delay {add_delay}")
-        if timeout > 0:
-            time.sleep(timeout)
+        elif DEFENSE_ADAPTIVE:
+            should_delay = random.choice([True, False])
+            if should_delay:
+                latencies = []
+                for prev_stream in self.response_done:
+                    latencies.append(
+                        self.response_done[prev_stream]
+                        - self.response_start[prev_stream]
+                    )
+                if len(latencies) > 0:
+                    timeout = _generate_noise(latencies)
+                    print(f"[DEFENSE_ADAPTIVE] : insert delay {timeout}")
 
         body = {}
         if response_size > 0:
@@ -293,20 +354,18 @@ class H2Protocol(asyncio.Protocol):
         else:
             body = ""
         if DEFENSE_PAD_RANDOM:
-            should_pad = random.choice([True, False])
-            if should_pad:
-                pad_size = 2 ** random.randint(4, 13)
-                pad_size = (int(len(body) / pad_size) + 1) * pad_size
-                padding = "".join(
-                    random.choices(
-                        string.ascii_uppercase + string.digits, k=pad_size - len(body)
-                    )
+            pad_size = 2 ** random.randint(4, 13)
+            pad_size = (int(len(body) / pad_size) + 1) * pad_size
+            padding = "".join(
+                random.choices(
+                    string.ascii_uppercase + string.digits, k=pad_size - len(body)
                 )
-                old_size = len(body)
-                body += padding
-                print(
-                    f"[DEFENSE_PAD_RANDOM] adding costant response padding = {pad_size} body len = {len(body)} old body size = {old_size}"
-                )
+            )
+            old_size = len(body)
+            body += padding
+            print(
+                f"[DEFENSE_PAD_RANDOM] adding costant response padding = {pad_size} body len = {len(body)} old body size = {old_size}"
+            )
         elif DEFENSE_PAD_CONSTANT:
             if self.pad_constant is None:
                 self.pad_constant = 2 ** random.randint(9, 13)
@@ -324,8 +383,8 @@ class H2Protocol(asyncio.Protocol):
             )
         elif DEFENSE_MORPH:
             old_size = len(body)
-            morph_path = random.choice(list(SERVER_DB.keys()))
-            morph_data = SERVER_DB[morph_path]
+            morph_path = random.choice(list(self.server_db.keys()))
+            morph_data = self.server_db[morph_path]
             if morph_data["data_size"] == "random":
                 morph_size = random.randint(old_size, 2 * old_size)
             elif isinstance(morph_data["data_size"], (int, float)):
@@ -343,10 +402,24 @@ class H2Protocol(asyncio.Protocol):
             print(
                 f"[DEFENSE_MORPH] morphing {path} in {morph_path}. morph size = {morph_size}. body len = {len(body)} old body size = {old_size}"
             )
+        elif DEFENSE_ADAPTIVE:
+            should_pad = random.choice([True, False])
+            if should_pad and len(body) % self.pad_constant != 0:
+                pad_size = (int(len(body) / self.pad_constant) + 1) * self.pad_constant
+                padding = "".join(
+                    random.choices(
+                        string.ascii_uppercase + string.digits, k=pad_size - len(body)
+                    )
+                )
+                old_size = len(body)
+                body += padding
+                print(
+                    f"[DEFENSE_ADAPTIVE] adding response padding = {self.pad_constant} body len = {len(body)} old body size = {old_size}"
+                )
 
         print(f"[DATA] path={path} timeout={timeout} size={len(body)}")
 
-        return body
+        return body, timeout
 
     def _prepare_multiplexing_strategy(self):
         if DEFENSE_BATCH:
@@ -436,10 +509,10 @@ class H2Protocol(asyncio.Protocol):
             ("content-type", "text/plain"),
             ("content-length", "0"),  # No body content for HEAD
         ]
-        if path not in SERVER_DB:
+        if path not in self.server_db:
             return headers
 
-        db_data = SERVER_DB[path]
+        db_data = self.server_db[path]
         if db_data["data_size"] == "random":
             return headers
 
@@ -451,7 +524,7 @@ class H2Protocol(asyncio.Protocol):
         return headers
 
     def _generate_103_early_hints(self, stream_id, prev_path: str):
-        pending_requests = INJECT_HINTS
+        pending_requests = self.inject_hints
         hints_headers = [
             (":status", "103"),
         ]
@@ -475,7 +548,7 @@ class H2Protocol(asyncio.Protocol):
         headers = request_data.headers
         path = headers[":path"]
 
-        body = self._generate_response_data(path, headers)
+        body, delay = self._generate_response_data(path, headers)
 
         req_body = request_data.data.getvalue().decode("utf-8")
         print(f"request stream_id = {stream_id} path = {path} req_body = {req_body}")
@@ -496,7 +569,7 @@ class H2Protocol(asyncio.Protocol):
         )
         self.conn.send_headers(stream_id, response_headers)
 
-        asyncio.ensure_future(self.send_data(data, stream_id))
+        asyncio.ensure_future(self.send_data(data, stream_id, delay))
 
     def receive_data(self, data: bytes, stream_id: int):
         """
@@ -518,10 +591,13 @@ class H2Protocol(asyncio.Protocol):
             future = self.flow_control_futures.pop(stream_id)
             future.cancel()
 
-    async def send_data(self, data, stream_id):
+    async def send_data(self, data, stream_id, delay):
         """
         Send data according to the flow control rules.
         """
+        if delay > 0:
+            await asyncio.sleep(delay)
+
         while data:
             while self.conn.local_flow_control_window(stream_id) < 1:
                 # print(
@@ -552,6 +628,8 @@ class H2Protocol(asyncio.Protocol):
 
             self.transport.write(self.conn.data_to_send())
             data = data[chunk_size:]
+
+        self.response_done[stream_id] = time.time()
 
     async def wait_for_flow_control(self, stream_id):
         """

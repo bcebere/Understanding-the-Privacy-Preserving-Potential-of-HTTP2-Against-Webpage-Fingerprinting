@@ -1,20 +1,11 @@
 # Example usage
 
-1. Start server
+1. Start server with the WTF-PAD defense
 ```bash
 bash ./run_server.sh 9999
 ```
-The server configuration can be changed using the parameters
-```
-python ./server.py --dst_port $1 \
-    --use_server_push 0 \
-    --use_rnd_multiplexing 0 \
-    --use_rnd_hpack 0 \
-    --use_hints103 0
 
-```
-
-2. Run client with the FRONT defense
+2. Run client and collect the traces
 ```bash
 bash ./run_client.sh 127.0.0.1 9999 lo
 ```
