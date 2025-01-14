@@ -56,9 +56,31 @@ ml_score = evaluate_ml(
 print("ML F1-score", print_score(ml_score))
 
 ```
+## 🔑 Evaluation Datasets
 
-## 💥 HTTP/2 experiments
-TODO
+### Synthetic Datasets (Worst-case Scenarios)
+The synthetic datasets aim to spotlight a specific source of leakage in order to evaluate the privacy-preserving potential of the defenses.
+The generators and sample datasets are available in [datasets](datasets).
+
+The following scenarios are available:
+* Packet count/rate leakages: [pkt_v1](datasets/syn_datasets/pkt_v1), [pkt_v2](datasets/syn_datasets/pkt_v2), [pkt_v3](datasets/syn_datasets/pkt_v3).
+* Timing leakage: [time_v1](datasets/syn_datasets/time_v1), [time_v2](datasets/syn_datasets/time_v2), [time_v3](datasets/syn_datasets/time_v3), [time_v4](datasets/syn_datasets/time_v4), [time_v5](datasets/syn_datasets/time_v5).
+* Burst/CUMUL Leakage: [burst_v1](datasets/syn_datasets/burst_v1),[burst_v2](datasets/syn_datasets/burst_v2),[burst_v3](datasets/syn_datasets/burst_v3),[burst_v4](datasets/syn_datasets/burst_v4),[burst_v5](datasets/syn_datasets/burst_v5),[burst_v6](datasets/syn_datasets/burst_v6),[burst_v7](datasets/syn_datasets/burst_v7),[burst_v8](datasets/syn_datasets/burst_v8).
+* Joint Leakage: [mix_v1](datasets/syn_datasets/mix_v1), [mix_v2](datasets/syn_datasets/mix_v2),[mix_v3](datasets/syn_datasets/mix_v3),[mix_v4](datasets/syn_datasets/mix_v4),[mix_v5](datasets/syn_datasets/mix_v5),[mix_v6](datasets/syn_datasets/mix_v6),[mix_v7](datasets/syn_datasets/mix_v7).
+
+### Real-world datasets
+For the real-world datasets, we provide the source URLs and the [playwright](https://playwright.dev/) script for collecting the resources.
+The following datasets are available:
+* [Amazon](datasets/realworld_datasets/1_amazon/).
+* [BBC](datasets/realworld_datasets/2_bbc/).
+* [Reddit](datasets/realworld_datasets/3_reddit/).
+* [DailyStar](datasets/realworld_datasets/4_dailystar/).
+* [Udemy](datasets/realworld_datasets/5_udemy/).
+* [Wikipedia](datasets/realworld_datasets/6_wikipedia/).
+
+
+## 💥 HTTP/2 Experiments
+
 
 ## :hammer: Tests
 
