@@ -115,10 +115,8 @@ for testcase in tqdm(keys):
                 break
 
         # Run the test
-        # DEFENSE: ADAPTIVE HTTP2
-        run_test_case(
-            SERVER_IP, SERVER_PORT, testcase, requests, defense_name="adaptive"
-        )
+        # DEFENSE: HTTPOS HTTP2
+        run_test_case(SERVER_IP, SERVER_PORT, testcase, requests, defense_name="httpos")
 
         # Save trace
         network_trace = tracer.stop()

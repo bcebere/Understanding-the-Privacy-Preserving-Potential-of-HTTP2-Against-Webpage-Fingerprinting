@@ -108,6 +108,7 @@ class DEFENSE(BaseModel):
     random_user_agent: bool = False
     request_batch: bool = False
     request_shuffle: bool = False
+    ranged_requests: bool = False
     adaptive_noise_budget: float = 0  # ratio of frames from the total frames
     adaptive_delay_budget: float = (
         0  # ratio of delay from the total communication roundtrips
@@ -192,6 +193,55 @@ class DEFENSE(BaseModel):
             return self.send_packet_size_strategy
         else:
             raise NotImplementedError()
+
+    def use_ranged_requests(self):
+        return self.ranged_requests
+
+    def _random_partition(self, N, X):
+        min_value = 10
+        remaining_N = N - X * min_value
+
+        # Generate X-1 random cut points in the range [0, N]
+        cuts = np.sort(np.random.randint(0, remaining_N, X - 1))
+
+        # Include 0 and N as the boundaries
+        cuts = np.concatenate(([0], cuts, [remaining_N]))
+
+        # The differences between consecutive points will be the random numbers
+        return np.diff(cuts) + min_value
+
+    def split_for_ranged_requests(self, request, with_overlap=False):
+        output = []
+
+        expected_data_size = request.expected_size
+        if not isinstance(expected_data_size, int):
+            return [request]
+
+        if expected_data_size < 60:
+            return [request]
+
+        splits = random.randint(3, 5)
+        rnd_parts = self._random_partition(expected_data_size, splits)
+        offset = 0
+        ranges = []
+        if not with_overlap:
+            for cut in rnd_parts:
+                ranges.append((offset, offset + cut))
+                offset += cut + 1
+        else:
+            for cut1, cut2 in zip(rnd_parts, rnd_parts[1:]):
+                ranges.append((offset, offset + cut1 + cut2))
+                offset += cut1 + 1
+
+        for start, stop in ranges:
+            local_req = deepcopy(request)
+            local_req.headers = {
+                "Range": f"bytes={start}-{stop}",
+            }
+            local_req.expected_size = stop - start
+            output.append(local_req)
+
+        return output
 
     def send_dummy_packet(
         self,

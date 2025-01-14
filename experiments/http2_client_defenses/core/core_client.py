@@ -11,6 +11,7 @@ from typing import Dict, List, Optional
 # third party
 from defenses.adaptive import ADAPTIVE_DEFENSE
 from defenses.front import FRONT_DEFENSE
+from defenses.httpos import HTTPOS_DEFENSE
 
 # DEFENSES
 from defenses.nop import NOP_DEFENSE
@@ -43,6 +44,8 @@ def get_defense(defense: str):
         return WTFPAD_DEFENSE
     elif defense == "front":
         return FRONT_DEFENSE
+    elif defense == "httpos":
+        return HTTPOS_DEFENSE
     elif defense == "adaptive":
         return ADAPTIVE_DEFENSE
     else:
@@ -214,6 +217,13 @@ class Client(asyncio.Protocol):
             user_agent += "a" * (packet_size - len(base_request.path) - len(user_agent))
 
         # Handle main request
+        if self.defense.use_ranged_requests():
+            ranged_requests = self.defense.split_for_ranged_requests(base_request)
+            print(f"[DEFENSE] Using ranged requests N = {len(ranged_requests)}")
+            for req in ranged_requests:
+                _handle_request(req, user_agent)
+            return
+
         stream_id = _handle_request(base_request, user_agent)
 
         if is_noise:  # already handled noise
