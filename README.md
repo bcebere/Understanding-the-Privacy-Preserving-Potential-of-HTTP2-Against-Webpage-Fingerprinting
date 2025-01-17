@@ -125,10 +125,4 @@ The tests can be executed using
 ```bash
 pytest -vsx
 ```
-## Citing
 
-If you use this code, please cite the associated paper:
-
-```
-...
-```
