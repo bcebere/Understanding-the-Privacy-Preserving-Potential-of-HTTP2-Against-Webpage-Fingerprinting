@@ -1,15 +1,17 @@
 # Adapted from https://github.com/notem/reWeFDE
 # stdlib
 import os
+from pathlib import Path
 
 # third party
 import dill
+from joblib import Parallel, delayed
 import numpy as np
 import pandas as pd
 from pathos.multiprocessing import ProcessPool as Pool, cpu_count
 
 # wfaudit absolute
-from wfaudit.helpers_wefde.analysis.data_utils import WebsiteData
+from wfaudit.helpers_wefde.analysis.data_utils import WebsiteData, WebsiteData_v2
 from wfaudit.helpers_wefde.analysis.fingerprint_modeler import WebsiteFingerprintModeler
 from wfaudit.helpers_wefde.analysis.mi_analyzer import MutualInformationAnalyzer
 import wfaudit.logger as log
@@ -94,16 +96,241 @@ def print_leakage(
 
     summary = {}
     offset = 0
-    for category in features_range:
-        next_off = features_range[category]
-        y = leakages[offset:next_off]
-        summary[category] = [np.max(y)]
-        offset = next_off
+    if features_range is not None:
+        for category in features_range:
+            next_off = features_range[category]
+            y = leakages[offset:next_off]
+            summary[category] = [np.max(y)]
+            offset = next_off
 
-    summary["joint"] = joint_leakages[0]
+    summary["joint"] = [joint_leakages[0]]
 
     summary = pd.DataFrame(summary)
     return summary
+
+
+def _evaluate_individual_leakage(
+    feature_data,
+    outdir: Path,
+    n_procs: int = 0,
+    topn=20,
+    nmi_threshold=0.9,
+    discrete_threshold=100000,
+):
+    # create process pool
+    if n_procs > 1:
+        print("nprocs ", n_procs)
+        pool = Pool(n_procs)
+    elif n_procs == 0:
+        print("full nprocs")
+        pool = Pool(cpu_count())
+    else:
+        pool = None
+
+    # initialize fingerprint modeler
+    modeler = WebsiteFingerprintModeler(
+        feature_data, discrete_threshold=discrete_threshold
+    )
+    modeler._pool = pool  # configure modeler to use the proc pool
+
+    max_info_leakage = modeler.max_information_leakage()
+    log.info(f"Maximum information leakage = {max_info_leakage}")
+    with open(outdir / "max_entropy.pkl", "wb") as fi:
+        dill.dump(max_info_leakage, fi)
+
+    # load previous leakage measurements if possible
+    indiv_path = outdir / "indiv.pkl"
+    if indiv_path.exists():
+        with open(indiv_path, "rb") as fi:
+            log.info("Loading individual leakage measures from file.")
+            leakage_indiv = dill.load(fi)
+    else:
+        # otherwise do individual measure
+        log.info("Begin individual feature analysis.")
+
+        # perform individual measure with checkpointing
+        chk_path = outdir / "indiv_checkpoint.txt"
+        leakage_indiv = _individual_measure(modeler, pool, str(chk_path))
+
+        # save individual leakage to file
+        log.info(f"Saving individual leakage to {indiv_path}.")
+        with open(indiv_path, "wb") as fi:
+            dill.dump(leakage_indiv, fi)
+
+    # perform combined information leakage measurements
+    # initialize MI analyzer
+    analyzer = MutualInformationAnalyzer(feature_data, pool=pool)
+
+    # sort the list of features by their individual leakage
+    # we will process these features in the order of their importance during MI analysis
+    log.info("Sorting features by individual leakage.")
+    tuples = list(zip(feature_data.features, leakage_indiv))
+    tuples = sorted(tuples, key=lambda x: (-x[1], x[0]))
+    log.info(f"TopN:\t {tuples[:topn]}")
+    sorted_features = list(list(zip(*tuples))[0])
+
+    # process into list of non-redundant features
+    cln_path = outdir / "cleaned.pkl"
+    rdn_path = outdir / "redundant.pkl"
+    chk_path = outdir / "prune_checkpoint.txt"
+    if cln_path.exists():
+        log.info("Loading top non-redundant features from file.")
+        with open(cln_path, "rb") as fi:
+            cleaned = dill.load(fi)
+    else:
+        log.info("Begin feature pruning.")
+        try:
+            cleaned, pruned = analyzer.prune(
+                features=sorted_features,
+                nmi_threshold=nmi_threshold,
+                topn=topn,
+                checkpoint=str(chk_path),
+            )
+            with open(cln_path, "wb") as fi:
+                dill.dump(cleaned, fi)
+            with open(rdn_path, "wb") as fi:
+                dill.dump(pruned, fi)
+        except BaseException:
+            cleaned = sorted_features
+            pruned = []
+
+    top_feats = dict(tuples)
+    relevant_feats = sorted(cleaned, key=lambda x: top_feats[x], reverse=True)
+
+    return modeler, analyzer, relevant_feats, leakage_indiv
+
+
+def _base_evaluate_info_leakage(
+    feature_data,
+    output_path: str,  # where to save the leakages
+    features_range: dict,  # the offsets of each feature
+    n_procs=0,
+    n_samples=50000,
+    topn=20,
+    nmi_threshold=0.9,
+    discrete_threshold=100000,
+    max_instances=100,
+):
+    """
+    Run the full information leakage analysis on a processed dataset.
+
+    Parameters
+    ----------
+    features_data :
+        Operating system file path to the directory containing processed feature files.
+    output_path : str
+        Operating system file path to the directory where analysis results should be saved.
+    n_procs : int
+        Number of processes to use for parallelism.
+        If 0 is used, auto-detect based on number of system CPUs.
+    n_samples : int
+        Number of samples to use when performing monte-carlo estimation when running the fingerprint modeler.
+    topn : int
+        Top number of features to analyze during joint analysis.
+    nmi_threshold : float
+        Cut-off value for determining redundant features. Should be a percentage value.
+
+    Returns
+    -------
+    float
+        Combined feature leakage (in bits)
+    """
+    # prepare feature dataset
+    log.info(f"Loaded {len(feature_data.sites)} sites.")
+    log.info(f"Loaded {len(feature_data)} instances.")
+    log.info(
+        f"""Running analysis with params:
+        *     n_procs = {n_procs}
+        *     n_samples = {n_samples}
+        *     topn = {topn}
+        *     nmi_threshold = {nmi_threshold}
+        *     max_instances = {max_instances}
+             """
+    )
+
+    # directory to save results
+    outdir = Path(output_path)
+    outdir.mkdir(parents=True, exist_ok=True)
+
+    modeler, analyzer, relevant_feats, leakage_indiv = _evaluate_individual_leakage(
+        feature_data,
+        outdir=outdir,
+        n_procs=n_procs,
+        topn=topn,
+        nmi_threshold=nmi_threshold,
+    )
+
+    indiv_path = outdir / "indiv.pkl"
+    assert indiv_path.exists()
+
+    log.info(f"Relevant features = {relevant_feats} total = {len(relevant_feats)}")
+    # cluster non-redundant features
+    cst_path = outdir / "clusters.pkl"
+    chk_path = outdir / "prune_checkpoint.txt"
+    if cst_path.exists():
+        log.info("Loading clusters from file.")
+        with open(cst_path, "rb") as fi:
+            clusters = dill.load(fi)
+    else:
+        log.info("Begin feature clustering.")
+        try:
+            clusters, _ = analyzer.cluster(relevant_feats, checkpoint=str(chk_path))
+            with open(cst_path, "wb") as fi:
+                dill.dump(clusters, fi)
+        except BaseException:
+            clusters = [relevant_feats]
+
+    # perform joint information leakage measurement
+    log.info(f"Identified {len(clusters)} clusters.")
+    log.info("Begin cluster leakage measurements.")
+
+    def _eval_and_cache(clusters, joint_leakage: bool, out_file: str):
+        out_path = outdir / out_file
+        if os.path.exists(out_path):
+            with open(out_path, "rb") as fi:
+                results = dill.load(fi)
+        else:
+            results = modeler.information_leakage(
+                clusters=clusters, sample_size=n_samples, joint_leakage=joint_leakage
+            )
+            assert len(results) != 0, clusters
+            with open(out_path, "wb") as fi:
+                dill.dump(results, fi)
+        return results
+
+    def _get_pretty_names(label, indexes):
+        if features_range is not None:
+            features_range_list = list(features_range.keys())
+            pretty_names = [features_range_list[idx] for idx in indexes]
+            # log.info(f"{label} : {pretty_names}")
+            return pretty_names
+        return None
+
+    joint_leakage = _eval_and_cache(
+        clusters=relevant_feats, joint_leakage=True, out_file="cleaned_leakage.pkl"
+    )
+
+    log.info(
+        f"Non-redudant leakage results: {joint_leakage} bits. Source: {_get_pretty_names('Non-redundant', relevant_feats)}"
+    )
+
+    joint_path = outdir / "joint.pkl"
+    if joint_path.exists():
+        with open(joint_path, "rb") as fi:
+            leakage_joint = dill.load(fi)
+    else:
+        leakage_joint = modeler.information_leakage(
+            clusters=clusters, sample_size=n_samples, joint_leakage=True
+        )
+        with open(joint_path, "wb") as fi:
+            dill.dump(leakage_joint, fi)
+
+    log.info("Finished execution.")
+    return print_leakage(
+        features_range=features_range,  # offsets for leakage types
+        indiv_file=indiv_path,  # path to individual leakages,
+        joint_file=joint_path,  # path to joint leakages,
+    )
 
 
 def evaluate_info_leakage(
@@ -112,7 +339,7 @@ def evaluate_info_leakage(
     features_range: dict,  # the offsets of each feature
     n_procs=0,
     n_samples=50000,
-    topn=100,
+    topn=20,
     nmi_threshold=0.9,
     discrete_threshold=100000,
     max_instances=100,
@@ -144,111 +371,127 @@ def evaluate_info_leakage(
     # prepare feature dataset
     log.info("Loading dataset.")
     feature_data = WebsiteData(features_path, max_instances=max_instances)
+    return _base_evaluate_info_leakage(
+        feature_data=feature_data,
+        output_path=output_path,
+        features_range=features_range,
+        n_procs=n_procs,
+        n_samples=n_samples,
+        topn=topn,
+        nmi_threshold=nmi_threshold,
+        discrete_threshold=discrete_threshold,
+        max_instances=max_instances,
+    )
+
+
+def evaluate_info_leakage_v2(
+    X: np.ndarray,
+    y: np.ndarray,
+    output_path: str,  # where to save the leakages
+    features_range: dict,  # the offsets of each feature
+    n_procs=0,
+    n_samples=50000,
+    topn=40,
+    nmi_threshold=0.9,
+    discrete_threshold=100000,
+    max_instances=100,
+):
+    """
+    Run the full information leakage analysis on a processed dataset.
+
+    Parameters
+    ----------
+    X, y: dataset
+    output_path : str
+        Operating system file path to the directory where analysis results should be saved.
+    n_procs : int
+        Number of processes to use for parallelism.
+        If 0 is used, auto-detect based on number of system CPUs.
+    n_samples : int
+        Number of samples to use when performing monte-carlo estimation when running the fingerprint modeler.
+    topn : int
+        Top number of features to analyze during joint analysis.
+    nmi_threshold : float
+        Cut-off value for determining redundant features. Should be a percentage value.
+
+    Returns
+    -------
+    float
+        Combined feature leakage (in bits)
+    """
+    # prepare feature dataset
+    log.info("Loading dataset.")
+    feature_data = WebsiteData_v2(X, y, max_instances=max_instances)
+    return _base_evaluate_info_leakage(
+        feature_data=feature_data,
+        output_path=output_path,
+        features_range=features_range,
+        n_procs=n_procs,
+        n_samples=n_samples,
+        topn=topn,
+        nmi_threshold=nmi_threshold,
+        discrete_threshold=discrete_threshold,
+        max_instances=max_instances,
+    )
+
+
+def exploratory_analysis(
+    X,
+    y,
+    output_path: str,  # where to save the leakages
+    features_range: dict,  # the offsets of each feature
+    n_procs=0,
+    n_samples=50000,
+    topn=20,
+    nmi_threshold=0.9,
+    discrete_threshold=100000,
+    max_instances=100,
+):
+    """
+    Identify clusters of similar leakage.
+
+    Parameters
+    ----------
+    X, y :
+        features and labels
+    output_path : str
+        Operating system file path to the directory where analysis results should be saved.
+    n_procs : int
+        Number of processes to use for parallelism.
+        If 0 is used, auto-detect based on number of system CPUs.
+    n_samples : int
+        Number of samples to use when performing monte-carlo estimation when running the fingerprint modeler.
+    topn : int
+        Top number of features to analyze during joint analysis.
+    nmi_threshold : float
+        Cut-off value for determining redundant features. Should be a percentage value.
+
+    Returns
+    -------
+    float
+        Combined feature leakage (in bits)
+    """
+    # prepare feature dataset
+    feature_data = WebsiteData_v2(X, y, max_instances=max_instances)
     log.info(f"Loaded {len(feature_data.sites)} sites.")
     log.info(f"Loaded {len(feature_data)} instances.")
 
-    # create process pool
-    if n_procs > 1:
-        pool = Pool(n_procs)
-    elif n_procs == 0:
-        pool = Pool(cpu_count())
-    else:
-        pool = None
-
     # directory to save results
-    outdir = output_path
-    if not os.path.isdir(outdir):
-        os.makedirs(outdir)
+    outdir = Path(output_path)
+    outdir.mkdir(parents=True, exist_ok=True)
 
-    # initialize fingerprint modeler
-    modeler = WebsiteFingerprintModeler(
-        feature_data, discrete_threshold=discrete_threshold
+    modeler, analyzer, relevant_feats, leakage_indiv = _evaluate_individual_leakage(
+        feature_data,
+        outdir=outdir,
+        n_procs=n_procs,
+        topn=topn,
+        nmi_threshold=nmi_threshold,
     )
 
-    # load previous leakage measurements if possible
-    indiv_path = os.path.join(outdir, "indiv.pkl")
-    if os.path.exists(indiv_path):
-        with open(indiv_path, "rb") as fi:
-            log.info("Loading individual leakage measures from file.")
-            leakage_indiv = dill.load(fi)
-
-    # otherwise do individual measure
-    else:
-        log.info("Begin individual feature analysis.")
-
-        # perform individual measure with checkpointing
-        chk_path = os.path.join(outdir, "indiv_checkpoint.txt")
-        leakage_indiv = _individual_measure(modeler, pool, chk_path)
-
-        # save individual leakage to file
-        log.info(f"Saving individual leakage to {indiv_path}.")
-        with open(indiv_path, "wb") as fi:
-            dill.dump(leakage_indiv, fi)
-
-    # perform combined information leakage measurements
-    # initialize MI analyzer
-    analyzer = MutualInformationAnalyzer(feature_data, pool=pool)
-
-    # sort the list of features by their individual leakage
-    # we will process these features in the order of their importance during MI analysis
-    log.info("Sorting features by individual leakage.")
-    tuples = list(zip(feature_data.features, leakage_indiv))
-    tuples = sorted(tuples, key=lambda x: (-x[1], x[0]))
-    log.info(f"Top 20:\t {tuples[:20]}")
-    sorted_features = list(list(zip(*tuples))[0])
-
-    # process into list of non-redundant features
-    cln_path = os.path.join(outdir, "cleaned.pkl")
-    rdn_path = os.path.join(outdir, "redundant.pkl")
-    chk_path = os.path.join(outdir, "prune_checkpoint.txt")
-    if os.path.exists(cln_path):
-        log.info("Loading top non-redundant features from file.")
-        with open(cln_path, "rb") as fi:
-            cleaned = dill.load(fi)
-    else:
-        log.info("Begin feature pruning.")
-        try:
-            cleaned, pruned = analyzer.prune(
-                features=sorted_features,
-                nmi_threshold=nmi_threshold,
-                topn=topn,
-                checkpoint=chk_path,
-            )
-            with open(cln_path, "wb") as fi:
-                dill.dump(cleaned, fi)
-            with open(rdn_path, "wb") as fi:
-                dill.dump(pruned, fi)
-        except BaseException:
-            cleaned = sorted_features
-            pruned = []
-
-    log.info(f"cleaned features = {cleaned} total = {len(cleaned)}")
-    # cluster non-redundant features
-    cst_path = os.path.join(outdir, "clusters.pkl")
-    if os.path.exists(cst_path):
-        log.info("Loading clusters from file.")
-        with open(cst_path, "rb") as fi:
-            clusters = dill.load(fi)
-    else:
-        log.info("Begin feature clustering.")
-        try:
-            clusters, _ = analyzer.cluster(cleaned, checkpoint=chk_path)
-            with open(cst_path, "wb") as fi:
-                dill.dump(clusters, fi)
-        except BaseException:
-            clusters = [cleaned]
-
-    max_info_leakage = modeler.max_information_leakage()
-    with open(os.path.join(outdir, "max_entropy.pkl"), "wb") as fi:
-        dill.dump(max_info_leakage, fi)
-
-    # perform joint information leakage measurement
-    log.info(f"Identified {len(clusters)} clusters.")
-    log.info("Begin cluster leakage measurements.")
-    modeler._pool = pool  # configure modeler to use the proc pool
+    log.info(f"Relevant features = {relevant_feats} total = {len(relevant_feats)}")
 
     def _eval_and_cache(clusters, joint_leakage: bool, out_file: str):
-        out_path = os.path.join(outdir, out_file)
+        out_path = outdir / out_file
         if os.path.exists(out_path):
             with open(out_path, "rb") as fi:
                 results = dill.load(fi)
@@ -261,44 +504,48 @@ def evaluate_info_leakage(
                 dill.dump(results, fi)
         return results
 
-    selected_candidates = []
-    leak_median = np.median(leakage_indiv)
-
-    # [feat[0] for feat in clusters]
-    for cluster in clusters:
-        candidate_idx = np.argmax(np.asarray(leakage_indiv)[cluster])
-        candidate = cluster[candidate_idx]
-        candidate_leak = np.asarray(leakage_indiv)[candidate]
-
-        if leak_median < candidate_leak:
-            selected_candidates.append(candidate)
-
-    top_leaks = _eval_and_cache(
-        clusters=selected_candidates,
-        joint_leakage=False,
-        out_file="top_per_cluster_leaks.pkl",
-    )
-    log.info(f"Top-cluster leakage results: {top_leaks} bits")
+    def _get_pretty_names(label, indexes):
+        if features_range is not None:
+            features_range_list = list(features_range.keys())
+            pretty_names = [features_range_list[idx] for idx in indexes]
+            # log.info(f"{label} : {pretty_names}")
+            return pretty_names
+        return None
 
     joint_leakage = _eval_and_cache(
-        clusters=cleaned, joint_leakage=True, out_file="cleaned_leakage.pkl"
+        clusters=relevant_feats, joint_leakage=True, out_file="cleaned_leakage.pkl"
     )
-    log.info(f"Cleaned feats leakage results: {joint_leakage} bits")
 
-    joint_path = os.path.join(outdir, "joint.pkl")
-    if os.path.exists(joint_path):
-        with open(joint_path, "rb") as fi:
-            leakage_joint = dill.load(fi)
-    else:
-        leakage_joint = modeler.information_leakage(
-            clusters=clusters, sample_size=n_samples, joint_leakage=True
+    log.info(
+        f"Non-redudant leakage results: {joint_leakage} bits. Source: {_get_pretty_names('Non-redundant', relevant_feats)}"
+    )
+
+    return
+
+    def _joint_eval_cbk(off, reverse=False):
+        if reverse:
+            label = f"Non-red rev[ {off} : ]"
+            curr_candidates = relevant_feats[off:]
+            cache_file = f"nonred_leakage_rev{off}.pkl"
+        else:
+            label = f"Non-red[ : {off} ]"
+            curr_candidates = relevant_feats[:off]
+            cache_file = f"nonred_leakage{off}.pkl"
+
+        interm_leakage = _eval_and_cache(
+            clusters=curr_candidates, joint_leakage=True, out_file=str(cache_file)
         )
-        with open(joint_path, "wb") as fi:
-            dill.dump(leakage_joint, fi)
+        log.info(f"{label}: leakage results: {interm_leakage} bits")
+        return interm_leakage
 
-    log.info("Finished execution.")
-    return print_leakage(
-        features_range=features_range,  # offsets for leakage types
-        indiv_file=indiv_path,  # path to individual leakages,
-        joint_file=joint_path,  # path to joint leakages,
+    keys = _get_pretty_names("Non-redundant", relevant_feats)
+    interm_results = Parallel(n_jobs=n_procs)(
+        delayed(_joint_eval_cbk)(off) for off in range(1, len(relevant_feats))
     )
+    log.info(f"Incremental leakage: { dict(zip(keys, interm_results)) }")
+    rev_results = Parallel(n_jobs=n_procs)(
+        delayed(_joint_eval_cbk)(off, reverse=True)
+        for off in range(0, len(relevant_feats) - 1)
+    )
+    log.info(f"Incremental reverse leakage: { dict(zip(keys, rev_results)) }")
+    log.info("Finished exploration.")

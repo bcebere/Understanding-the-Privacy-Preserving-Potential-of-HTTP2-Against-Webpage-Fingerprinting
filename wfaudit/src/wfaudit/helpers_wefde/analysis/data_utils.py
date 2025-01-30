@@ -12,13 +12,82 @@ import numpy as np
 import wfaudit.logger as log
 
 
+class WebsiteData_v2(object):
+    """
+    Object-wrapper to conveniently manage dataset
+    """
+
+    def __init__(self, X, y, **kwargs):
+        self._X, self._Y = X, y
+        self.features = list(range(self._X.shape[1]))
+        self.sites = list(range(len(np.unique(self._Y))))
+        log.info(f"total samples = {len(self._X)} unique labels = {len(self.sites)}")
+
+    def __len__(self):
+        return self._X.shape[0]
+
+    def get_labels(self):
+        """
+        Return Y
+
+        Returns
+        -------
+        ndarray
+
+        """
+        return self._Y
+
+    def get_site(self, label, feature=None):
+        """
+        Return X for given site.
+
+        Parameters
+        ----------
+        label : int
+            The site label to load
+        feature : int
+            The feature number to load.
+            Load all features if None.
+
+        Returns
+        -------
+        ndarray
+
+        """
+        f = [True if y == label else False for y in self._Y]
+        if feature is not None:
+            return self._X[f, feature]
+        return self._X[f, :]
+
+    def get_feature(self, feature, site=None):
+        """
+        Return all X for a specific feature
+
+        Parameters
+        ----------
+        feature : int
+            The feature which to load.
+        site : int
+            The site which to load.
+            Load from all sites if None.
+
+        Returns
+        -------
+        ndarray
+
+        """
+        if site is not None:
+            f = [True if y == site else False for y in self._Y]
+            return self._X[f, feature]
+        return self._X[:, feature]
+
+
 class WebsiteData(object):
     """
     Object-wrapper to conveniently manage dataset
     """
 
     def __init__(self, directory, **kwargs):
-        print(kwargs)
         self._X, self._Y = load_wefde_features(directory, **kwargs)
         self.features = list(range(self._X.shape[1]))
         self.sites = list(range(len(np.unique(self._Y))))

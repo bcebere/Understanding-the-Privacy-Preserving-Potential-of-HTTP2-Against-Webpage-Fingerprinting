@@ -10,7 +10,10 @@ from wfaudit.helpers_ml import (
     save_to_file,
 )
 from wfaudit.helpers_wefde.analysis.data_utils import load_wefde_features
-from wfaudit.helpers_wefde.analysis.info_leak import evaluate_info_leakage
+from wfaudit.helpers_wefde.analysis.info_leak import (
+    evaluate_info_leakage,
+    evaluate_info_leakage_v2,
+)
 from wfaudit.helpers_wefde.preprocess.extract import prepare_wefde_features
 import wfaudit.logger as log
 
@@ -77,6 +80,34 @@ def evaluate_leakage(
         features_path=wefde_features_dir,
         output_path=workspace,
         features_range=features_range,
+    )
+
+
+def evaluate_leakage_v2(
+    X,
+    y,
+    features_range: dict = None,
+    workspace=Path("output_leakage"),
+    n_procs=0,
+    n_samples=50000,
+    topn=40,
+    nmi_threshold=0.9,
+    discrete_threshold=100000,
+    max_instances=100,
+):
+    workspace.mkdir(parents=True, exist_ok=True)
+
+    return evaluate_info_leakage_v2(
+        X,
+        y,
+        output_path=workspace,
+        features_range=features_range,
+        n_procs=n_procs,
+        n_samples=n_samples,
+        topn=topn,
+        nmi_threshold=nmi_threshold,
+        discrete_threshold=discrete_threshold,
+        max_instances=max_instances,
     )
 
 

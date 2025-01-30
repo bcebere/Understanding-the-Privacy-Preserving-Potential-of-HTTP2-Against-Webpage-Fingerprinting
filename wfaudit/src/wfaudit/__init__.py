@@ -5,6 +5,7 @@ import sys
 from . import logger  # noqa: F401
 from .benchmarks import evaluate_all  # noqa: F401
 from .benchmarks import evaluate_leakage  # noqa: F401
+from .benchmarks import evaluate_leakage_v2  # noqa: F401
 from .benchmarks import evaluate_ml  # noqa: F401
 from .benchmarks import prepare_features  # noqa: F401; noqa: F401
 from .parser import create_datasets  # noqa: F401

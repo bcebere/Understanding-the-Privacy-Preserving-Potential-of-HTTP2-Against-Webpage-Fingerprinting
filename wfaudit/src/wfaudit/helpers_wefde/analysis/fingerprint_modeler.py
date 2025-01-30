@@ -197,7 +197,7 @@ class WebsiteFingerprintModeler(object):
             clusters = [clusters]
 
         self.sample_size = sample_size
-        log.info(f"Measuring leakage for {clusters} with {sample_size}")
+        log.info(f"Measuring leakage for {clusters} using {sample_size} samples")
 
         # Shannon Entropy func: -p(x)*log2(p(x))
         def h(x):
@@ -205,7 +205,7 @@ class WebsiteFingerprintModeler(object):
 
         # H(C) -- compute website entropy, this represents the maximum number of bits which can be leaked
         H_C = sum([h(prior) for prior in self.website_priors if prior > 0])
-        log.info(f"Maximum uncertaininty = {H_C}")
+        # log.info(f"Maximum uncertaininty = {H_C}")
 
         # map clusters to probability predictions for random samples
         # allows for KDE construction, sampling, and prediction to be done in parallel (if enabled)
