@@ -32,20 +32,20 @@ from wfaudit.helpers_ml.xgb import XGBoostClassifier
 import wfaudit.logger as log
 
 clf_supported_metrics = [
-    "aucroc_ovo_macro",
+    # "aucroc_ovo_macro",
     # "aucroc_ovo_weighted",
     # "aucroc_ovr_macro",
     # "aucroc_ovr_micro",
     # "aucroc_ovr_weighted",
     # "aucprc_weighted",
-    "aucprc_macro",
+    # "aucprc_macro",
     # "aucprc_micro",
     # "accuracy",
     # "f1_score_micro",
     "f1_score_macro",
     # "f1_score_weighted",
-    "kappa",
-    "kappa_quadratic",
+    # "kappa",
+    # "kappa_quadratic",
     # "precision_micro",
     "precision_macro",
     # "precision_weighted",
@@ -505,6 +505,8 @@ def _evaluate_static_models_cv(
             )
         except BaseException as e:
             log.error(f"static evaluation failed {e}")
+            print(input_data, labels)
+            raise
             time.sleep(0.5)
             return None
 

@@ -301,21 +301,11 @@ def _base_evaluate_info_leakage(
                 dill.dump(results, fi)
         return results
 
-    def _get_pretty_names(label, indexes):
-        if features_range is not None:
-            features_range_list = list(features_range.keys())
-            pretty_names = [features_range_list[idx] for idx in indexes]
-            # log.info(f"{label} : {pretty_names}")
-            return pretty_names
-        return None
-
     joint_leakage = _eval_and_cache(
         clusters=relevant_feats, joint_leakage=True, out_file="cleaned_leakage.pkl"
     )
 
-    log.info(
-        f"Non-redundant leakage results: {joint_leakage} bits. Source: {_get_pretty_names('Non-redundant', relevant_feats)}"
-    )
+    log.info(f"Non-redundant leakage results: {joint_leakage} bits.")
 
     joint_path = outdir / "joint.pkl"
     if joint_path.exists():
@@ -538,22 +528,11 @@ def exploratory_analysis(
                 dill.dump(results, fi)
         return float(results[0])
 
-    def _get_pretty_names(label, indexes):
-        if features_range is not None:
-            features_range_list = list(features_range.keys())
-            pretty_names = [features_range_list[idx] for idx in indexes]
-
-            # log.info(f"{label} : {pretty_names}")
-            return pretty_names
-        return None
-
     joint_leakage = _eval_and_cache(
         features=relevant_feats, out_file="cleaned_leakage.pkl"
     )
 
-    log.info(
-        f"Non-redudant leakage results: {joint_leakage} bits. Source: {_get_pretty_names('Non-redundant', relevant_feats)}"
-    )
+    log.info(f"Non-redudant leakage results: {joint_leakage} bits.")
     top_features = copy.deepcopy(relevant_feats)
     relevant_feats = relevant_feats[:topn]
 
@@ -601,9 +580,7 @@ def exploratory_analysis(
     log.info(f"Redundant fingerprints =  {len(candidates)}")
     results = []
     for idx, (candidate, cand_leak) in enumerate(candidates):
-        log.info(
-            f" [{idx}] {cand_leak} bits >>> {_get_pretty_names('cluster', candidate)} leaks"
-        )
+        log.info(f" [{idx}] {cand_leak} bits >>> {candidate}")
         results.append((candidate, cand_leak))
     log.info("Finished exploration.")
 

@@ -42,8 +42,11 @@ def test_sanity(tmp_path):
     print(leakage)
 
     # Test ML benchmark
-    output_ml = tmp_path / "output_ml"
-    ml_score = evaluate_ml(workspace=output_ml, wefde_features_dir=output_features)
-    assert output_ml.exists()
-    assert max(ml_score) <= 1
-    print("ML", print_score(ml_score))
+    for arch in ["xgboost", "svm", "lr", "rf"]:
+        output_ml = tmp_path / f"output_ml_{arch}"
+        ml_score = evaluate_ml(
+            workspace=output_ml, wefde_features_dir=output_features, arch=arch
+        )
+        assert output_ml.exists()
+        assert max(ml_score) <= 1
+        print("ML", arch, print_score(ml_score))

@@ -38,14 +38,13 @@ def evaluate_ml(
     workspace=Path("output_ml"),
     wefde_features_dir=Path("output_features"),
     metric_key="f1_score_macro",
+    arch: str = "xgboost",
 ):
     if not wefde_features_dir.exists():
         log.error("WeFDE features not extracted")
         return None
 
     workspace.mkdir(parents=True, exist_ok=True)
-
-    arch = "xgboost"
 
     bkp_file = workspace / f"eval_ts_full_{arch}_{metric_key}.json"
     if bkp_file.exists():
