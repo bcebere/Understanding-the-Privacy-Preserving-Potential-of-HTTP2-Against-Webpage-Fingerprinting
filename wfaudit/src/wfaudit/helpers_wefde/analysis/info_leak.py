@@ -1,5 +1,7 @@
 # Adapted from https://github.com/notem/reWeFDE
 # stdlib
+import copy
+import hashlib
 import os
 from pathlib import Path
 
@@ -119,11 +121,9 @@ def _evaluate_individual_leakage(
 ):
     # create process pool
     if n_procs > 1:
-        print("nprocs ", n_procs)
         pool = Pool(n_procs)
     elif n_procs == 0:
-        print("full nprocs")
-        pool = Pool(cpu_count())
+        pool = Pool(cpu_count() - 1)
     else:
         pool = None
 
@@ -252,6 +252,9 @@ def _base_evaluate_info_leakage(
     outdir = Path(output_path)
     outdir.mkdir(parents=True, exist_ok=True)
 
+    if n_procs == 0:
+        n_procs = cpu_count() - 1
+
     modeler, analyzer, relevant_feats, leakage_indiv = _evaluate_individual_leakage(
         feature_data,
         outdir=outdir,
@@ -311,20 +314,32 @@ def _base_evaluate_info_leakage(
     )
 
     log.info(
-        f"Non-redudant leakage results: {joint_leakage} bits. Source: {_get_pretty_names('Non-redundant', relevant_feats)}"
+        f"Non-redundant leakage results: {joint_leakage} bits. Source: {_get_pretty_names('Non-redundant', relevant_feats)}"
     )
 
     joint_path = outdir / "joint.pkl"
     if joint_path.exists():
         with open(joint_path, "rb") as fi:
-            leakage_joint = dill.load(fi)
+            leakage_cluster_joint = dill.load(fi)
     else:
-        leakage_joint = modeler.information_leakage(
+        leakage_cluster_joint = modeler.information_leakage(
             clusters=clusters, sample_size=n_samples, joint_leakage=True
         )
         with open(joint_path, "wb") as fi:
-            dill.dump(leakage_joint, fi)
+            dill.dump(leakage_cluster_joint, fi)
 
+    log.info(
+        f"Non-redundant clusters joint leakage results: {leakage_cluster_joint} bits. Clusters {len(clusters)}"
+    )
+
+    cluster_sep_results = Parallel(n_jobs=n_procs)(
+        delayed(_eval_and_cache)(
+            clusters=cluster, joint_leakage=True, out_file=f"cluster_{cidx}_leakage.pkl"
+        )
+        for cidx, cluster in enumerate(clusters)
+    )
+
+    log.info(f"Non-redundant clusters indiv leakage results: {cluster_sep_results}.")
     log.info("Finished execution.")
     return print_leakage(
         features_range=features_range,  # offsets for leakage types
@@ -438,6 +453,7 @@ def evaluate_info_leakage_v2(
 def exploratory_analysis(
     X,
     y,
+    min_cluster_size: int,
     output_path: str,  # where to save the leakages
     features_range: dict,  # the offsets of each feature
     n_procs=0,
@@ -480,6 +496,9 @@ def exploratory_analysis(
     outdir = Path(output_path)
     outdir.mkdir(parents=True, exist_ok=True)
 
+    if n_procs == 0:
+        n_procs = cpu_count() - 1
+
     modeler, analyzer, relevant_feats, leakage_indiv = _evaluate_individual_leakage(
         feature_data,
         outdir=outdir,
@@ -488,64 +507,104 @@ def exploratory_analysis(
         nmi_threshold=nmi_threshold,
     )
 
-    log.info(f"Relevant features = {relevant_feats} total = {len(relevant_feats)}")
+    tuples = list(zip(feature_data.features, leakage_indiv))
+    tuples = sorted(tuples, key=lambda x: (-x[1], x[0]))
+    # sorted_features = list(list(zip(*tuples))[0])
+    top_feats = dict(tuples)
 
-    def _eval_and_cache(clusters, joint_leakage: bool, out_file: str):
+    log.info(f"Relevant features = {relevant_feats} total = {len(relevant_feats)}")
+    log.info(f"Leakage dict: {top_feats}")
+
+    def _eval_and_cache(features, out_file: str = None):
+        if out_file is None:
+            cluster_hash = "_".join(map(str, sorted(features)))
+            md5_hash = hashlib.md5()
+            md5_hash.update(cluster_hash.encode("utf-8"))
+            cluster_hash = md5_hash.hexdigest()
+            out_file = f"cluster_len{len(features)}_{cluster_hash}.pkl"
+            # log.debug(f'Evaluation output: {out_file}')
+
         out_path = outdir / out_file
+
         if os.path.exists(out_path):
             with open(out_path, "rb") as fi:
                 results = dill.load(fi)
         else:
             results = modeler.information_leakage(
-                clusters=clusters, sample_size=n_samples, joint_leakage=joint_leakage
+                clusters=features, sample_size=n_samples, joint_leakage=True
             )
-            assert len(results) != 0, clusters
+            assert len(results) != 0, features
             with open(out_path, "wb") as fi:
                 dill.dump(results, fi)
-        return results
+        return float(results[0])
 
     def _get_pretty_names(label, indexes):
         if features_range is not None:
             features_range_list = list(features_range.keys())
             pretty_names = [features_range_list[idx] for idx in indexes]
+
             # log.info(f"{label} : {pretty_names}")
             return pretty_names
         return None
 
     joint_leakage = _eval_and_cache(
-        clusters=relevant_feats, joint_leakage=True, out_file="cleaned_leakage.pkl"
+        features=relevant_feats, out_file="cleaned_leakage.pkl"
     )
 
     log.info(
         f"Non-redudant leakage results: {joint_leakage} bits. Source: {_get_pretty_names('Non-redundant', relevant_feats)}"
     )
+    top_features = copy.deepcopy(relevant_feats)
+    relevant_feats = relevant_feats[:topn]
 
-    return
+    max_cluster_size = min(int(joint_leakage) + 20, len(relevant_feats))
 
-    def _joint_eval_cbk(off, reverse=False):
-        if reverse:
-            label = f"Non-red rev[ {off} : ]"
-            curr_candidates = relevant_feats[off:]
-            cache_file = f"nonred_leakage_rev{off}.pkl"
-        else:
-            label = f"Non-red[ : {off} ]"
-            curr_candidates = relevant_feats[:off]
-            cache_file = f"nonred_leakage{off}.pkl"
+    candidates = []
+    for test_size in range(min_cluster_size, max_cluster_size):
+        log.info(f"Test clusters of size {test_size}/{len(relevant_feats)}")
+        if test_size > len(relevant_feats):
+            log.info(f"Less than {test_size} features remained!! Exiting...")
+            break
+        cluster_subsets = [
+            relevant_feats[i : i + test_size] for i in range(0, len(relevant_feats), 1)
+        ]
 
-        interm_leakage = _eval_and_cache(
-            clusters=curr_candidates, joint_leakage=True, out_file=str(cache_file)
+        cluster_size_leakages = Parallel(n_jobs=n_procs)(
+            delayed(_eval_and_cache)(features=cluster)
+            for cidx, cluster in enumerate(cluster_subsets)
         )
-        log.info(f"{label}: leakage results: {interm_leakage} bits")
-        return interm_leakage
 
-    keys = _get_pretty_names("Non-redundant", relevant_feats)
-    interm_results = Parallel(n_jobs=n_procs)(
-        delayed(_joint_eval_cbk)(off) for off in range(1, len(relevant_feats))
-    )
-    log.info(f"Incremental leakage: { dict(zip(keys, interm_results)) }")
-    rev_results = Parallel(n_jobs=n_procs)(
-        delayed(_joint_eval_cbk)(off, reverse=True)
-        for off in range(0, len(relevant_feats) - 1)
-    )
-    log.info(f"Incremental reverse leakage: { dict(zip(keys, rev_results)) }")
+        cluster_leakages_sorted = sorted(
+            enumerate(cluster_size_leakages), key=lambda x: x[1], reverse=True
+        )
+        rem_feats = set(relevant_feats)
+
+        for tidx, leakage in cluster_leakages_sorted:
+            log.debug(
+                f"Leakage {leakage}/{joint_leakage} with cluster {cluster_subsets[tidx]}"
+            )
+            if joint_leakage <= leakage or abs(leakage - joint_leakage) <= 0.1:
+                log.info(
+                    f"Cluster {cluster_subsets[tidx]} is a candidate!. Leakage {leakage}/{joint_leakage}"
+                )
+                candidates.append((cluster_subsets[tidx], leakage))
+                local_set = set(cluster_subsets[tidx])
+                if local_set.issubset(rem_feats):
+                    rem_feats.difference_update(local_set)
+                    log.info(
+                        f"Dropping features {cluster_subsets[tidx]} from benchmarks!!"
+                    )
+
+        rem_feats = list(rem_feats)
+        relevant_feats = sorted(rem_feats, key=lambda x: top_feats[x], reverse=True)
+
+    log.info(f"Redundant fingerprints =  {len(candidates)}")
+    results = []
+    for idx, (candidate, cand_leak) in enumerate(candidates):
+        log.info(
+            f" [{idx}] {cand_leak} bits >>> {_get_pretty_names('cluster', candidate)} leaks"
+        )
+        results.append((candidate, cand_leak))
     log.info("Finished exploration.")
+
+    return top_features, results

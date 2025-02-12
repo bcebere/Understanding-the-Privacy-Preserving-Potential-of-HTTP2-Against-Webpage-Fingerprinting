@@ -1,9 +1,14 @@
 # stdlib
+import hashlib
 from pathlib import Path
+
+# third party
+import numpy as np
+import pandas as pd
 
 # wfaudit absolute
 from wfaudit.helpers_ml import (
-    _evaluate_by_domain,
+    evaluate_by_domain,
     generate_score,
     load_from_file,
     print_score,
@@ -13,6 +18,7 @@ from wfaudit.helpers_wefde.analysis.data_utils import load_wefde_features
 from wfaudit.helpers_wefde.analysis.info_leak import (
     evaluate_info_leakage,
     evaluate_info_leakage_v2,
+    exploratory_analysis,
 )
 from wfaudit.helpers_wefde.preprocess.extract import prepare_wefde_features
 import wfaudit.logger as log
@@ -48,7 +54,7 @@ def evaluate_ml(
 
     if not bkp_file.exists():
         X, y = load_wefde_features(wefde_features_dir)
-        scores = _evaluate_by_domain(
+        scores = evaluate_by_domain(
             arch,
             "full_data",
             X,
@@ -109,6 +115,81 @@ def evaluate_leakage_v2(
         discrete_threshold=discrete_threshold,
         max_instances=max_instances,
     )
+
+
+def evaluate_exploratory(
+    X,
+    y,
+    min_cluster_size: int,
+    features_range: dict = None,
+    workspace=Path("output_leakage"),
+    n_procs=0,
+    n_samples=50000,
+    topn=40,
+    nmi_threshold=0.9,
+    discrete_threshold=100000,
+    max_instances=100,
+):
+    workspace.mkdir(parents=True, exist_ok=True)
+
+    return exploratory_analysis(
+        X,
+        y,
+        min_cluster_size=min_cluster_size,
+        output_path=workspace,
+        features_range=features_range,
+        n_procs=n_procs,
+        n_samples=n_samples,
+        topn=topn,
+        nmi_threshold=nmi_threshold,
+        discrete_threshold=discrete_threshold,
+        max_instances=max_instances,
+    )
+
+
+def evaluate_exploratory_ml(
+    X: pd.DataFrame,
+    y: pd.DataFrame,
+    min_cluster_size: int,
+    features_range: dict = None,
+    workspace=Path("output_leakage"),
+    n_procs=0,
+    n_samples=50000,
+    topn=40,
+    nmi_threshold=0.9,
+    discrete_threshold=100000,
+    max_instances=100,
+):
+    top_feats, clusters = evaluate_exploratory(
+        np.asarray(X),
+        np.asarray(y),
+        min_cluster_size=min_cluster_size,
+        workspace=workspace,
+        features_range=features_range,
+        n_procs=n_procs,
+        n_samples=n_samples,
+        topn=topn,
+        nmi_threshold=nmi_threshold,
+        discrete_threshold=discrete_threshold,
+        max_instances=max_instances,
+    )
+
+    for idx, (cluster, cluster_leak) in enumerate(clusters):
+        # print(f"Evaluate cluster {idx}. Bits leaked {cluster_leak}. Features = {X.columns[cluster]}")
+        cluster_hash = "_".join(map(str, sorted(cluster)))
+        arch = "xgboost"
+        md5_hash = hashlib.md5()
+        md5_hash.update(cluster_hash.encode("utf-8"))
+        cluster_hash = md5_hash.hexdigest()
+        scores = evaluate_by_domain(
+            arch,
+            f"cluster_{arch}_{cluster_hash}",
+            X[X.columns[cluster]],
+            y,
+            metric_key="f1_score_macro",
+            workspace=Path("output_ml"),
+        )
+        print("Evaluate", idx, cluster, print_score(generate_score(scores)))
 
 
 def evaluate_all(
