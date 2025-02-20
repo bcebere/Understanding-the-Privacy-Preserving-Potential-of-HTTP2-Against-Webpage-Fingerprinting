@@ -2,10 +2,11 @@
 import glob
 import hashlib
 from pathlib import Path
-import time
+from random import shuffle
 from typing import Optional
 
 # third party
+from joblib import Parallel, delayed
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
@@ -19,6 +20,7 @@ def process_raw_pcaps(
     traces=Path("traces"),
     workspace=Path("workspace"),
     unlink_after_processing=True,
+    n_jobs=8,
 ):
     """
     Args:
@@ -34,20 +36,22 @@ def process_raw_pcaps(
     output.mkdir(parents=True, exist_ok=True)
 
     files = glob.glob(str(traces / "*.pcap"))
+    shuffle(files)
 
-    for filename in tqdm(files):
+    def _parse_single_pcap(filename):
         filename = Path(filename)
         stem = filename.stem
         output_csv_static = output / f"static_data_{stem}.csv"
         output_csv_temporal = output / f"temporal_data_{stem}.csv"
         if not filename.exists():
-            continue
+            return
 
         if output_csv_temporal.exists():
             if unlink_after_processing:
                 log.debug(f"dropping  {filename}")
                 filename.unlink()
-            continue
+            return
+        log.debug(f"Parsing {filename}")
         try:
             session = process_pcap(filename)
         except BaseException as e:
@@ -55,15 +59,14 @@ def process_raw_pcaps(
                 f"failed to parse pcap. moving to graveyard {filename}, error = {e}"
             )
             filename.unlink()
-            time.sleep(0.1)
-            continue
+            return
 
         label = stem.split("_")[1]
         static_data, temporal_data = session.temporal_stats_per_flow()
         if len(static_data) == 0:
             log.error(f"empty dataset {filename}")
             filename.unlink()
-            continue
+            return
 
         static_data["label"] = label
         static_data.to_csv(output_csv_static, index=False)
@@ -71,6 +74,8 @@ def process_raw_pcaps(
 
         if unlink_after_processing:
             filename.unlink()
+
+    Parallel(n_jobs=n_jobs)(delayed(_parse_single_pcap)(filename) for filename in files)
 
 
 def merge_pcap_csvs(workspace=Path("workspace"), pd_lim: int = 3000) -> None:
@@ -103,7 +108,8 @@ def merge_pcap_csvs(workspace=Path("workspace"), pd_lim: int = 3000) -> None:
         try:
             local_static_csv = pd.read_csv(static_filename)
             local_temporal_csv = pd.read_csv(temporal_filename)
-        except BaseException:
+        except BaseException as e:
+            print("failed to read csv", e)
             continue
 
         original_ids = local_static_csv["id"].values[0]

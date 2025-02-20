@@ -75,6 +75,12 @@ def evaluate_leakage(
     features_range: dict,
     workspace=Path("output_leakage"),
     wefde_features_dir=Path("output_features"),
+    n_procs=0,
+    n_samples=50000,
+    topn=20,
+    nmi_threshold=0.9,
+    discrete_threshold=100000,
+    max_instances=100,
 ):
     if not wefde_features_dir.exists():
         log.error("WeFDE features not extracted")
@@ -85,6 +91,12 @@ def evaluate_leakage(
         features_path=wefde_features_dir,
         output_path=workspace,
         features_range=features_range,
+        n_procs=n_procs,
+        n_samples=n_samples,
+        topn=topn,
+        nmi_threshold=nmi_threshold,
+        discrete_threshold=discrete_threshold,
+        max_instances=max_instances,
     )
 
 
