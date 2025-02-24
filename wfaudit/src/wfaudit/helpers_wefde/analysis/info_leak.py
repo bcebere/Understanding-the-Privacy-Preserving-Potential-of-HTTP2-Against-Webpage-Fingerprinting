@@ -87,25 +87,21 @@ def _individual_measure(modeler, pool, checkpoint):
 
 def print_leakage(
     features_range: dict,  # offsets for leakage types
-    indiv_file: str,  # path to individual leakages,
-    joint_file: str,  # path to joint leakages,
+    leakages_indiv: list,
+    leakages_clusters: list,
+    leakages_topfeats: list,
 ):
-    # read independent leakage information from files
-    with open(indiv_file, "rb") as fi:
-        leakages = dill.load(fi)
-    with open(joint_file, "rb") as fi:
-        joint_leakages = dill.load(fi)
-
     summary = {}
     offset = 0
     if features_range is not None:
         for category in features_range:
             next_off = features_range[category]
-            y = leakages[offset:next_off]
+            y = leakages_indiv[offset:next_off]
             summary[category] = [np.max(y)]
             offset = next_off
 
-    summary["joint"] = [joint_leakages[0]]
+    summary["leakage_clusters"] = [leakages_clusters[0]]
+    summary["leakage_topfeats"] = [leakages_topfeats[0]]
 
     summary = pd.DataFrame(summary)
     return summary
@@ -301,42 +297,27 @@ def _base_evaluate_info_leakage(
                 dill.dump(results, fi)
         return results
 
-    joint_leakage = _eval_and_cache(
+    leakages_topfeats = _eval_and_cache(
         clusters=relevant_feats,
         joint_leakage=True,
         out_file="leakage_joint_topfeats.pkl",
     )
 
-    log.info(f"Non-redundant leakage results: {joint_leakage} bits.")
+    log.info(f"Non-redundant leakage results: {leakages_topfeats} bits.")
 
-    joint_path = outdir / "leakage_joint_clusters.pkl"
-    if joint_path.exists():
-        with open(joint_path, "rb") as fi:
-            leakage_cluster_joint = dill.load(fi)
-    else:
-        leakage_cluster_joint = modeler.information_leakage(
-            clusters=clusters, sample_size=n_samples, joint_leakage=True
-        )
-        with open(joint_path, "wb") as fi:
-            dill.dump(leakage_cluster_joint, fi)
-
-    log.info(
-        f"Non-redundant clusters joint leakage results: {leakage_cluster_joint} bits. Clusters {len(clusters)}"
+    leakages_clusters = _eval_and_cache(
+        clusters=clusters, joint_leakage=True, out_file="leakage_joint_clusters.pkl"
     )
-
-    # cluster_sep_results = Parallel(n_jobs=n_procs)(
-    #    delayed(_eval_and_cache)(
-    #        clusters=cluster, joint_leakage=True, out_file=f"cluster_{cidx}_leakage.pkl"
-    #    )
-    #    for cidx, cluster in enumerate(clusters)
-    # )
-    # log.info(f"Non-redundant clusters indiv leakage results: {cluster_sep_results}.")
+    log.info(
+        f"Non-redundant clusters joint leakage results: {leakages_clusters} bits. Clusters {len(clusters)}"
+    )
 
     log.info("Finished execution.")
     return print_leakage(
         features_range=features_range,  # offsets for leakage types
-        indiv_file=indiv_path,  # path to individual leakages,
-        joint_file=joint_path,  # path to joint leakages,
+        leakages_indiv=leakage_indiv,
+        leakages_clusters=leakages_clusters,
+        leakages_topfeats=leakages_topfeats,
     )
 
 

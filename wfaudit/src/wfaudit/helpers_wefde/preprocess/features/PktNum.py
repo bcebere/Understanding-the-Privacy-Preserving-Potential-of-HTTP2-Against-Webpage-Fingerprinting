@@ -1,40 +1,19 @@
-def roundArbitrary(x, base):
-    return int(base * round(float(x) / base))
+# wfaudit absolute
+from wfaudit.helpers_wefde.preprocess.features.common import split_by_value
 
 
 # packet number features
-def PacketNumFeature(times, sizes):
-    total = len(times)
-    features = []
-    features.append(total)
+def get_packet_counts(times, sizes, conn_limit: int = 5):
+    features = [len(times)]
 
-    # count is outgoing pkt. number
-    count = 0
-    for x in sizes:
-        if x > 0:
-            count += 1
-    features.append(count)
-    features.append(total - count)
+    # per connection
+    conn_idxs = split_by_value(times, 0)
+    if len(conn_idxs) < conn_limit:
+        conn_idxs += [[]] * (conn_limit - len(conn_idxs))
 
-    # kanonymity also include incoming/total, outgoing/total
-    out_total = float(count) / total
-    in_total = float(total - count) / total
-    features.append(out_total * 100)
-    features.append(in_total * 100)
+    for idx, conn_idx in enumerate(conn_idxs[:conn_limit]):
+        features.append(len(conn_idx))
 
-    # rounded version, from WPES 2011
-    features.append(roundArbitrary(total, 15))
-    features.append(roundArbitrary(count, 15))
-    features.append(roundArbitrary(total - count, 15))
-
-    features.append(roundArbitrary(out_total * 100, 5))
-    features.append(roundArbitrary(in_total * 100, 5))
-
-    # packet size in total (or called bandwidth)
-    # should be the same with packet number, but anyway, include them
-
-    features.append(total * 512)
-    features.append(count * 512)
-    features.append((total - count) * 512)
+    assert len(features) == conn_limit + 1, features
 
     return features

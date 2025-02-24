@@ -1,26 +1,45 @@
+# stdlib
+import heapq
+
 # third party
 import numpy as np
 
+# wfaudit absolute
+from wfaudit.helpers_wefde.preprocess.features.common import split_by_value
 
-# knn feature (share similarity with interval)
-# the burst of inflow traffic
-def BurstFeature(times, sizes, max_length=20):
-    burst_features = []
-    bursts = []
-    for x in sizes:
-        if x > 0:
-            bursts.append(x)
-        else:
-            bursts.append(-x)
 
-    # burst could be none
-    if len(bursts) != 0:
-        burst_features = [
-            np.max(bursts),
-            np.mean(bursts),
-            np.std(bursts),
-        ]
-    else:
-        burst_features = [0, 0, 0, 0, 0]
+def get_burst_features_per_connection(bursts, topn=10):
+    if len(bursts) < topn:
+        bursts += [0] * (topn - len(bursts))
 
+    burst_features = heapq.nlargest(topn, bursts)
+    burst_features += [
+        float(np.mean(bursts)),
+        float(np.median(bursts)),
+        float(np.std(bursts)),
+    ]
+    # burst_features.extend(bursts[ : topn])
+    return burst_features
+
+
+# times are relative to previous packet. 0 means a new connection
+def get_burst_features(times, sizes, topn: int = 4, conn_limit: int = 5):
+    sizes = np.abs(np.asarray(sizes))
+
+    # global
+    burst_features = get_burst_features_per_connection(sizes.tolist(), topn=topn)
+
+    # per connection
+    conn_idxs = split_by_value(times, 0)
+
+    if len(conn_idxs) < conn_limit:
+        conn_idxs += [[]] * (conn_limit - len(conn_idxs))
+
+    for idx, conn_idx in enumerate(conn_idxs[:conn_limit]):
+        conn_bursts = sizes[conn_idx].tolist()
+        conn_burst_features = get_burst_features_per_connection(conn_bursts, topn=topn)
+
+        burst_features += conn_burst_features
+
+    assert len(burst_features) == (conn_limit + 1) * (topn + 3), burst_features
     return burst_features

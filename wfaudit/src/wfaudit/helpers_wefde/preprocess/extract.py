@@ -19,9 +19,8 @@ from tqdm import tqdm
 import wfaudit.helpers_wefde.preprocess.features.Burst as Burst
 import wfaudit.helpers_wefde.preprocess.features.Cumul as Cumul
 import wfaudit.helpers_wefde.preprocess.features.PktNum as PktNum
-import wfaudit.helpers_wefde.preprocess.features.PktSec as PktSec
 import wfaudit.helpers_wefde.preprocess.features.Time as Time
-from wfaudit.helpers_wefde.preprocess.util import FEATURE_EXT, featureCount
+from wfaudit.helpers_wefde.preprocess.util import FEATURE_EXT
 
 
 def enumerate_files(dir, splitter="-", extension=""):
@@ -49,24 +48,19 @@ def extract(times, sizes, debug_path="./"):
     features = []
 
     # Transmission size features
-    features.extend(PktNum.PacketNumFeature(times, sizes))
+    features.extend(PktNum.get_packet_counts(times, sizes))
     feature_pos["PACKET_NUMBER"] = len(features)
 
     # inter packet time + transmission time feature
-    features.extend(Time.TimeFeature(times, sizes))
+    features.extend(Time.get_time_features(times, sizes))
     feature_pos["PKT_TIME"] = len(features)
 
     # Bursts (knn)
-    features.extend(Burst.BurstFeature(times, sizes))
+    features.extend(Burst.get_burst_features(times, sizes))
     feature_pos["BURST"] = len(features)
 
-    # packets per second (k-anonymity)
-    # plus alternative list
-    features.extend(PktSec.PktSecFeature(times, sizes))
-    feature_pos["PKT_PER_SECOND"] = len(features)
-
     # CUMUL features
-    features.extend(Cumul.CumulFeatures(sizes, featureCount))
+    features.extend(Cumul.get_cumul_features(times, sizes))
     feature_pos["CUMUL"] = len(features)
 
     # output FeaturePos

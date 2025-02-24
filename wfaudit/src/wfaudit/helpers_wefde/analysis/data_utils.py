@@ -5,7 +5,6 @@ import csv
 import os
 
 # third party
-import dill
 import numpy as np
 
 # wfaudit absolute
@@ -158,9 +157,8 @@ def load_wefde_features(
     delimiter=" ",
     split_at="-",
     max_classes=99999,
-    min_instances=2,
+    min_instances=10,
     max_instances=500,
-    pack_dataset=False,
 ):
     """
     Load feature files from a directory.
@@ -184,11 +182,6 @@ def load_wefde_features(
         If a class has less than this number of instances, the all instances of the class are discarded.
     max_instances : int
         Maximum number of instances to load per class.
-    pack_dataset : bool
-        Determines whether or not ascii feature files should be packed into a condensed pickle file.
-        If True, the function will attempt to load from the packed feature file as well.
-        The packed feature file is saved in the root of the same directory as the feature files.
-
     Returns
     -------
     ndarray
@@ -197,96 +190,58 @@ def load_wefde_features(
         Numpy array of Nx1 containing the labels for site visits.
 
     """
-    # load pickle file if it exist
-    feat_pkl = os.path.join(directory, f"features_{max_instances}.pkl")
-    if os.path.exists(feat_pkl) and pack_dataset:
-        with open(feat_pkl, "rb") as fi:
-            X, Y = dill.load(fi)
-            return X, Y
-    else:
-        X = []  # feature instances
-        Y = []  # site labels
-        for root, dirs, files in os.walk(directory):
+    X = []  # feature instances
+    Y = []  # site labels
+    for root, dirs, files in os.walk(directory):
+        # filter for feature files
+        files = [fi for fi in files if fi.endswith(extension)]
 
-            # filter for feature files
-            files = [fi for fi in files if fi.endswith(extension)]
+        # read each feature file as CSV
+        class_counter = dict()  # track number of instances per class
+        for file in files:
+            # feature files are of name
+            cls, ins = file.split(split_at)
+            cls = int(cls)
 
-            def isfloat(element):
-                """
-                Simple function to reliably determine if a string element is a float.
-                Used for feature file filtering.
-                """
-                try:
-                    float(element)
-                    return True
-                except ValueError:
-                    return False
+            # skip if maximum number of instances reached
+            if class_counter.get(int(cls), 0) >= max_instances:
+                continue
 
-            # read each feature file as CSV
-            class_counter = dict()  # track number of instances per class
-            for file in files:
-                # feature files are of name
-                cls, ins = file.split(split_at)
-                cls = int(cls)
+            # skip if maximum number of classes reached
+            if int(cls) >= max_classes:
+                continue
 
-                # skip if maximum number of instances reached
-                if class_counter.get(int(cls), 0) >= max_instances:
-                    continue
+            with open(os.path.join(root, file), "r") as csvFile:
 
-                # skip if maximum number of classes reached
-                if int(cls) >= max_classes:
-                    continue
+                # load the csv file and parse it into a data instance
+                features = list(csv.reader(csvFile, delimiter=delimiter))
+                features = [[float(f) for f in instance if f] for instance in features]
 
-                with open(os.path.join(root, file), "r") as csvFile:
+                # cut off instance count is above the maximum
+                features = features[: max_instances - class_counter.get(int(cls), 0)]
 
-                    # load the csv file and parse it into a data instance
-                    features = list(csv.reader(csvFile, delimiter=delimiter))
-                    features = [
-                        [float(f) if isfloat(f) else 0 for f in instance if f]
-                        for instance in features
-                    ]
+                X.extend(features)
+                Y.extend([int(cls) - 1 for _ in range(len(features))])
+                class_counter[int(cls)] = class_counter.get(int(cls), 0) + len(features)
 
-                    # cut off instance count is above the maximum
-                    features = features[
-                        : max_instances - class_counter.get(int(cls), 0)
-                    ]
+    # trim data to minimum instance count
+    counts = {y: Y.count(y) for y in set(Y)}
+    new_X, new_Y = [], []
+    for x, y in zip(X, Y):
+        if counts[y] >= min_instances:
+            new_Y.append(y)
+            new_X.append(x)
+    X, Y = new_X, new_Y
 
-                    X.extend(features)
-                    Y.extend([int(cls) - 1 for _ in range(len(features))])
-                    class_counter[int(cls)] = class_counter.get(int(cls), 0) + len(
-                        features
-                    )
-
-        # trim data to minimum instance count
-        counts = {y: Y.count(y) for y in set(Y)}
-        new_X, new_Y = [], []
-        for x, y in zip(X, Y):
-            if counts[y] >= min_instances:
-                new_Y.append(y)
-                new_X.append(x)
-        X, Y = new_X, new_Y
-
-        # adjust labels such that they are assigned a number from 0..N
-        # (required when labels are non-numerical or does not start at 0)
-        # try to keep the class numbers the same if numerical
-        labels = list(set(Y))
-        labels.sort()
-        d = dict()
-        for i in range(len(labels)):
-            d[labels[i]] = i
-        Y = list(map(lambda x: d[x], Y))
-
-        # save dataset to pickle file for quicker future loading
-        if pack_dataset:
-            try:
-                X, Y = np.array(X), np.array(Y)
-                with open(feat_pkl, "wb") as fi:
-                    dill.dump((X, Y), fi)
-            except BaseException:
-                try:
-                    os.remove(feat_pkl)
-                except BaseException:
-                    pass
+    # adjust labels such that they are assigned a number from 0..N
+    # (required when labels are non-numerical or does not start at 0)
+    # try to keep the class numbers the same if numerical
+    labels = list(set(Y))
+    labels.sort()
+    d = dict()
+    for i in range(len(labels)):
+        d[labels[i]] = i
+    Y = list(map(lambda x: d[x], Y))
 
     # return X and Y as numpy arrays
     return np.asarray(X), np.asarray(Y)

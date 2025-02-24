@@ -47,9 +47,6 @@ def evaluate_ml(
     workspace.mkdir(parents=True, exist_ok=True)
 
     bkp_file = workspace / f"eval_ts_full_{arch}_{metric_key}.json"
-    if bkp_file.exists():
-        scores = load_from_file(bkp_file)
-        return scores
 
     if not bkp_file.exists():
         X, y = load_wefde_features(wefde_features_dir)

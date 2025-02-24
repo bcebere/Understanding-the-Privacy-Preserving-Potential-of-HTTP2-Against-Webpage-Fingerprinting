@@ -78,7 +78,7 @@ def process_raw_pcaps(
     Parallel(n_jobs=n_jobs)(delayed(_parse_single_pcap)(filename) for filename in files)
 
 
-def merge_pcap_csvs(workspace=Path("workspace"), pd_lim: int = 3000) -> None:
+def merge_pcap_csvs(workspace=Path("workspace"), pd_lim: int = 5000) -> None:
     """
     Args:
         workspace: The folder which contains the post-processed pcaps --- output_csv_single.
@@ -97,7 +97,9 @@ def merge_pcap_csvs(workspace=Path("workspace"), pd_lim: int = 3000) -> None:
     cnt = 0
     batch_idx = 0
 
-    for fidx, filename in enumerate(glob.glob(str(in_workspace / "static*.csv"))):
+    static_files = glob.glob(str(in_workspace / "static*.csv"))
+    print("static files", len(static_files))
+    for fidx, filename in enumerate(static_files):
         static_filename = Path(filename)
         base = static_filename.name.split("static_")[1]
         temporal_base = "temporal_" + base
@@ -136,7 +138,7 @@ def merge_pcap_csvs(workspace=Path("workspace"), pd_lim: int = 3000) -> None:
                 [full_temporal_csv, local_temporal_csv], ignore_index=True
             )
 
-        if cnt % 100 == 0:
+        if cnt % 1000 == 0:
             log.debug(f"merge  batch {cnt}, {full_static_csv.shape}")
 
         if len(full_static_csv) > pd_lim:
@@ -170,7 +172,7 @@ def merge_pcap_csvs(workspace=Path("workspace"), pd_lim: int = 3000) -> None:
     full_data_static = None
     full_data_temporal = None
 
-    for batch in range(0, 100):
+    for batch in range(0, batch_idx + 1):
         static_batch = Path(output / f"static_data_batch{batch}.csv")
         temporal_batch = Path(output / f"temporal_data_batch{batch}.csv")
         if not static_batch.exists():
@@ -236,18 +238,6 @@ def _prepare_time_series(
     for idx, group in tqdm(groups):
         if idx not in static_ids:
             continue
-
-        # patch ID collisions
-        collisions = group[group["relative_timestamp"] == 0]
-        if len(collisions) > 1:
-            cnt_cons = 0
-            prev_val = 0
-            for idxval in group.index.values:
-                if prev_val != 0 and prev_val + 1 != idxval:
-                    break
-                prev_val = idxval
-                cnt_cons += 1
-            group = group.head(cnt_cons)
 
         lens.append(len(group))
         local_data = group.drop(columns=["id", "full_id", "file_order", "duration"])
@@ -343,7 +333,7 @@ def prepare_ts_datasets(
         )
         timestamps = clean_ts_data[real_idx]["relative_timestamp"].copy()
         timestamps[timestamps < 0] = 0  # WTF
-        local_ts = timestamps.cumsum().values
+        local_ts = timestamps.values
         assert len(local_ts) == len(local_sizes)
         assert (local_ts >= 0).all(), timestamps.values
 

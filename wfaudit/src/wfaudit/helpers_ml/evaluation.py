@@ -8,19 +8,9 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 # third party
 import numpy as np
 import pandas as pd
-from sklearn.metrics import (
-    accuracy_score,
-    average_precision_score,
-    cohen_kappa_score,
-    f1_score,
-    matthews_corrcoef,
-    precision_score,
-    recall_score,
-    roc_auc_score,
-    roc_curve,
-)
+from sklearn.metrics import f1_score, matthews_corrcoef, precision_score, recall_score
 from sklearn.model_selection import StratifiedGroupKFold, StratifiedKFold
-from sklearn.preprocessing import LabelEncoder, label_binarize
+from sklearn.preprocessing import LabelEncoder
 from tqdm import tqdm
 
 # wfaudit absolute
@@ -32,103 +22,23 @@ from wfaudit.helpers_ml.xgb import XGBoostClassifier
 import wfaudit.logger as log
 
 clf_supported_metrics = [
-    # "aucroc_ovo_macro",
-    # "aucroc_ovo_weighted",
-    # "aucroc_ovr_macro",
-    # "aucroc_ovr_micro",
-    # "aucroc_ovr_weighted",
-    # "aucprc_weighted",
-    # "aucprc_macro",
-    # "aucprc_micro",
-    # "accuracy",
-    # "f1_score_micro",
     "f1_score_macro",
-    # "f1_score_weighted",
-    # "kappa",
-    # "kappa_quadratic",
-    # "precision_micro",
     "precision_macro",
-    # "precision_weighted",
-    # "recall_micro",
     "recall_macro",
-    # "recall_weighted",
-    # "mcc",
-    # "fpr_micro",
-    # "tpr_micro",
-    # "fpr_macro",
-    # "tpr_macro",
+    "mcc",
 ]
-
-
-def evaluate_auc(
-    y_test: np.ndarray,
-    y_pred_proba: np.ndarray,
-    classes: list,
-    multi_class: str = "ovr",  # ovo, ovr
-    average: str = "micro",  # micro, macro, weighted
-) -> Tuple[float, float]:
-    """Helper for evaluating AUCROC/AUCPRC for any number of classes."""
-
-    y_test = np.asarray(y_test)
-    y_pred_proba = np.asarray(y_pred_proba)
-    y_test_proba = label_binarize(y_test, classes=classes)
-
-    nnan = sum(np.ravel(np.isnan(y_pred_proba)))
-
-    if nnan:
-        raise ValueError("nan in predictions. aborting")
-
-    n_classes = y_pred_proba.shape[1]
-
-    if n_classes > 2:
-        scores = []
-        for i in range(n_classes):
-            scores.append(
-                average_precision_score(
-                    y_test_proba[:, i], y_pred_proba[:, i], average=average
-                )
-            )
-
-        aucprc = np.mean(scores)
-
-        aucroc = roc_auc_score(
-            y_test,
-            y_pred_proba,
-            multi_class=multi_class,
-            average=average,
-        )
-    else:
-        aucprc = average_precision_score(y_test, y_pred_proba[:, 1], average=average)
-
-        aucroc = roc_auc_score(
-            y_test,
-            y_pred_proba[:, 1],
-            average=average,
-        )
-
-    return aucroc, aucprc
 
 
 class classifier_metrics:
     """Helper class for evaluating the performance of the classifier.
 
     Args:
-        metric: list, default=["aucroc_ovr_macro",  "aucroc_ovr_micro",  "aucroc_ovo_macro",  "aucroc_ovo_weighted", "aucprc", "accuracy", "f1_score_micro", "f1_score_macro", "f1_score_weighted",  "kappa", "precision_micro", "precision_macro", "precision_weighted", "recall_micro", "recall_macro", "recall_weighted",  "mcc",]
+        metric: list, default=["f1_score_macro", "precision_macro", "recall_macro",  "mcc",]
             The type of metric to use for evaluation.
             Potential values:
-                - "aucroc_(ovo/ovr)_(micro/macro)" : the Area Under the Receiver Operating Characteristic Curve (ROC AUC) from prediction scores.
-                - "aucprc" : The average precision summarizes a precision-recall curve as the weighted mean of precisions achieved at each threshold, with the increase in recall from the previous threshold used as the weight.
-                - "accuracy" : Accuracy classification score.
-                - "f1_score_micro": F1 score is a harmonic mean of the precision and recall. This version uses the "micro" average: calculate metrics globally by counting the total true positives, false negatives and false positives.
                 - "f1_score_macro": F1 score is a harmonic mean of the precision and recall. This version uses the "macro" average: calculate metrics for each label, and find their unweighted mean. This does not take label imbalance into account.
-                - "f1_score_weighted": F1 score is a harmonic mean of the precision and recall. This version uses the "weighted" average: Calculate metrics for each label, and find their average weighted by support (the number of true instances for each label).
-                - "kappa", "kappa_quadratic":  computes Cohen’s kappa, a score that expresses the level of agreement between two annotators on a classification problem.
-                - "precision_micro": Precision is defined as the number of true positives over the number of true positives plus the number of false positives. This version(micro) calculates metrics globally by counting the total true positives.
                 - "precision_macro": Precision is defined as the number of true positives over the number of true positives plus the number of false positives. This version(macro) calculates metrics for each label, and finds their unweighted mean.
-                - "precision_weighted": Precision is defined as the number of true positives over the number of true positives plus the number of false positives. This version(weighted) calculates metrics for each label, and find their average weighted by support.
-                - "recall_micro": Recall is defined as the number of true positives over the number of true positives plus the number of false negatives. This version(micro) calculates metrics globally by counting the total true positives.
                 - "recall_macro": Recall is defined as the number of true positives over the number of true positives plus the number of false negatives. This version(macro) calculates metrics for each label, and finds their unweighted mean.
-                - "recall_weighted": Recall is defined as the number of true positives over the number of true positives plus the number of false negatives. This version(weighted) calculates metrics for each label, and find their average weighted by support.
                 - "mcc": The Matthews correlation coefficient is used in machine learning as a measure of the quality of binary and multiclass classifications. It takes into account true and false positives and negatives and is generally regarded as a balanced measure which can be used even if the classes are of very different sizes.
     """
 
@@ -150,192 +60,26 @@ class classifier_metrics:
         results = {}
         y_pred = np.argmax(np.asarray(y_pred_proba), axis=1)
 
-        fpr, tpr = self.fpr_tpr(y_test, y_pred_proba, classes)
-
         for metric in self.metrics:
-            if metric == "aucroc_ovo_macro":
-                results[metric] = self.roc_auc_score(
-                    y_test, y_pred_proba, classes, multi_class="ovo", average="macro"
-                )
-            elif metric == "aucroc_ovr_weighted":
-                results[metric] = self.roc_auc_score(
-                    y_test, y_pred_proba, classes, multi_class="ovr", average="weighted"
-                )
-            elif metric == "aucroc_ovr_macro":
-                results[metric] = self.roc_auc_score(
-                    y_test, y_pred_proba, classes, multi_class="ovr", average="macro"
-                )
-            elif metric == "aucroc_ovr_micro":
-                results[metric] = self.roc_auc_score(
-                    y_test, y_pred_proba, classes, multi_class="ovr", average="micro"
-                )
-            elif metric == "aucprc_micro":
-                results[metric] = self.average_precision_score(
-                    y_test, y_pred_proba, classes, average="micro"
-                )
-            elif metric == "aucprc_macro":
-                results[metric] = self.average_precision_score(
-                    y_test,
-                    y_pred_proba,
-                    classes,
-                    average="macro",
-                )
-            elif metric == "aucprc_weighted":
-                results[metric] = self.average_precision_score(
-                    y_test,
-                    y_pred_proba,
-                    classes,
-                    average="weighted",
-                )
-            elif metric == "accuracy":
-                results[metric] = accuracy_score(y_test, y_pred)
-            elif metric == "f1_score_micro":
-                results[metric] = f1_score(
-                    y_test, y_pred, average="micro", zero_division=0
-                )
-            elif metric == "f1_score_macro":
+            if metric == "f1_score_macro":
                 results[metric] = f1_score(
                     y_test, y_pred, average="macro", zero_division=0
-                )
-            elif metric == "f1_score_weighted":
-                results[metric] = f1_score(
-                    y_test, y_pred, average="weighted", zero_division=0
-                )
-            elif metric == "kappa":
-                results[metric] = cohen_kappa_score(y_test, y_pred)
-            elif metric == "kappa_quadratic":
-                results[metric] = cohen_kappa_score(y_test, y_pred, weights="quadratic")
-            elif metric == "recall_micro":
-                results[metric] = recall_score(
-                    y_test, y_pred, average="micro", zero_division=0
                 )
             elif metric == "recall_macro":
                 results[metric] = recall_score(
                     y_test, y_pred, average="macro", zero_division=0
                 )
-            elif metric == "recall_weighted":
-                results[metric] = recall_score(
-                    y_test, y_pred, average="weighted", zero_division=0
-                )
-            elif metric == "precision_micro":
-                results[metric] = precision_score(
-                    y_test, y_pred, average="micro", zero_division=0
-                )
             elif metric == "precision_macro":
                 results[metric] = precision_score(
                     y_test, y_pred, average="macro", zero_division=0
                 )
-            elif metric == "precision_weighted":
-                results[metric] = precision_score(
-                    y_test, y_pred, average="weighted", zero_division=0
-                )
             elif metric == "mcc":
                 results[metric] = matthews_corrcoef(y_test, y_pred)
-            elif metric == "fpr_micro":
-                results[metric] = fpr["micro"]
-            elif metric == "fpr_macro":
-                results[metric] = fpr["macro"]
-            elif metric == "tpr_micro":
-                results[metric] = tpr["micro"]
-            elif metric == "tpr_macro":
-                results[metric] = tpr["macro"]
             else:
                 raise ValueError(f"invalid metric {metric}")
 
         log.debug(f"evaluate_classifier: {results}")
         return results
-
-    def fpr_tpr(
-        self,
-        y_test: np.ndarray,
-        y_pred_proba: np.ndarray,
-        classes: list,
-    ) -> Tuple[dict, dict]:
-        n_classes = len(np.unique(classes))
-
-        if n_classes > 2:
-            y_onehot_test = label_binarize(y_test, classes=classes)
-
-            fpr, tpr = dict(), dict()
-            fpr_per_class, tpr_per_class = dict(), dict()
-            # Compute micro-average ROC curve and ROC area
-            fpr["micro"], tpr["micro"], _ = roc_curve(
-                y_onehot_test.ravel(), y_pred_proba.ravel()
-            )
-            # roc_auc["micro"] = auc(fpr["micro"], tpr["micro"])
-
-            for i in range(n_classes):
-                fpr_per_class[i], tpr_per_class[i], _ = roc_curve(
-                    y_onehot_test[:, i], y_pred_proba[:, i]
-                )
-                # roc_auc[i] = auc(fpr_per_class[i], tpr_per_class[i])
-
-            fpr_grid = np.linspace(0.0, 1.0, 1000)
-
-            # Interpolate all ROC curves at these points
-            mean_tpr = np.zeros_like(fpr_grid)
-
-            for i in range(n_classes):
-                mean_tpr += np.interp(
-                    fpr_grid, fpr_per_class[i], tpr_per_class[i]
-                )  # linear interpolation
-
-            # Average it and compute AUC
-            mean_tpr /= n_classes
-
-            fpr["macro"] = fpr_grid
-            tpr["macro"] = mean_tpr
-        else:
-            y_onehot_test = label_binarize(y_test, classes=classes)
-            fpr, tpr = dict(), dict()
-            fpr_per_class, tpr_per_class = dict(), dict()
-            # Compute micro-average ROC curve and ROC area
-            fpr["micro"], tpr["micro"], _ = roc_curve(
-                y_onehot_test.ravel(), y_pred_proba[:, 1]
-            )
-
-            fpr_per_class, tpr_per_class, _ = roc_curve(
-                y_onehot_test, y_pred_proba[:, 1]
-            )
-
-            fpr_grid = np.linspace(0.0, 1.0, 1000)
-
-            # Interpolate all ROC curves at these points
-            mean_tpr = np.zeros_like(fpr_grid)
-
-            mean_tpr = np.interp(
-                fpr_grid, fpr_per_class, tpr_per_class
-            )  # linear interpolation
-
-            fpr["macro"] = fpr_grid
-            tpr["macro"] = mean_tpr
-
-        return fpr, tpr
-
-    def roc_auc_score(
-        self,
-        y_test: np.ndarray,
-        y_pred_proba: np.ndarray,
-        classes: list,
-        multi_class: str = "ovr",
-        average: str = "micro",
-    ) -> float:
-        return evaluate_auc(
-            y_test,
-            y_pred_proba,
-            classes,
-            multi_class=multi_class,
-            average=average,
-        )[0]
-
-    def average_precision_score(
-        self,
-        y_test: np.ndarray,
-        y_pred_proba: np.ndarray,
-        classes: list,
-        average: str = "macro",
-    ) -> float:
-        return evaluate_auc(y_test, y_pred_proba, classes, average=average)[1]
 
 
 def enable_reproducible_results(random_state: int = 0) -> None:
@@ -382,22 +126,6 @@ def evaluate_classifier(
 
     Returns:
         Dict containing "raw" and "str" nodes. The "str" node contains prettified metrics, while the raw metrics includes tuples of form (`mean`, `std`) for each metric.
-        Both "raw" and "str" nodes contain the following metrics:
-            - "aucroc_ovo_macro", "aucroc_ovr_macro", "aucroc_ovr_micro" : the Area Under the Receiver Operating Characteristic Curve (ROC AUC) from prediction scores.
-            - "aucprc" : The average precision summarizes a precision-recall curve as the weighted mean of precisions achieved at each threshold, with the increase in recall from the previous threshold used as the weight.
-            - "accuracy" : Accuracy classification score.
-            - "f1_score_micro": F1 score is a harmonic mean of the precision and recall. This version uses the "micro" average: calculate metrics globally by counting the total true positives, false negatives and false positives.
-            - "f1_score_macro": F1 score is a harmonic mean of the precision and recall. This version uses the "macro" average: calculate metrics for each label, and find their unweighted mean. This does not take label imbalance into account.
-            - "f1_score_weighted": F1 score is a harmonic mean of the precision and recall. This version uses the "weighted" average: Calculate metrics for each label, and find their average weighted by support (the number of true instances for each label).
-            - "kappa":  computes Cohen’s kappa, a score that expresses the level of agreement between two annotators on a classification problem.
-            - "precision_micro": Precision is defined as the number of true positives over the number of true positives plus the number of false positives. This version(micro) calculates metrics globally by counting the total true positives.
-            - "precision_macro": Precision is defined as the number of true positives over the number of true positives plus the number of false positives. This version(macro) calculates metrics for each label, and finds their unweighted mean.
-            - "precision_weighted": Precision is defined as the number of true positives over the number of true positives plus the number of false positives. This version(weighted) calculates metrics for each label, and find their average weighted by support.
-            - "recall_micro": Recall is defined as the number of true positives over the number of true positives plus the number of false negatives. This version(micro) calculates metrics globally by counting the total true positives.
-            - "recall_macro": Recall is defined as the number of true positives over the number of true positives plus the number of false negatives. This version(macro) calculates metrics for each label, and finds their unweighted mean.
-            - "recall_weighted": Recall is defined as the number of true positives over the number of true positives plus the number of false negatives. This version(weighted) calculates metrics for each label, and find their average weighted by support.
-            - "mcc": The Matthews correlation coefficient is used in machine learning as a measure of the quality of binary and multiclass classifications. It takes into account true and false positives and negatives and is generally regarded as a balanced measure which can be used even if the classes are of very different sizes.
-
     """
     if n_folds < 2:
         raise ValueError("n_folds must be >= 2")
@@ -506,7 +234,6 @@ def _evaluate_static_models_cv(
         except BaseException as e:
             log.error(f"static evaluation failed {e}")
             print(input_data, labels)
-            raise
             time.sleep(0.5)
             return None
 
