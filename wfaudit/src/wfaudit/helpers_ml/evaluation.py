@@ -14,6 +14,7 @@ from sklearn.preprocessing import LabelEncoder
 from tqdm import tqdm
 
 # wfaudit absolute
+from wfaudit.helpers_ml.kfp import kFingerprinting
 from wfaudit.helpers_ml.lr import LinearClassifier
 from wfaudit.helpers_ml.rf import RFClassifier
 from wfaudit.helpers_ml.serialization import load_from_file, save_to_file
@@ -209,6 +210,8 @@ def _get_static_arch_mode(arch: str):
         return LinearClassifier()
     elif arch == "rf":
         return RFClassifier()
+    elif arch == "kfp":
+        return kFingerprinting()
     else:
         raise RuntimeError(arch)
 
