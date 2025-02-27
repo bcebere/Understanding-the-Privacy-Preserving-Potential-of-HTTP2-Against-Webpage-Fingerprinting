@@ -15,6 +15,8 @@ from tqdm import tqdm
 import wfaudit.logger as log
 from wfaudit.processing import process_pcap
 
+np.set_printoptions(suppress=True)
+
 
 def process_raw_pcaps(
     traces=Path("traces"),
@@ -224,7 +226,11 @@ def _constant_columns(dataframe: pd.DataFrame) -> list:
 
 
 def _prepare_time_series(
-    static_data: pd.DataFrame, ts_data: pd.DataFrame, ID_COL="file_order"  # id, full_id
+    static_data: pd.DataFrame,
+    ts_data: pd.DataFrame,
+    ts_limit: Optional[int] = None,
+    ts_pad: int = 0,
+    ID_COL="file_order",  # id, full_id
 ):
     ts_data_clean = []
 
@@ -241,6 +247,17 @@ def _prepare_time_series(
 
         lens.append(len(group))
         local_data = group.drop(columns=["id", "full_id", "file_order", "duration"])
+        if ts_limit is not None:
+            if len(local_data) > ts_limit:
+                local_data = local_data.head(ts_limit)
+            else:
+                padded = ts_pad * np.ones(
+                    ((ts_limit - len(local_data)), len(local_data.columns))
+                )
+                local_data = pd.concat(
+                    [local_data, pd.DataFrame(padded, columns=local_data.columns)],
+                    ignore_index=True,
+                )
 
         ts_data_clean.append(local_data)
         ids.append(idx)
@@ -270,26 +287,18 @@ def prepare_ts_datasets(
     full_data_static = pd.read_csv(in_workspace / "static_data.csv")
     full_data_temporal = pd.read_csv(in_workspace / "temporal_data.csv")
 
-    static_data_no_cache_no_blacklists = full_data_static
-    constant = _constant_columns(static_data_no_cache_no_blacklists)
-    static_data_no_cache_no_blacklists = static_data_no_cache_no_blacklists.drop(
-        columns=constant
-    )
+    static_data = full_data_static
+    constant = _constant_columns(static_data)
+    static_data = static_data.drop(columns=constant)
 
-    static_ids = static_data_no_cache_no_blacklists[ID_COL].values
+    static_ids = static_data[ID_COL].values
 
-    temporal_data_no_cache_no_blacklists = full_data_temporal[
-        full_data_temporal[ID_COL].isin(static_ids)
-    ]
-    static_data_no_cache_no_blacklists = static_data_no_cache_no_blacklists[
-        static_data_no_cache_no_blacklists[ID_COL].isin(
-            temporal_data_no_cache_no_blacklists[ID_COL].values
-        )
-    ]
+    temporal_data = full_data_temporal[full_data_temporal[ID_COL].isin(static_ids)]
+    static_data = static_data[static_data[ID_COL].isin(temporal_data[ID_COL].values)]
 
     (clean_static_data, clean_ts_data,) = _prepare_time_series(
-        static_data_no_cache_no_blacklists,
-        temporal_data_no_cache_no_blacklists,
+        static_data,
+        temporal_data,
         ID_COL=ID_COL,
     )
 
@@ -341,6 +350,100 @@ def prepare_ts_datasets(
         new_local_data.to_csv(output / outfile, sep=" ", index=False, header=False)
 
         real_idx += 1
+
+
+def prepare_ts_datasets_for_nns(
+    workspace=Path("workspace"),
+    ID_COL="file_order",
+    ts_limit: int = 1000,
+):  # id, full_id
+    in_workspace = workspace / Path("output_csv_full")
+    if not workspace.exists():
+        log.error("Missing output_csv_full data")
+        return
+
+    output = workspace / Path("output_ml")
+    output.mkdir(parents=True, exist_ok=True)
+
+    static_data = pd.read_csv(in_workspace / "static_data.csv")
+    full_data_temporal = pd.read_csv(in_workspace / "temporal_data.csv")
+
+    constant = _constant_columns(static_data)
+    static_data = static_data.drop(columns=constant)
+
+    static_ids = static_data[ID_COL].values
+
+    temporal_data = full_data_temporal[full_data_temporal[ID_COL].isin(static_ids)]
+    static_data = static_data[static_data[ID_COL].isin(temporal_data[ID_COL].values)]
+
+    (clean_static_data, clean_ts_data,) = _prepare_time_series(
+        static_data,
+        temporal_data,
+        ID_COL=ID_COL,
+        ts_limit=ts_limit,
+        ts_pad=0,
+    )
+
+    real_idx = 0
+    domain_repeats = {}
+    domain_label = {}
+    domain_limit = 50
+    class_cnt_limit = 1024
+
+    experiment_labels = []
+    for ridx, static_row in clean_static_data.iterrows():
+        encoded_label = static_row["label"]
+        experiment_labels.append(encoded_label)
+
+    experiment_labels = list(sorted(list(set(experiment_labels))))
+
+    X = []
+    y = []
+    for ridx, static_row in clean_static_data.iterrows():
+        local_token = static_row["label"]
+        encoded_label = experiment_labels.index(local_token)
+
+        if local_token not in domain_repeats:
+            if len(domain_repeats) > class_cnt_limit:
+                real_idx += 1
+                continue
+            domain_repeats[local_token] = 0
+            domain_label[local_token] = encoded_label
+
+        if domain_repeats[local_token] >= domain_limit:
+            real_idx += 1
+            continue
+
+        domain_repeats[local_token] += 1
+
+        local_sizes = (
+            clean_ts_data[real_idx]["length"].values
+            * clean_ts_data[real_idx]["direction"].values
+        )
+        timestamps = clean_ts_data[real_idx]["relative_timestamp"].copy()
+        timestamps[timestamps < 0] = 0  # WTF
+        local_ts = timestamps.values
+        assert len(local_ts) == len(local_sizes)
+        assert (local_ts >= 0).all(), timestamps.values
+
+        merged_array = np.empty(2 * len(local_sizes))
+        merged_array[0::2] = local_ts
+        merged_array[1::2] = local_sizes
+
+        X.append(merged_array)
+        y.append(encoded_label)
+
+        real_idx += 1
+
+    X = np.asarray(X)
+    y = np.asarray(y)
+
+    with open(output / "X.npy", "wb") as f:
+        np.save(f, X)
+    with open(output / "y.npy", "wb") as f:
+        np.save(f, y)
+
+    return X, y
 
 
 def create_datasets(

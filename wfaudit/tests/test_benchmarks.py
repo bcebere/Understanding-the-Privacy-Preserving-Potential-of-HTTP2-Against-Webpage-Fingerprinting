@@ -37,7 +37,7 @@ def test_leakage(tmp_path):
 
     for feat in features:
         assert feat in leakage.columns
-    assert "joint" in leakage.columns
+    assert "leakage_topfeats" in leakage.columns
 
 
 def test_ml_benchmarks(tmp_path):

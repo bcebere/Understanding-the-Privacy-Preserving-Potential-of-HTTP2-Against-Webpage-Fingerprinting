@@ -11,6 +11,7 @@ from wfaudit import (
     create_datasets,
     merge_pcap_csvs,
     prepare_ts_datasets,
+    prepare_ts_datasets_for_nns,
     process_raw_pcaps,
 )
 
@@ -109,6 +110,24 @@ def test_prepare_wefde_datasets(tmp_path):
 
     num_files = sum(1 for file in output.iterdir() if file.is_file())
     assert num_files == 6
+
+
+def test_prepare_nn_datasets(tmp_path):
+    process_raw_pcaps(
+        traces=Path("traces"),
+        workspace=tmp_path,
+        unlink_after_processing=False,
+    )
+
+    merge_pcap_csvs(workspace=tmp_path)
+
+    prepare_ts_datasets_for_nns(workspace=tmp_path)
+
+    output = tmp_path / "output_ml"
+    assert output.exists()
+
+    num_files = sum(1 for file in output.iterdir() if file.is_file())
+    assert num_files == 2
 
 
 def test_e2e(tmp_path):
