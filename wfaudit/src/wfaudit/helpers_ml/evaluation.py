@@ -19,6 +19,7 @@ from wfaudit.helpers_ml.lr import LinearClassifier
 from wfaudit.helpers_ml.rf import RFClassifier
 from wfaudit.helpers_ml.serialization import load_from_file, save_to_file
 from wfaudit.helpers_ml.svm import SVMClassifier
+from wfaudit.helpers_ml.varcnn import VarCNNClassifier
 from wfaudit.helpers_ml.xgb import XGBoostClassifier
 import wfaudit.logger as log
 
@@ -201,7 +202,7 @@ def evaluate_classifier(
     }
 
 
-def _get_static_arch_mode(arch: str):
+def _get_arch_mode(arch: str, **kwargs):
     if arch == "xgboost":
         return XGBoostClassifier()
     elif arch == "svm":
@@ -212,6 +213,8 @@ def _get_static_arch_mode(arch: str):
         return RFClassifier()
     elif arch == "kfp":
         return kFingerprinting()
+    elif arch == "varcnn":
+        return VarCNNClassifier(**kwargs)
     else:
         raise RuntimeError(arch)
 
@@ -222,6 +225,7 @@ def _evaluate_static_models_cv(
     input_data: List,
     labels: pd.Series,
     workspace=Path("workspace"),
+    **kwargs,
 ):
     bkp_file = workspace / f"eval_ts_flow_ho_{len(input_data)}_{arch}_{testname}.json"
 
@@ -229,14 +233,17 @@ def _evaluate_static_models_cv(
     if bkp_file.exists():
         score = load_from_file(bkp_file)
     else:
-        model = _get_static_arch_mode(arch)
+        model = _get_arch_mode(
+            arch,
+            **kwargs,
+        )
         try:
             score = evaluate_classifier(
                 model, X=np.asarray(input_data), Y=np.asarray(labels)
             )
         except BaseException as e:
             log.error(f"static evaluation failed {e}")
-            print(input_data, labels)
+            raise
             time.sleep(0.5)
             return None
 
@@ -252,6 +259,7 @@ def evaluate_by_domain(
     labels: np.ndarray,
     metric_key: str = "f1_score_macro",
     workspace=Path("workspace"),
+    **kwargs,
 ):
     scores = []
     for domain in tqdm(np.unique(labels)):
@@ -266,6 +274,7 @@ def evaluate_by_domain(
             data,
             horizon_labels,
             workspace=workspace,
+            **kwargs,
         )
         if score is None:
             continue

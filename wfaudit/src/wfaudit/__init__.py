@@ -9,6 +9,7 @@ from .benchmarks import evaluate_exploratory_ml  # noqa: F401; noqa: F401
 from .benchmarks import evaluate_leakage  # noqa: F401
 from .benchmarks import evaluate_leakage_v2  # noqa: F401
 from .benchmarks import evaluate_ml  # noqa: F401
+from .benchmarks import evaluate_ml_rawts  # noqa: F401
 from .benchmarks import prepare_features  # noqa: F401; noqa: F401
 from .parser import create_datasets  # noqa: F401
 from .parser import merge_pcap_csvs  # noqa: F401

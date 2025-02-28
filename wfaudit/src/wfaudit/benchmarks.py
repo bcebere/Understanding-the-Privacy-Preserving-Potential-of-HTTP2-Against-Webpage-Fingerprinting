@@ -68,6 +68,38 @@ def evaluate_ml(
     return final_score
 
 
+def evaluate_ml_rawts(
+    X,
+    y,
+    workspace=Path("output_ml"),
+    metric_key="f1_score_macro",
+    arch: str = "xgboost",
+    **kwargs,
+):
+    workspace.mkdir(parents=True, exist_ok=True)
+
+    bkp_file = workspace / f"eval_rawts_{arch}_{metric_key}.json"
+
+    if not bkp_file.exists():
+        scores = evaluate_by_domain(
+            arch,
+            "rawts",
+            X,
+            y,
+            metric_key=metric_key,
+            workspace=workspace,
+            **kwargs,
+        )
+        save_to_file(bkp_file, scores)
+    else:
+        scores = load_from_file(bkp_file)
+
+    final_score = generate_score(scores)
+    log.info(f"[ML perf rawts] arch = {arch}, F1 score={print_score(final_score)}")
+
+    return final_score
+
+
 def evaluate_leakage(
     features_range: dict,
     workspace=Path("output_leakage"),

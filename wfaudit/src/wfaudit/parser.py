@@ -80,7 +80,7 @@ def process_raw_pcaps(
     Parallel(n_jobs=n_jobs)(delayed(_parse_single_pcap)(filename) for filename in files)
 
 
-def merge_pcap_csvs(workspace=Path("workspace"), pd_lim: int = 5000) -> None:
+def merge_pcap_csvs(workspace=Path("workspace"), pd_lim: int = 10000) -> None:
     """
     Args:
         workspace: The folder which contains the post-processed pcaps --- output_csv_single.
@@ -465,3 +465,6 @@ def create_datasets(
 
     # Create Time-Series datasets
     prepare_ts_datasets(workspace=workspace)
+
+    # Create datasets for NNs
+    prepare_ts_datasets_for_nns(workspace=workspace, ts_limit=1000)
