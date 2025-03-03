@@ -13,6 +13,7 @@ from sklearn.preprocessing import LabelEncoder
 from tqdm import tqdm
 
 # wfaudit absolute
+from wfaudit.helpers_ml.holmes import HolmesClassifier
 from wfaudit.helpers_ml.kfp import kFingerprinting
 from wfaudit.helpers_ml.lr import LinearClassifier
 from wfaudit.helpers_ml.rf import RFClassifier
@@ -217,6 +218,8 @@ def _get_arch_mode(arch: str, **kwargs):
         return VarCNNClassifier(**kwargs)
     elif arch == "tam":
         return RobustFingerprintingClassifier(**kwargs)
+    elif arch == "holmes":
+        return HolmesClassifier(**kwargs)
     else:
         raise RuntimeError(arch)
 
