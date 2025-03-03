@@ -67,18 +67,20 @@ def test_ml_benchmarks_stats(tmp_path):
     assert num_files == 6 + 1
 
     saved_features = json.load(open(output_features / "FeaturePositions.json"))
-    print(features)
     assert features == saved_features
 
     # Test ML benchmark
     for arch in ["kfp", "xgboost", "svm", "lr", "rf"]:
         output_ml = tmp_path / f"output_ml_{arch}"
-        ml_score = evaluate_ml(
+        ml_score, scores_by_domain = evaluate_ml(
             workspace=output_ml, wefde_features_dir=output_features, arch=arch
         )
         assert output_ml.exists()
         assert max(ml_score) <= 1
         print("ML", arch, print_score(ml_score))
+        assert len(scores_by_domain.keys()) == 3
+        for label in [0, 1, 2]:
+            assert label in scores_by_domain
 
 
 def test_ml_benchmarks_raw(tmp_path):
@@ -97,7 +99,7 @@ def test_ml_benchmarks_raw(tmp_path):
     # Test ML benchmark
     for arch in ["varcnn", "xgboost"]:
         output_ml = tmp_path / f"output_ml_{arch}"
-        ml_score = evaluate_ml_rawts(
+        ml_score, scores_by_domain = evaluate_ml_rawts(
             X,
             y,
             workspace=output_ml,
@@ -108,3 +110,6 @@ def test_ml_benchmarks_raw(tmp_path):
         assert output_ml.exists()
         assert max(ml_score) <= 1
         print("ML", arch, print_score(ml_score))
+        assert len(scores_by_domain.keys()) == 3
+        for label in [0, 1, 2]:
+            assert label in scores_by_domain
