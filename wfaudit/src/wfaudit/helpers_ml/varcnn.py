@@ -2,6 +2,9 @@
 ########################
 ########################
 
+# stdlib
+import random
+
 # third party
 import numpy as np
 from sklearn.model_selection import train_test_split
@@ -12,6 +15,42 @@ from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
+def enable_reproducible_results(random_state: int = 0) -> None:
+    np.random.seed(random_state)
+    try:
+        torch.manual_seed(random_state)
+    except BaseException:
+        pass
+    random.seed(random_state)
+
+
+enable_reproducible_results(42)
+
+
+class EarlyStopping:
+    def __init__(self, patience=5, min_delta=0):
+        """
+        Args:
+            patience (int): How many epochs to wait before stopping if no improvement.
+            min_delta (float): Minimum change to qualify as an improvement.
+        """
+        self.patience = patience
+        self.min_delta = min_delta
+        self.best_loss = 999999999
+        self.counter = 0
+
+    def __call__(self, val_loss):
+        if val_loss < self.best_loss - self.min_delta:
+            self.best_loss = val_loss
+            self.counter = 0  # Reset counter if loss improves
+        else:
+            self.counter += 1  # Increment counter if no improvement
+            if self.counter >= self.patience:
+                print("Early stopping triggered!")
+                return True
+        return False
 
 
 class DilatedBasic1D(nn.Module):
@@ -174,20 +213,18 @@ class VarCNNClassifier:
     def __init__(
         self,
         num_classes: int = 2,
-        batch_size: int = 512,
-        num_workers: int = 8,
+        batch_size: int = 1024,
         lr: float = 1e-3,
         device=DEVICE,
         train_epochs: int = 100,
         criterion=torch.nn.CrossEntropyLoss,
     ) -> None:
         self.batch_size = batch_size
-        self.num_workers = num_workers
         self.lr = lr
         self.device = device
         self.train_epochs = train_epochs
         self.criterion = criterion()
-        self.model = VarCNN(num_classes=num_classes)
+        self.model = VarCNN(num_classes=num_classes).to(self.device)
 
     def _reshape_covs(self, X):
         if len(X.shape) == 2:
@@ -259,12 +296,12 @@ class VarCNNClassifier:
 
         train_dataset, test_dataset, train_sampler = self._datasets(X, y)
         optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
+        early_stopping = EarlyStopping(patience=10)
 
         loader = DataLoader(
             train_dataset,
             batch_size=min(self.batch_size, len(train_dataset)),
             sampler=train_sampler,
-            num_workers=self.num_workers,
             pin_memory=False,
         )
         for epoch in tqdm(range(self.train_epochs)):
@@ -292,6 +329,12 @@ class VarCNNClassifier:
                 print(
                     f"Epoch {epoch}: train_loss = {train_loss} validation_loss: {val_loss}"
                 )
+
+            if early_stopping(val_loss):
+                print(
+                    f"Epoch {epoch}: Stopping early: train_loss = {train_loss} validation_loss: {val_loss}"
+                )
+                break
 
     @staticmethod
     def name() -> str:

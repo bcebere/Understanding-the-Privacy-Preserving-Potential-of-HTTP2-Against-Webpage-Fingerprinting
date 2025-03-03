@@ -212,7 +212,6 @@ def load_wefde_features(
                 continue
 
             with open(os.path.join(root, file), "r") as csvFile:
-
                 # load the csv file and parse it into a data instance
                 features = list(csv.reader(csvFile, delimiter=delimiter))
                 features = [[float(f) for f in instance if f] for instance in features]

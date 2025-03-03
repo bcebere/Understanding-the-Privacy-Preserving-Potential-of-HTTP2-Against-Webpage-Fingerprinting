@@ -7,13 +7,7 @@ import numpy as np
 import pandas as pd
 
 # wfaudit absolute
-from wfaudit.helpers_ml import (
-    evaluate_by_domain,
-    generate_score,
-    load_from_file,
-    print_score,
-    save_to_file,
-)
+from wfaudit.helpers_ml import evaluate_by_domain, generate_score, print_score
 from wfaudit.helpers_wefde.analysis.data_utils import load_wefde_features
 from wfaudit.helpers_wefde.analysis.info_leak import (
     evaluate_info_leakage,
@@ -39,6 +33,7 @@ def evaluate_ml(
     wefde_features_dir=Path("output_features"),
     metric_key="f1_score_macro",
     arch: str = "xgboost",
+    filtered_labels=None,
 ):
     if not wefde_features_dir.exists():
         log.error("WeFDE features not extracted")
@@ -46,26 +41,22 @@ def evaluate_ml(
 
     workspace.mkdir(parents=True, exist_ok=True)
 
-    bkp_file = workspace / f"eval_ts_full_{arch}_{metric_key}.json"
+    X, y = load_wefde_features(wefde_features_dir)
+    _, scores_by_domain = evaluate_by_domain(
+        arch,
+        "stats",
+        X,
+        y,
+        metric_key=metric_key,
+        workspace=workspace,
+        filtered_labels=filtered_labels,
+    )
 
-    if not bkp_file.exists():
-        X, y = load_wefde_features(wefde_features_dir)
-        scores = evaluate_by_domain(
-            arch,
-            "full_data",
-            X,
-            y,
-            metric_key=metric_key,
-            workspace=workspace,
-        )
-        save_to_file(bkp_file, scores)
-    else:
-        scores = load_from_file(bkp_file)
-
+    scores = list(scores_by_domain.values())
     final_score = generate_score(scores)
-    log.info(f"[ML perf] arch = {arch}, F1 score={print_score(final_score)}")
+    log.info(f"[ML perf with stats] arch = {arch}, F1 score={print_score(final_score)}")
 
-    return final_score
+    return final_score, scores_by_domain
 
 
 def evaluate_ml_rawts(
@@ -74,30 +65,27 @@ def evaluate_ml_rawts(
     workspace=Path("output_ml"),
     metric_key="f1_score_macro",
     arch: str = "xgboost",
+    filtered_labels=None,
     **kwargs,
 ):
     workspace.mkdir(parents=True, exist_ok=True)
 
-    bkp_file = workspace / f"eval_rawts_{arch}_{metric_key}.json"
+    _, scores_by_domain = evaluate_by_domain(
+        arch,
+        "rawts",
+        X,
+        y,
+        metric_key=metric_key,
+        workspace=workspace,
+        filtered_labels=filtered_labels,
+        **kwargs,
+    )
 
-    if not bkp_file.exists():
-        scores = evaluate_by_domain(
-            arch,
-            "rawts",
-            X,
-            y,
-            metric_key=metric_key,
-            workspace=workspace,
-            **kwargs,
-        )
-        save_to_file(bkp_file, scores)
-    else:
-        scores = load_from_file(bkp_file)
-
+    scores = list(scores_by_domain.values())
     final_score = generate_score(scores)
     log.info(f"[ML perf rawts] arch = {arch}, F1 score={print_score(final_score)}")
 
-    return final_score
+    return final_score, scores_by_domain
 
 
 def evaluate_leakage(
@@ -110,6 +98,7 @@ def evaluate_leakage(
     nmi_threshold=0.9,
     discrete_threshold=100000,
     max_instances=100,
+    compute_joint: bool = True,
 ):
     if not wefde_features_dir.exists():
         log.error("WeFDE features not extracted")
@@ -126,6 +115,7 @@ def evaluate_leakage(
         nmi_threshold=nmi_threshold,
         discrete_threshold=discrete_threshold,
         max_instances=max_instances,
+        compute_joint=compute_joint,
     )
 
 
@@ -221,7 +211,7 @@ def evaluate_exploratory_ml(
         md5_hash = hashlib.md5()
         md5_hash.update(cluster_hash.encode("utf-8"))
         cluster_hash = md5_hash.hexdigest()
-        scores = evaluate_by_domain(
+        scores, scores_by_domain = evaluate_by_domain(
             arch,
             f"cluster_{arch}_{cluster_hash}",
             X[X.columns[cluster]],

@@ -100,7 +100,6 @@ class WebsiteFingerprintModeler(object):
         """
         samples = []
         for site, mkde in zip(self.data.sites, mkdes):
-
             # n = k * pr(c[i]) -- number of samples per site
             num = int(sample_size * web_priors[site])
 
@@ -241,7 +240,6 @@ class WebsiteFingerprintModeler(object):
             prob_sets = [prob_sets]
 
         for i, prob_set in enumerate(prob_sets):
-
             # weight the probability predictions by the website priors
             # in the closed-world scenario, all are equally weighted
             probs_weighted = []

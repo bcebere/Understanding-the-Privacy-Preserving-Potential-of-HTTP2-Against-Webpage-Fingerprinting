@@ -17,13 +17,14 @@ class kFingerprinting:
         n_neighbors: int = 5,
         **kwargs: Any,
     ) -> None:
-
         self.n_neighbors = n_neighbors
         self.n_components = n_components
         self.scaler = MinMaxScaler()
 
     def fit(self, X: np.ndarray, y: np.ndarray) -> "kFingerprinting":
-        self.model = KNeighborsClassifier(n_neighbors=min(self.n_neighbors, len(X)))
+        self.model = KNeighborsClassifier(
+            n_neighbors=min(self.n_neighbors, len(X)), n_jobs=2
+        )
         self.pca = PCA(n_components=min(self.n_components, len(X)))
         X = np.asarray(X)
         y = np.asarray(y)

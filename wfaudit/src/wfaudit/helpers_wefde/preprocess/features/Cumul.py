@@ -23,7 +23,6 @@ def get_cumul_features_per_connection(packets, feature_cnt=5):
 
     # Process trace
     for packetsize in itertools.islice(packets, None):
-
         # CUMUL uses positive to denote incoming, negative to be outgoing,
         # different from dataset
         packetsize = -packetsize

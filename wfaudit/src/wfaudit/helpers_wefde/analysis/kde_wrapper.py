@@ -34,7 +34,6 @@ class KDE(object):
         )
 
         if bw is None:
-
             # create empty bandwidth array
             bw = np.empty((self.n_features, self.n_kernels))
             bw[:] = np.nan

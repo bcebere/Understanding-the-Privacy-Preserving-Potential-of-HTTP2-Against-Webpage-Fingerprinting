@@ -331,6 +331,7 @@ def _base_evaluate_info_leakage_light(
     nmi_threshold=0.9,
     discrete_threshold=100000,
     max_instances=100,
+    compute_joint: bool = True,
 ):
     """
     Run the full information leakage analysis on a processed dataset.
@@ -389,6 +390,13 @@ def _base_evaluate_info_leakage_light(
     assert indiv_path.exists()
 
     log.info(f"Relevant features = {relevant_feats} total = {len(relevant_feats)}")
+
+    if not compute_joint:
+        return print_leakage(
+            features_range=features_range,  # offsets for leakage types
+            leakages_indiv=leakage_indiv,
+        )
+
     # cluster non-redundant features
     log.info("Begin cluster leakage measurements.")
 
@@ -432,6 +440,7 @@ def evaluate_info_leakage(
     nmi_threshold=0.9,
     discrete_threshold=100000,
     max_instances=100,
+    compute_joint: bool = True,
 ):
     """
     Run the full information leakage analysis on a processed dataset.
@@ -470,6 +479,7 @@ def evaluate_info_leakage(
         nmi_threshold=nmi_threshold,
         discrete_threshold=discrete_threshold,
         max_instances=max_instances,
+        compute_joint=compute_joint,
     )
 
 

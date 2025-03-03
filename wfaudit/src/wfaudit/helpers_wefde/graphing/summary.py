@@ -30,7 +30,6 @@ def print_leakage(
 
     summary = {"testcase": dataset_name}
     for i in range(1, len(feature_range) + 1):
-
         category, indices = feature_range[i - 1]
 
         # plot category leakages for each leakage file

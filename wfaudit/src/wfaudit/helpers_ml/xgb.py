@@ -61,12 +61,11 @@ class XGBoostClassifier:
         max_bin: int = 256,
         booster: int = 0,
         grow_policy: int = 0,
-        nthread: int = 4,
+        nthread: int = 2,
         random_state: int = 0,
         eta: float = 0.3,
         **kwargs: Any,
     ) -> None:
-
         self.model = XGBClassifier(
             n_estimators=n_estimators,
             reg_lambda=reg_lambda,

@@ -2,7 +2,6 @@
 import copy
 from pathlib import Path
 import random
-import time
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 # third party
@@ -95,7 +94,7 @@ def generate_score(metric: np.ndarray) -> Tuple[float, float]:
 
 
 def print_score(score: Tuple[float, float]) -> str:
-    return str(round(score[0], 4)) + " +/- " + str(round(score[1], 3))
+    return str(round(score[0], 3)) + " +/- " + str(round(score[1], 2))
 
 
 def evaluate_classifier(
@@ -237,16 +236,9 @@ def _evaluate_static_models_cv(
             arch,
             **kwargs,
         )
-        try:
-            score = evaluate_classifier(
-                model, X=np.asarray(input_data), Y=np.asarray(labels)
-            )
-        except BaseException as e:
-            log.error(f"static evaluation failed {e}")
-            raise
-            time.sleep(0.5)
-            return None
-
+        score = evaluate_classifier(
+            model, X=np.asarray(input_data), Y=np.asarray(labels)
+        )
         save_to_file(bkp_file, score)
     # log.error(f" >>> test = {testname}, score = {score['str']['f1_score_macro']}")
     return score
@@ -259,10 +251,16 @@ def evaluate_by_domain(
     labels: np.ndarray,
     metric_key: str = "f1_score_macro",
     workspace=Path("workspace"),
+    filtered_labels=None,
     **kwargs,
 ):
     scores = []
-    for domain in tqdm(np.unique(labels)):
+    scores_by_domain = {}
+    if filtered_labels is None:
+        filtered_labels = np.unique(labels)
+    # print("evaluating filtered labels", filtered_labels)
+
+    for domain in tqdm(filtered_labels):
         horizon_labels = pd.Series(labels).copy()
         horizon_labels[horizon_labels != domain] = -1
         horizon_labels[horizon_labels == domain] = 1
@@ -279,5 +277,6 @@ def evaluate_by_domain(
         if score is None:
             continue
         scores.append(score["raw"][metric_key][0])
+        scores_by_domain[int(domain)] = float(score["raw"][metric_key][0])
 
-    return scores
+    return scores, scores_by_domain
