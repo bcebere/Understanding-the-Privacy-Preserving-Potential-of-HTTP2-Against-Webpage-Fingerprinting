@@ -97,7 +97,7 @@ def test_ml_benchmarks_raw(tmp_path):
         y = np.load(f)
 
     # Test ML benchmark
-    for arch in ["varcnn", "xgboost"]:
+    for arch in ["tam", "varcnn", "xgboost"]:
         output_ml = tmp_path / f"output_ml_{arch}"
         ml_score, scores_by_domain = evaluate_ml_rawts(
             X,

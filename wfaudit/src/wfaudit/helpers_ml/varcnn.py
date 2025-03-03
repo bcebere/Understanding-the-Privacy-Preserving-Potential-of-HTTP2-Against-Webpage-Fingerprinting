@@ -172,7 +172,7 @@ class VarCNNClassifier:
     def __init__(
         self,
         num_classes: int = 2,
-        batch_size: int = 1024,
+        batch_size: int = 512,
         lr: float = 1e-3,
         device=DEVICE,
         train_epochs: int = 100,
@@ -190,14 +190,30 @@ class VarCNNClassifier:
             criterion=criterion,
         )
 
+    def _reshape_covs(self, X):
+        if len(X.shape) == 2:
+            Xts = X.reshape(len(X), int(X.shape[1] / 2), 2)
+            Xts = Xts.transpose(0, 2, 1)
+
+            return Xts
+        if len(X.shape) == 3:
+            return X
+        else:
+            raise RuntimeError(X.shape)
+
     def fit(self, X: np.ndarray, y: np.ndarray) -> "VarCNN":
+        X = self._reshape_covs(np.asarray(X))
+        y = np.asarray(y)
+
         self.model.fit(X, y)
         return self
 
     def predict_proba(self, X: np.ndarray) -> np.ndarray:
+        X = self._reshape_covs(np.asarray(X))
         return self.model.predict_proba(X)
 
     def predict(self, X: np.ndarray) -> np.ndarray:
+        X = self._reshape_covs(np.asarray(X))
         return self.model.predict(X)
 
     @staticmethod

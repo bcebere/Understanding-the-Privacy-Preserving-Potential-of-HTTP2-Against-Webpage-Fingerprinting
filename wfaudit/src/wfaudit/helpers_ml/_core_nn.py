@@ -70,27 +70,12 @@ class BasicNNClassifier:
         self.criterion = criterion()
         self.model = model
 
-    def _reshape_covs(self, X):
-        if len(X.shape) == 2:
-            Xts = X.reshape(len(X), int(X.shape[1] / 2), 2)
-            Xts = Xts.transpose(0, 2, 1)
-
-            return Xts
-        if len(X.shape) == 3:
-            return X
-        else:
-            raise RuntimeError(X.shape)
-
     def fit(self, X: np.ndarray, y: np.ndarray) -> "BasicNNClassifier":
-        X = self._reshape_covs(np.asarray(X))
-        y = np.asarray(y)
-
         self._train(X, y)
         return self
 
     def predict_proba(self, X: np.ndarray) -> np.ndarray:
         with torch.no_grad():
-            X = self._reshape_covs(np.asarray(X))
             Xt = self._check_tensor(X).float()
 
             logits = self.model(Xt)

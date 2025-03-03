@@ -16,6 +16,7 @@ from tqdm import tqdm
 from wfaudit.helpers_ml.kfp import kFingerprinting
 from wfaudit.helpers_ml.lr import LinearClassifier
 from wfaudit.helpers_ml.rf import RFClassifier
+from wfaudit.helpers_ml.robustfp import RobustFingerprintingClassifier
 from wfaudit.helpers_ml.serialization import load_from_file, save_to_file
 from wfaudit.helpers_ml.svm import SVMClassifier
 from wfaudit.helpers_ml.varcnn import VarCNNClassifier
@@ -214,6 +215,8 @@ def _get_arch_mode(arch: str, **kwargs):
         return kFingerprinting()
     elif arch == "varcnn":
         return VarCNNClassifier(**kwargs)
+    elif arch == "tam":
+        return RobustFingerprintingClassifier(**kwargs)
     else:
         raise RuntimeError(arch)
 
