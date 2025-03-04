@@ -13,7 +13,7 @@ class kFingerprinting:
     def __init__(
         self,
         random_state: int = 0,
-        n_components: int = 10,
+        n_components: int = 20,
         n_neighbors: int = 5,
         **kwargs: Any,
     ) -> None:
@@ -33,26 +33,26 @@ class kFingerprinting:
         X = self.scaler.fit_transform(X)
 
         # reduce
-        Xred = self.pca.fit_transform(X)
+        X = self.pca.fit_transform(X)
 
         # classify
-        self.model.fit(Xred, y)
+        self.model.fit(X, y)
         return self
 
     def predict(self, X: pd.DataFrame, *args: Any, **kwargs: Any) -> pd.DataFrame:
         X = np.asarray(X)
 
         X = self.scaler.transform(X)
-        Xred = self.pca.transform(X)
+        X = self.pca.transform(X)
 
-        return self.model.predict(Xred, *args, **kwargs)
+        return self.model.predict(X, *args, **kwargs)
 
     def predict_proba(self, X: pd.DataFrame, *args: Any, **kwargs: Any) -> pd.DataFrame:
         X = np.asarray(X)
         X = self.scaler.transform(X)
-        Xred = self.pca.transform(X)
+        X = self.pca.transform(X)
 
-        return self.model.predict_proba(Xred, *args, **kwargs)
+        return self.model.predict_proba(X, *args, **kwargs)
 
     @staticmethod
     def name() -> str:

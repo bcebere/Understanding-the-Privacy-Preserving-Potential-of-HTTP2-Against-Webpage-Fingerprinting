@@ -81,7 +81,7 @@ class classifier_metrics:
             else:
                 raise ValueError(f"invalid metric {metric}")
 
-        log.debug(f"evaluate_classifier: {results}")
+        # log.debug(f"evaluate_classifier: {results}")
         return results
 
 
@@ -230,12 +230,13 @@ def _evaluate_static_models_cv(
     input_data: List,
     labels: pd.Series,
     workspace=Path("workspace"),
+    use_cache: bool = True,
     **kwargs,
 ):
     bkp_file = workspace / f"eval_ts_flow_ho_{len(input_data)}_{arch}_{testname}.json"
 
     score = None
-    if bkp_file.exists():
+    if bkp_file.exists() and use_cache:
         score = load_from_file(bkp_file)
     else:
         model = _get_arch_mode(
@@ -245,7 +246,8 @@ def _evaluate_static_models_cv(
         score = evaluate_classifier(
             model, X=np.asarray(input_data), Y=np.asarray(labels)
         )
-        save_to_file(bkp_file, score)
+        if use_cache:
+            save_to_file(bkp_file, score)
     # log.error(f" >>> test = {testname}, score = {score['str']['f1_score_macro']}")
     return score
 
@@ -258,6 +260,7 @@ def evaluate_by_domain(
     metric_key: str = "f1_score_macro",
     workspace=Path("workspace"),
     filtered_labels=None,
+    use_cache: bool = True,
     **kwargs,
 ):
     scores = []
@@ -278,11 +281,15 @@ def evaluate_by_domain(
             data,
             horizon_labels,
             workspace=workspace,
+            use_cache=use_cache,
             **kwargs,
         )
         if score is None:
             continue
         scores.append(score["raw"][metric_key][0])
         scores_by_domain[int(domain)] = float(score["raw"][metric_key][0])
+        log.debug(
+            f" >>> [{arch}][{domain}] {metric_key} = {scores_by_domain[int(domain)]}"
+        )
 
     return scores, scores_by_domain

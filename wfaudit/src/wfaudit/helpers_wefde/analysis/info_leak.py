@@ -206,6 +206,7 @@ def _base_evaluate_info_leakage(
     nmi_threshold=0.9,
     discrete_threshold=100000,
     max_instances=100,
+    compute_joint: bool = True,
 ):
     """
     Run the full information leakage analysis on a processed dataset.
@@ -263,6 +264,11 @@ def _base_evaluate_info_leakage(
     assert indiv_path.exists()
 
     log.info(f"Relevant features = {relevant_feats} total = {len(relevant_feats)}")
+    if not compute_joint:
+        return print_leakage(
+            features_range=features_range,  # offsets for leakage types
+            leakages_indiv=leakage_indiv,
+        )
     # cluster non-redundant features
     cst_path = outdir / "clusters.pkl"
     chk_path = outdir / "prune_checkpoint.txt"
@@ -321,115 +327,6 @@ def _base_evaluate_info_leakage(
     )
 
 
-def _base_evaluate_info_leakage_light(
-    feature_data,
-    output_path: str,  # where to save the leakages
-    features_range: dict,  # the offsets of each feature
-    n_procs=0,
-    n_samples=50000,
-    topn=20,
-    nmi_threshold=0.9,
-    discrete_threshold=100000,
-    max_instances=100,
-    compute_joint: bool = True,
-):
-    """
-    Run the full information leakage analysis on a processed dataset.
-
-    Parameters
-    ----------
-    features_data :
-        Operating system file path to the directory containing processed feature files.
-    output_path : str
-        Operating system file path to the directory where analysis results should be saved.
-    n_procs : int
-        Number of processes to use for parallelism.
-        If 0 is used, auto-detect based on number of system CPUs.
-    n_samples : int
-        Number of samples to use when performing monte-carlo estimation when running the fingerprint modeler.
-    topn : int
-        Top number of features to analyze during joint analysis.
-    nmi_threshold : float
-        Cut-off value for determining redundant features. Should be a percentage value.
-
-    Returns
-    -------
-    float
-        Combined feature leakage (in bits)
-    """
-    print("Info leakage LIGHT !!!!")
-    # prepare feature dataset
-    log.info(f"Loaded {len(feature_data.sites)} sites.")
-    log.info(f"Loaded {len(feature_data)} instances.")
-    log.info(
-        f"""Running analysis with params:
-        *     n_procs = {n_procs}
-        *     n_samples = {n_samples}
-        *     topn = {topn}
-        *     nmi_threshold = {nmi_threshold}
-        *     max_instances = {max_instances}
-             """
-    )
-
-    # directory to save results
-    outdir = Path(output_path)
-    outdir.mkdir(parents=True, exist_ok=True)
-
-    if n_procs == 0:
-        n_procs = cpu_count() - 1
-
-    modeler, analyzer, relevant_feats, leakage_indiv = _evaluate_individual_leakage(
-        feature_data,
-        outdir=outdir,
-        n_procs=n_procs,
-        topn=topn,
-        nmi_threshold=nmi_threshold,
-    )
-
-    indiv_path = outdir / "indiv.pkl"
-    assert indiv_path.exists()
-
-    log.info(f"Relevant features = {relevant_feats} total = {len(relevant_feats)}")
-
-    if not compute_joint:
-        return print_leakage(
-            features_range=features_range,  # offsets for leakage types
-            leakages_indiv=leakage_indiv,
-        )
-
-    # cluster non-redundant features
-    log.info("Begin cluster leakage measurements.")
-
-    def _eval_and_cache(clusters, joint_leakage: bool, out_file: str):
-        out_path = outdir / out_file
-        if os.path.exists(out_path):
-            with open(out_path, "rb") as fi:
-                results = dill.load(fi)
-        else:
-            results = modeler.information_leakage(
-                clusters=clusters, sample_size=n_samples, joint_leakage=joint_leakage
-            )
-            assert len(results) != 0, clusters
-            with open(out_path, "wb") as fi:
-                dill.dump(results, fi)
-        return results
-
-    leakages_topfeats = _eval_and_cache(
-        clusters=relevant_feats,
-        joint_leakage=True,
-        out_file="leakage_joint_topfeats.pkl",
-    )
-
-    log.info(f"Non-redundant leakage results: {leakages_topfeats} bits.")
-
-    log.info("Finished execution.")
-    return print_leakage(
-        features_range=features_range,  # offsets for leakage types
-        leakages_indiv=leakage_indiv,
-        leakages_topfeats=leakages_topfeats,
-    )
-
-
 def evaluate_info_leakage(
     features_path: str,  # the folder with output of the feature extraction
     output_path: str,  # where to save the leakages
@@ -469,7 +366,7 @@ def evaluate_info_leakage(
     # prepare feature dataset
     log.info("Loading dataset.")
     feature_data = WebsiteData(features_path, max_instances=max_instances)
-    return _base_evaluate_info_leakage_light(
+    return _base_evaluate_info_leakage(
         feature_data=feature_data,
         output_path=output_path,
         features_range=features_range,

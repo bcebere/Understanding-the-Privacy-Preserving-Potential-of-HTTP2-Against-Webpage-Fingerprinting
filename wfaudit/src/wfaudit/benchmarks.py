@@ -34,6 +34,7 @@ def evaluate_ml(
     metric_key="f1_score_macro",
     arch: str = "xgboost",
     filtered_labels=None,
+    use_cache: bool = True,
 ):
     if not wefde_features_dir.exists():
         log.error("WeFDE features not extracted")
@@ -50,6 +51,7 @@ def evaluate_ml(
         metric_key=metric_key,
         workspace=workspace,
         filtered_labels=filtered_labels,
+        use_cache=use_cache,
     )
 
     scores = list(scores_by_domain.values())
@@ -66,6 +68,7 @@ def evaluate_ml_rawts(
     metric_key="f1_score_macro",
     arch: str = "xgboost",
     filtered_labels=None,
+    use_cache: bool = True,
     **kwargs,
 ):
     workspace.mkdir(parents=True, exist_ok=True)
@@ -78,6 +81,7 @@ def evaluate_ml_rawts(
         metric_key=metric_key,
         workspace=workspace,
         filtered_labels=filtered_labels,
+        use_cache=use_cache,
         **kwargs,
     )
 
