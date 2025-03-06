@@ -192,6 +192,7 @@ def _evaluate_individual_leakage(
 
     top_feats = dict(tuples)
     relevant_feats = sorted(cleaned, key=lambda x: top_feats[x], reverse=True)
+    relevant_feats = relevant_feats[:topn]
 
     return modeler, analyzer, relevant_feats, leakage_indiv
 
@@ -269,24 +270,6 @@ def _base_evaluate_info_leakage(
             features_range=features_range,  # offsets for leakage types
             leakages_indiv=leakage_indiv,
         )
-    # cluster non-redundant features
-    cst_path = outdir / "clusters.pkl"
-    chk_path = outdir / "prune_checkpoint.txt"
-    if cst_path.exists():
-        log.info("Loading clusters from file.")
-        with open(cst_path, "rb") as fi:
-            clusters = dill.load(fi)
-    else:
-        log.info("Begin feature clustering.")
-        try:
-            clusters, _ = analyzer.cluster(relevant_feats, checkpoint=str(chk_path))
-            with open(cst_path, "wb") as fi:
-                dill.dump(clusters, fi)
-        except BaseException:
-            clusters = [relevant_feats]
-
-    # perform joint information leakage measurement
-    log.info(f"Identified {len(clusters)} clusters.")
     log.info("Begin cluster leakage measurements.")
 
     def _eval_and_cache(clusters, joint_leakage: bool, out_file: str):
@@ -306,23 +289,41 @@ def _base_evaluate_info_leakage(
     leakages_topfeats = _eval_and_cache(
         clusters=relevant_feats,
         joint_leakage=True,
-        out_file="leakage_joint_topfeats.pkl",
+        out_file=f"leakage_joint_topfeats_top{topn}.pkl",
     )
 
     log.info(f"Non-redundant leakage results: {leakages_topfeats} bits.")
 
-    leakages_clusters = _eval_and_cache(
-        clusters=clusters, joint_leakage=True, out_file="leakage_joint_clusters.pkl"
-    )
-    log.info(
-        f"Non-redundant clusters joint leakage results: {leakages_clusters} bits. Clusters {len(clusters)}"
-    )
+    # cluster non-redundant features
+    # cst_path = outdir / f"clusters_top{topn}.pkl"
+    # chk_path = outdir / f"prune_checkpoint_top{topn}.txt"
+    # if cst_path.exists():
+    #    log.info("Loading clusters from file.")
+    #    with open(cst_path, "rb") as fi:
+    #        clusters = dill.load(fi)
+    # else:
+    #    log.info("Begin feature clustering.")
+    #    try:
+    #        clusters, _ = analyzer.cluster(relevant_feats, checkpoint=str(chk_path))
+    #        with open(cst_path, "wb") as fi:
+    #            dill.dump(clusters, fi)
+    #    except BaseException:
+    #        clusters = [relevant_feats]
+
+    # perform joint information leakage measurement
+    # log.info(f"Identified {len(clusters)} clusters.")
+    # leakages_clusters = _eval_and_cache(
+    #    clusters=clusters, joint_leakage=True, out_file=f"leakage_joint_clusters_top{topn}.pkl"
+    # )
+    # log.info(
+    #    f"Non-redundant clusters joint leakage results: {leakages_clusters} bits. Clusters {len(clusters)}"
+    # )
 
     log.info("Finished execution.")
     return print_leakage(
         features_range=features_range,  # offsets for leakage types
         leakages_indiv=leakage_indiv,
-        leakages_clusters=leakages_clusters,
+        # leakages_clusters=leakages_clusters,
         leakages_topfeats=leakages_topfeats,
     )
 
