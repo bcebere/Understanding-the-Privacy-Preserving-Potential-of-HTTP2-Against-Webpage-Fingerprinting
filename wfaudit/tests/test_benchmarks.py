@@ -70,7 +70,7 @@ def test_ml_benchmarks_stats(tmp_path):
     assert features == saved_features
 
     # Test ML benchmark
-    for arch in ["kfp", "xgboost", "svm", "lr", "rf"]:
+    for arch in ["kfpv2", "kfp", "xgboost", "svm", "lr", "rf"]:
         output_ml = tmp_path / f"output_ml_{arch}"
         ml_score, scores_by_domain = evaluate_ml(
             workspace=output_ml, wefde_features_dir=output_features, arch=arch
@@ -97,7 +97,7 @@ def test_ml_benchmarks_raw(tmp_path):
         y = np.load(f)
 
     # Test ML benchmark
-    for arch in ["tam", "varcnn", "xgboost"]:
+    for arch in ["holmes", "tam", "varcnn", "xgboost"]:
         output_ml = tmp_path / f"output_ml_{arch}"
         ml_score, scores_by_domain = evaluate_ml_rawts(
             X,

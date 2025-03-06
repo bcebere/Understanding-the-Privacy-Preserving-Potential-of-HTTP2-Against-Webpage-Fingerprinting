@@ -15,6 +15,7 @@ from tqdm import tqdm
 # wfaudit absolute
 from wfaudit.helpers_ml.holmes import HolmesClassifier
 from wfaudit.helpers_ml.kfp import kFingerprinting
+from wfaudit.helpers_ml.kfpv2 import KFingerprintingForestClassifier
 from wfaudit.helpers_ml.lr import LinearClassifier
 from wfaudit.helpers_ml.rf import RFClassifier
 from wfaudit.helpers_ml.robustfp import RobustFingerprintingClassifier
@@ -214,6 +215,8 @@ def _get_arch_mode(arch: str, **kwargs):
         return RFClassifier()
     elif arch == "kfp":
         return kFingerprinting()
+    elif arch == "kfpv2":
+        return KFingerprintingForestClassifier()
     elif arch == "varcnn":
         return VarCNNClassifier(**kwargs)
     elif arch == "tam":
