@@ -22,6 +22,7 @@ from wfaudit.helpers_ml.robustfp import RobustFingerprintingClassifier
 from wfaudit.helpers_ml.serialization import load_from_file, save_to_file
 from wfaudit.helpers_ml.svm import SVMClassifier
 from wfaudit.helpers_ml.varcnn import VarCNNClassifier
+from wfaudit.helpers_ml.varcnnv2 import VarCNNKerasClassifier
 from wfaudit.helpers_ml.xgb import XGBoostClassifier
 import wfaudit.logger as log
 
@@ -146,7 +147,7 @@ def evaluate_classifier(
     if group_ids is not None:
         group_ids = pd.Series(group_ids).reset_index(drop=True)
 
-    log.debug(f"evaluate_estimator shape x:{X.shape} y:{Y.shape}")
+    # log.debug(f"evaluate_estimator shape x:{X.shape} y:{Y.shape}")
 
     results = {}
 
@@ -219,6 +220,8 @@ def _get_arch_mode(arch: str, **kwargs):
         return KFingerprintingForestClassifier()
     elif arch == "varcnn":
         return VarCNNClassifier(**kwargs)
+    elif arch == "varcnnv2":
+        return VarCNNKerasClassifier(**kwargs)
     elif arch == "tam":
         return RobustFingerprintingClassifier(**kwargs)
     elif arch == "holmes":
@@ -296,3 +299,27 @@ def evaluate_by_domain(
         )
 
     return scores, scores_by_domain
+
+
+def evaluate_multiclass(
+    arch: str,  # = "xgboost"
+    label: str,
+    data: np.ndarray,
+    labels: np.ndarray,
+    metric_key: str = "f1_score_macro",
+    workspace=Path("workspace"),
+    use_cache: bool = True,
+    **kwargs,
+):
+    score = _evaluate_static_models_cv(
+        arch,
+        f"{label}_multiclass",
+        data,
+        labels,
+        workspace=workspace,
+        use_cache=use_cache,
+        **kwargs,
+    )
+    log.debug(f" >>> [{arch}][multiclass] Score = {score}")
+
+    return score

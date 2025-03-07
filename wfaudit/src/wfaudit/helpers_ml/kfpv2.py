@@ -57,7 +57,7 @@ class KFingerprintingForestClassifier:
         self,
         forest: Optional[RandomForestClassifier] = None,
         n_neighbours: int = 2,
-        n_jobs=2,
+        n_jobs=4,
         random_state=42,
     ):
 
@@ -65,7 +65,8 @@ class KFingerprintingForestClassifier:
             self.forest = forest
         else:
             self.forest = RandomForestClassifier(
-                n_estimators=150,
+                n_estimators=100,
+                max_depth=3,
                 oob_score=True,
                 random_state=random_state,
                 n_jobs=n_jobs,
@@ -78,16 +79,15 @@ class KFingerprintingForestClassifier:
         X = np.asarray(X)
         y = np.asarray(y)
 
-        print("Fitting the random forest on %d samples.", len(X))
+        # print("Fitting the random forest on %d samples.", len(X))
 
         # pylint: disable=attribute-defined-outside-init
         self.classes_ = unique_labels(y)
         self.forest_ = sklearn.base.clone(self.forest)
         self.forest_.fit(X, y)
-
-        print("Fitting the nearest neighbor graph.")
+        # print("Fitting the nearest neighbor graph.")
         self.graph_ = NearestNeighbors(
-            n_neighbors=self.n_neighbours, metric="hamming", n_jobs=self.n_jobs
+            n_neighbors=self.n_neighbours, n_jobs=self.n_jobs
         )
 
         self.graph_.fit(self.forest_.apply(X))
@@ -98,17 +98,16 @@ class KFingerprintingForestClassifier:
         assert isinstance(y, np.ndarray)
         self.labels_ = y
 
-        print("Model fitting complete.")
+        # print("Model fitting complete.")
         return self
 
     def _predict(self, X, n_neighbors: Optional[int] = None):
         sklearn.utils.validation.check_is_fitted(self, ["graph_", "labels_", "forest_"])
 
-        print("Determining leaves for the prediction.")
+        # print("Determining leaves for the prediction.")
 
         leaves = self.forest_.apply(X)
-
-        print("Identifying neighbours of the leaves.")
+        # print("Identifying neighbours of the leaves.")
         neighbourhoods = self.graph_.kneighbors(
             leaves, return_distance=False, n_neighbors=n_neighbors
         )
@@ -133,7 +132,7 @@ class KFingerprintingForestClassifier:
         X = np.asarray(X)
         neighbourhoods = self._predict(X, n_neighbors)
 
-        print("Formulating decision.")
+        # print("Formulating decision.")
 
         first_column = neighbourhoods[:, 0].reshape((-1, 1))
         all_match = np.all(neighbourhoods == first_column, axis=1)
