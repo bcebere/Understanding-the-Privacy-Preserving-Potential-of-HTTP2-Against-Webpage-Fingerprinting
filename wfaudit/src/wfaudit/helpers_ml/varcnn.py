@@ -6,176 +6,82 @@
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 # wfaudit absolute
 from wfaudit.helpers_ml._core_nn import DEVICE, BasicNNClassifier
 
 
-class DilatedBasic1D(nn.Module):
-    """
-    This class defines a basic 1D dilated convolutional block with two convolutional layers,
-    batch normalization, ReLU activation, and an optional shortcut connection for residual learning.
-    """
-
-    def __init__(
-        self, in_channels, out_channels, kernel_size=3, stride=1, dilations=(1, 1)
-    ):
-        super(DilatedBasic1D, self).__init__()
-        # First convolutional layer with dilation
-        self.conv1 = nn.Conv1d(
-            in_channels,
-            out_channels,
-            kernel_size,
-            stride=stride,
-            padding=dilations[0],
-            dilation=dilations[0],
-            bias=False,
-        )
-        self.bn1 = nn.BatchNorm1d(out_channels)
-        # Second convolutional layer with dilation
-        self.conv2 = nn.Conv1d(
-            out_channels,
-            out_channels,
-            kernel_size,
-            padding=dilations[1],
-            dilation=dilations[1],
-            bias=False,
-        )
-        self.bn2 = nn.BatchNorm1d(out_channels)
-        # Shortcut connection to match dimensions if necessary
-        self.shortcut = nn.Sequential()
-        if stride != 1 or in_channels != out_channels:
-            self.shortcut = nn.Sequential(
-                nn.Conv1d(
-                    in_channels, out_channels, kernel_size=1, stride=stride, bias=False
-                ),
-                nn.BatchNorm1d(out_channels),
-            )
-
-    def forward(self, x):
-        """
-        Defines the forward pass through the block.
-        """
-        # Apply first convolutional layer, batch norm, and ReLU activation
-        out = F.relu(self.bn1(self.conv1(x)))
-        # Apply second convolutional layer and batch norm
-        out = self.bn2(self.conv2(out))
-        # Add the shortcut connection
-        out += self.shortcut(x)
-        # Apply ReLU activation
-        out = F.relu(out)
-        return out
-
-
-class Encoder(nn.Module):
-    """
-    This class defines an encoder network composed of an initial convolutional block followed by several dilated convolutional blocks.
-    """
-
-    def __init__(self):
-        super(Encoder, self).__init__()
-        # Initial convolutional block with padding, convolution, batch norm, ReLU, and max pooling
-        self.init_convs = nn.Sequential(
-            *[
-                nn.ConstantPad1d(3, 0),
-                nn.Conv1d(1, 64, 7, stride=2),
-                nn.BatchNorm1d(64),
-                nn.ReLU(inplace=True),
-                nn.MaxPool1d(3, stride=2, padding=1),
-            ]
-        )
-        # Sequential stack of DilatedBasic1D blocks
-        self.convs = nn.Sequential(
-            *[
-                DilatedBasic1D(
-                    in_channels=64, out_channels=64, stride=1, dilations=[1, 2]
-                ),
-                DilatedBasic1D(
-                    in_channels=64, out_channels=64, stride=1, dilations=[4, 8]
-                ),
-                DilatedBasic1D(
-                    in_channels=64, out_channels=128, stride=2, dilations=[1, 2]
-                ),
-                DilatedBasic1D(
-                    in_channels=128, out_channels=128, stride=1, dilations=[4, 8]
-                ),
-                DilatedBasic1D(
-                    in_channels=128, out_channels=256, stride=2, dilations=[1, 2]
-                ),
-                DilatedBasic1D(
-                    in_channels=256, out_channels=256, stride=1, dilations=[4, 8]
-                ),
-                DilatedBasic1D(
-                    in_channels=256, out_channels=512, stride=2, dilations=[1, 2]
-                ),
-                DilatedBasic1D(
-                    in_channels=512, out_channels=512, stride=1, dilations=[4, 8]
-                ),
-            ]
-        )
-        # Adaptive average pooling to reduce the output to a fixed size
-        self.classifier = nn.AdaptiveAvgPool1d(1)
-
-    def forward(self, x):
-        """
-        Defines the forward pass through the encoder.
-        """
-        # Pass through initial convolutional block
-        x = self.init_convs(x)
-        # Pass through dilated convolutional blocks
-        x = self.convs(x)
-        # Apply adaptive average pooling
-        x = self.classifier(x)
-        # Flatten the output
-        x = x.view(x.shape[0], -1)
-        return x
-
-
 class VarCNN(nn.Module):
-    """
-    This class defines the overall VarCNN composed of two encoders (directional and temporal)
-    and a classifier for final prediction.
-    """
-
-    def __init__(self, num_classes):
+    def __init__(self, num_classes=2):
         super(VarCNN, self).__init__()
-        # Two separate encoders for directional and temporal data
-        self.dir_encoder = Encoder()
-        self.time_encoder = Encoder()
-        # Classifier consisting of linear layers, batch norm, ReLU, and dropout
+
+        # (1) First block
+        self.conv1 = nn.Conv1d(in_channels=1, out_channels=32, kernel_size=3, padding=1)
+        self.bn1 = nn.BatchNorm1d(32)
+        self.relu = nn.ReLU()
+        self.pool1 = nn.MaxPool1d(kernel_size=2, stride=2)
+        # -- After this block, length goes from 100 -> 50
+
+        # (2) Second block
+        self.conv2 = nn.Conv1d(
+            in_channels=32, out_channels=64, kernel_size=3, padding=1
+        )
+        self.bn2 = nn.BatchNorm1d(64)
+        self.pool2 = nn.MaxPool1d(kernel_size=2, stride=2)
+        # -- After this block, length goes from 50 -> 25
+
+        # (3) Third block (no further pooling)
+        self.conv3 = nn.Conv1d(
+            in_channels=64, out_channels=128, kernel_size=3, padding=1
+        )
+        self.bn3 = nn.BatchNorm1d(128)
+
+        # (4) Global average pool
+        self.global_pool = nn.AdaptiveAvgPool1d(1)
+
+        # (5) Classifier head
         self.classifier = nn.Sequential(
-            *[
-                nn.Linear(in_features=1024, out_features=1024),
-                nn.BatchNorm1d(1024),
-                nn.ReLU(inplace=True),
-                nn.Dropout(p=0.5),
-                nn.Linear(in_features=1024, out_features=num_classes),
-            ]
+            nn.Linear(128, 64), nn.ReLU(), nn.Dropout(0.3), nn.Linear(64, num_classes)
         )
 
     def forward(self, x):
         """
-        Defines the forward pass through the VarCNN.
+        x shape: (batch_size, 3, 100)
         """
-        # Separate input into directional and temporal components and pass through respective encoders
-        x_dir = self.dir_encoder(x[:, 0:1, :])
-        x_time = self.time_encoder(x[:, 1:, :])
-        # Concatenate the outputs of the two encoders
-        x = torch.concat((x_dir, x_time), dim=1)
-        # Pass through the classifier
-        x = self.classifier(x)
-        return x
+        # Block 1
+        x = self.conv1(x)  # [B, 32, 100]
+        x = self.bn1(x)
+        x = self.relu(x)
+        x = self.pool1(x)  # [B, 32, 50]
+
+        # Block 2
+        x = self.conv2(x)  # [B, 64, 50]
+        x = self.bn2(x)
+        x = self.relu(x)
+        x = self.pool2(x)  # [B, 64, 25]
+
+        # Block 3
+        x = self.conv3(x)  # [B, 128, 25]
+        x = self.bn3(x)
+        x = self.relu(x)
+
+        # Global average pool from length=25 to length=1
+        x = self.global_pool(x)  # [B, 128, 1]
+        x = x.squeeze(-1)  # [B, 128]
+
+        # Classifier
+        out = self.classifier(x)  # [B, num_classes]
+        return out
 
 
 class VarCNNClassifier:
     def __init__(
         self,
         num_classes: int = 2,
-        batch_size: int = 512,
+        batch_size: int = 128,
         lr: float = 1e-3,
         device=DEVICE,
-        train_epochs: int = 100,
+        epochs: int = 100,
         criterion=torch.nn.CrossEntropyLoss,
     ) -> None:
         model = VarCNN(num_classes=num_classes).to(device)
@@ -186,34 +92,23 @@ class VarCNNClassifier:
             batch_size=batch_size,
             lr=lr,
             device=device,
-            train_epochs=train_epochs,
+            epochs=epochs,
             criterion=criterion,
         )
 
-    def _reshape_covs(self, X):
-        if len(X.shape) == 2:
-            Xts = X.reshape(len(X), int(X.shape[1] / 2), 2)
-            Xts = Xts.transpose(0, 2, 1)
-
-            return Xts
-        if len(X.shape) == 3:
-            return X
-        else:
-            raise RuntimeError(X.shape)
-
     def fit(self, X: np.ndarray, y: np.ndarray) -> "VarCNN":
-        X = self._reshape_covs(np.asarray(X))
+        X = np.asarray(X)
         y = np.asarray(y)
 
         self.model.fit(X, y)
         return self
 
     def predict_proba(self, X: np.ndarray) -> np.ndarray:
-        X = self._reshape_covs(np.asarray(X))
+        X = np.asarray(X)
         return self.model.predict_proba(X)
 
     def predict(self, X: np.ndarray) -> np.ndarray:
-        X = self._reshape_covs(np.asarray(X))
+        X = np.asarray(X)
         return self.model.predict(X)
 
     @staticmethod

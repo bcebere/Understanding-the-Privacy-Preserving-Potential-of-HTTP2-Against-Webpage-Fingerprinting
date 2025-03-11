@@ -215,7 +215,7 @@ class HolmesClassifier:
         batch_size: int = 512,
         lr: float = 1e-3,
         device=DEVICE,
-        train_epochs: int = 100,
+        epochs: int = 100,
         criterion=torch.nn.CrossEntropyLoss,
     ) -> None:
         model = Holmes(num_classes=num_classes).to(device)
@@ -226,35 +226,31 @@ class HolmesClassifier:
             batch_size=batch_size,
             lr=lr,
             device=device,
-            train_epochs=train_epochs,
+            epochs=epochs,
             criterion=criterion,
         )
 
-    def _reshape_covs(self, X):
-        if len(X.shape) == 2:
-            Xts = X.reshape(len(X), int(X.shape[1] / 2), 2)
-            Xts = Xts.transpose(0, 2, 1)
-
-            Xts = np.expand_dims(Xts, axis=1)
-            assert Xts.shape[2] == 2
-
-            return Xts
-        else:
-            raise RuntimeError(X.shape)
-
     def fit(self, X: np.ndarray, y: np.ndarray) -> "HolmesClassifier":
-        X = self._reshape_covs(np.asarray(X))
+        X = np.asarray(X)
+        assert len(X.shape) == 3
+        X = np.expand_dims(X, axis=1)
         y = np.asarray(y)
 
         self.model.fit(X, y)
         return self
 
     def predict_proba(self, X: np.ndarray) -> np.ndarray:
-        X = self._reshape_covs(np.asarray(X))
+        X = np.asarray(X)
+        assert len(X.shape) == 3
+        X = np.expand_dims(X, axis=1)
+
         return self.model.predict_proba(X)
 
     def predict(self, X: np.ndarray) -> np.ndarray:
-        X = self._reshape_covs(np.asarray(X))
+        X = np.asarray(X)
+        assert len(X.shape) == 3
+        X = np.expand_dims(X, axis=1)
+
         return self.model.predict(X)
 
     @staticmethod

@@ -65,8 +65,8 @@ class KFingerprintingForestClassifier:
             self.forest = forest
         else:
             self.forest = RandomForestClassifier(
-                n_estimators=100,
-                max_depth=3,
+                n_estimators=150,
+                max_depth=None,
                 oob_score=True,
                 random_state=random_state,
                 n_jobs=n_jobs,

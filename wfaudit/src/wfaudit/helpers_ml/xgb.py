@@ -86,17 +86,20 @@ class XGBoostClassifier:
             **kwargs,
         )
 
-    def fit(self, X: pd.DataFrame, *args: Any, **kwargs: Any) -> "XGBoostClassifier":
-        y = np.asarray(args[0])
+    def fit(self, X: np.ndarray, y: np.ndarray, **kwargs: Any) -> "XGBoostClassifier":
+        X = np.asarray(X).reshape(len(X), -1)
         self.encoder = LabelEncoder()
         y = self.encoder.fit_transform(y)
+        y = np.asarray(y).reshape(-1, 1)
         self.model.fit(X, y, **kwargs)
         return self
 
-    def predict(self, X: pd.DataFrame, *args: Any, **kwargs: Any) -> pd.DataFrame:
+    def predict(self, X: np.ndarray, *args: Any, **kwargs: Any) -> pd.DataFrame:
+        X = np.asarray(X).reshape(len(X), -1)
         return self.encoder.inverse_transform(self.model.predict(X, *args, **kwargs))
 
     def predict_proba(self, X: pd.DataFrame, *args: Any, **kwargs: Any) -> pd.DataFrame:
+        X = np.asarray(X).reshape(len(X), -1)
         return self.model.predict_proba(X, *args, **kwargs)
 
     @staticmethod

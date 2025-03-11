@@ -43,6 +43,7 @@ def evaluate_ml(
     workspace.mkdir(parents=True, exist_ok=True)
 
     X, y = load_wefde_features(wefde_features_dir)
+
     _, scores_by_domain = evaluate_by_domain(
         arch,
         "stats",
@@ -99,7 +100,7 @@ def evaluate_leakage(
     n_procs=0,
     n_samples=50000,
     topn=20,
-    nmi_threshold=0.9,
+    nmi_threshold=0.7,
     discrete_threshold=100000,
     max_instances=100,
     compute_joint: bool = True,
@@ -160,7 +161,7 @@ def evaluate_exploratory(
     n_procs=0,
     n_samples=50000,
     topn=40,
-    nmi_threshold=0.9,
+    nmi_threshold=0.7,
     discrete_threshold=100000,
     max_instances=100,
 ):
@@ -190,7 +191,7 @@ def evaluate_exploratory_ml(
     n_procs=0,
     n_samples=50000,
     topn=40,
-    nmi_threshold=0.9,
+    nmi_threshold=0.7,
     discrete_threshold=100000,
     max_instances=100,
 ):

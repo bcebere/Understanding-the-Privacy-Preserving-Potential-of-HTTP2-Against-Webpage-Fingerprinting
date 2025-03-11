@@ -241,12 +241,16 @@ def _prepare_time_series(
     static_ids = set(static_data[ID_COL].values)
 
     lens = []
+    sizes = []
+    rel_times = []
     for idx, group in tqdm(groups):
         if idx not in static_ids:
             continue
 
         lens.append(len(group))
         local_data = group.drop(columns=["id", "full_id", "file_order", "duration"])
+        sizes.extend(local_data["length"].values.tolist())
+        rel_times.extend(local_data["relative_timestamp"].values.tolist())
         if ts_limit is not None:
             if len(local_data) > ts_limit:
                 local_data = local_data.head(ts_limit)
@@ -270,11 +274,14 @@ def _prepare_time_series(
               min len={np.min(lens)}, max len={np.max(lens)}
               """
     )
-    return static_data, ts_data_clean
+    return static_data, ts_data_clean, (lens, sizes, rel_times)
 
 
 def prepare_ts_datasets(
-    workspace=Path("workspace"), ID_COL="file_order"
+    workspace=Path("workspace"),
+    ID_COL="file_order",
+    domain_limit=50,
+    class_cnt_limit=1024,
 ):  # id, full_id
     in_workspace = workspace / Path("output_csv_full")
     if not workspace.exists():
@@ -296,7 +303,7 @@ def prepare_ts_datasets(
     temporal_data = full_data_temporal[full_data_temporal[ID_COL].isin(static_ids)]
     static_data = static_data[static_data[ID_COL].isin(temporal_data[ID_COL].values)]
 
-    (clean_static_data, clean_ts_data,) = _prepare_time_series(
+    (clean_static_data, clean_ts_data, _) = _prepare_time_series(
         static_data,
         temporal_data,
         ID_COL=ID_COL,
@@ -305,8 +312,6 @@ def prepare_ts_datasets(
     real_idx = 0
     domain_repeats = {}
     domain_label = {}
-    domain_limit = 50
-    class_cnt_limit = 1024
 
     experiment_labels = []
     for ridx, static_row in clean_static_data.iterrows():
@@ -355,7 +360,9 @@ def prepare_ts_datasets(
 def prepare_ts_datasets_for_nns(
     workspace=Path("workspace"),
     ID_COL="file_order",
-    ts_limit: int = 1000,
+    domain_limit=50,
+    class_cnt_limit=1024,
+    n_bins: int = 20,
 ):  # id, full_id
     in_workspace = workspace / Path("output_csv_full")
     if not workspace.exists():
@@ -376,19 +383,60 @@ def prepare_ts_datasets_for_nns(
     temporal_data = full_data_temporal[full_data_temporal[ID_COL].isin(static_ids)]
     static_data = static_data[static_data[ID_COL].isin(temporal_data[ID_COL].values)]
 
-    (clean_static_data, clean_ts_data,) = _prepare_time_series(
+    (
+        clean_static_data,
+        clean_ts_data,
+        (lens, pkt_sizes, pkt_ts),
+    ) = _prepare_time_series(
         static_data,
         temporal_data,
         ID_COL=ID_COL,
-        ts_limit=ts_limit,
-        ts_pad=0,
     )
+
+    padlimit = min(max(lens), 1000)
+
+    def _preprocess(arr):
+        return np.log1p(arr + 1e-6)
+
+    def _binning(data):
+        N = len(data)
+        bin_size = N // n_bins  # could be 0 if n_bins > N
+        bins = []
+        start_idx = 0
+
+        for i in range(n_bins):
+            end_idx = N if i == n_bins - 1 else (start_idx + bin_size)
+            bin_sum = float(data[start_idx:end_idx].sum())
+            bins.append(bin_sum)
+            start_idx = end_idx
+
+        return bins
+
+    def _bin_all(sizes, times, directions, direction):
+        dir_sizes = sizes[directions == direction]
+        dir_sizes = _binning(dir_sizes)
+
+        dir_ts = times[directions == direction]
+        dir_ts = _binning(dir_ts)
+
+        dir_dir = directions[directions == direction]
+        dir_dir = _binning(dir_dir)
+
+        return dir_sizes, dir_ts, dir_dir
+
+    def _pad(arr, arrsize: int = padlimit):
+        arr = np.asarray(arr).tolist()
+        if len(arr) > arrsize:
+            arr = arr[:arrsize]
+        else:
+            arr = np.pad(arr, (0, arrsize - len(arr)), "constant", constant_values=0)
+        assert len(arr) == arrsize
+
+        return np.asarray(arr)
 
     real_idx = 0
     domain_repeats = {}
     domain_label = {}
-    domain_limit = 50
-    class_cnt_limit = 1024
 
     experiment_labels = []
     for ridx, static_row in clean_static_data.iterrows():
@@ -399,6 +447,7 @@ def prepare_ts_datasets_for_nns(
 
     X = []
     y = []
+
     for ridx, static_row in clean_static_data.iterrows():
         local_token = static_row["label"]
         encoded_label = experiment_labels.index(local_token)
@@ -416,21 +465,32 @@ def prepare_ts_datasets_for_nns(
 
         domain_repeats[local_token] += 1
 
-        local_sizes = (
-            clean_ts_data[real_idx]["length"].values
-            * clean_ts_data[real_idx]["direction"].values
-        )
+        local_sizes = clean_ts_data[real_idx]["length"].values
+        local_direction = clean_ts_data[real_idx]["direction"].values
         timestamps = clean_ts_data[real_idx]["relative_timestamp"].copy()
         timestamps[timestamps < 0] = 0  # WTF
         local_ts = timestamps.values
+
+        out_sizes, out_ts, out_dir = _bin_all(
+            local_sizes, local_ts, local_direction, direction=1
+        )
+        in_sizes, in_ts, in_dir = _bin_all(
+            local_sizes, local_ts, local_direction, direction=-1
+        )
+
+        local_sizes = np.asarray(out_sizes + in_sizes)
+        local_ts = np.asarray(out_ts + in_ts)
+        local_dir = np.asarray(out_dir + in_dir)
+
+        local_sizes = _preprocess(local_sizes)
+        local_sizes = _pad(local_sizes, arrsize=2 * n_bins)
+
+        local_dir = _pad(local_dir, arrsize=2 * n_bins)
+        local_ts = _pad(local_ts, arrsize=2 * n_bins)
+
         assert len(local_ts) == len(local_sizes)
-        assert (local_ts >= 0).all(), timestamps.values
 
-        merged_array = np.empty(2 * len(local_sizes))
-        merged_array[0::2] = local_ts
-        merged_array[1::2] = local_sizes
-
-        X.append(merged_array)
+        X.append([local_dir, local_ts, local_sizes])
         y.append(encoded_label)
 
         real_idx += 1
@@ -467,4 +527,4 @@ def create_datasets(
     prepare_ts_datasets(workspace=workspace)
 
     # Create datasets for NNs
-    prepare_ts_datasets_for_nns(workspace=workspace, ts_limit=1000)
+    prepare_ts_datasets_for_nns(workspace=workspace)

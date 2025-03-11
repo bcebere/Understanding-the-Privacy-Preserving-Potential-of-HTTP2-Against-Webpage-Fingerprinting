@@ -3,6 +3,7 @@ from pathlib import Path
 import shutil
 
 # third party
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -128,6 +129,15 @@ def test_prepare_nn_datasets(tmp_path):
 
     num_files = sum(1 for file in output.iterdir() if file.is_file())
     assert num_files == 2
+
+    with open(output / "X.npy", "rb") as f:
+        X = np.load(f)
+    with open(output / "y.npy", "rb") as f:
+        y = np.load(f)
+
+    assert len(X) == len(y)
+    assert X.shape[1] == 2  # size, ts
+    assert X.shape[2] == 225
 
 
 def test_e2e(tmp_path):

@@ -156,7 +156,7 @@ def load_wefde_features(
     extension=".features",
     delimiter=" ",
     split_at="-",
-    max_classes=99999,
+    max_classes=1024,
     min_instances=2,
     max_instances=500,
 ):

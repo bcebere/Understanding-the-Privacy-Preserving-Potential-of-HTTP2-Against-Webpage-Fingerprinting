@@ -2,13 +2,13 @@
 import copy
 from pathlib import Path
 import random
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Tuple, Union
 
 # third party
 import numpy as np
 import pandas as pd
 from sklearn.metrics import f1_score, matthews_corrcoef, precision_score, recall_score
-from sklearn.model_selection import StratifiedGroupKFold, StratifiedKFold
+from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import LabelEncoder
 from tqdm import tqdm
 
@@ -22,7 +22,6 @@ from wfaudit.helpers_ml.robustfp import RobustFingerprintingClassifier
 from wfaudit.helpers_ml.serialization import load_from_file, save_to_file
 from wfaudit.helpers_ml.svm import SVMClassifier
 from wfaudit.helpers_ml.varcnn import VarCNNClassifier
-from wfaudit.helpers_ml.varcnnv2 import VarCNNKerasClassifier
 from wfaudit.helpers_ml.xgb import XGBoostClassifier
 import wfaudit.logger as log
 
@@ -103,12 +102,10 @@ def print_score(score: Tuple[float, float]) -> str:
 
 def evaluate_classifier(
     estimator: Any,
-    X: Union[pd.DataFrame, np.ndarray],
-    Y: Union[pd.Series, np.ndarray, List],
+    X: np.ndarray,
+    Y: np.ndarray,
     n_folds: int = 3,
     seed: int = 0,
-    pretrained: bool = False,
-    group_ids: Optional[pd.Series] = None,
     classes: Any = None,
 ) -> Dict:
     """Helper for evaluating classifiers.
@@ -116,18 +113,14 @@ def evaluate_classifier(
     Args:
         estimator:
             Baseline model to evaluate. if pretrained == False, it must not be fitted.
-        X: pd.DataFrame or np.ndarray:
+        X: np.ndarray:
             The covariates
-        Y: pd.Series or np.ndarray or list:
+        Y: np.ndarray or list:
             The labels
         n_folds: int
             cross-validation folds
         seed: int
             Random seed
-        pretrained: bool
-            If the estimator was already trained or not.
-        group_ids: pd.Series
-            The group_ids to use for stratified cross-validation
 
     Returns:
         Dict containing "raw" and "str" nodes. The "str" node contains prettified metrics, while the raw metrics includes tuples of form (`mean`, `std`) for each metric.
@@ -141,12 +134,9 @@ def evaluate_classifier(
 
     enable_reproducible_results(seed)
 
-    X = pd.DataFrame(X).reset_index(drop=True)
+    X = np.asarray(X)
     Y = LabelEncoder().fit_transform(Y)
-    Y = pd.Series(Y).reset_index(drop=True)
-    if group_ids is not None:
-        group_ids = pd.Series(group_ids).reset_index(drop=True)
-
+    Y = np.asarray(Y)
     # log.debug(f"evaluate_estimator shape x:{X.shape} y:{Y.shape}")
 
     results = {}
@@ -156,23 +146,16 @@ def evaluate_classifier(
         results[metric] = np.zeros(n_folds)
 
     indx = 0
-    if group_ids is not None:
-        skf = StratifiedGroupKFold(n_splits=n_folds, shuffle=True, random_state=seed)
-    else:
-        skf = StratifiedKFold(n_splits=n_folds, shuffle=True, random_state=seed)
+    skf = StratifiedKFold(n_splits=n_folds, shuffle=True, random_state=seed)
 
-    # group_ids is always ignored for StratifiedKFold so safe to pass None
-    for train_index, test_index in skf.split(X, Y, groups=group_ids):
-        X_train = X.loc[X.index[train_index]]
-        Y_train = Y.loc[Y.index[train_index]]
-        X_test = X.loc[X.index[test_index]]
-        Y_test = Y.loc[Y.index[test_index]]
+    for train_index, test_index in skf.split(X, Y):
+        X_train = X[train_index]
+        Y_train = Y[train_index]
+        X_test = X[test_index]
+        Y_test = Y[test_index]
 
-        if pretrained:
-            model = estimator[indx]
-        else:
-            model = copy.deepcopy(estimator)
-            model.fit(X_train, Y_train)
+        model = copy.deepcopy(estimator)
+        model.fit(X_train, Y_train)
 
         preds = model.predict_proba(X_test)
         pred_labels = set(np.ravel(model.predict(X_test)))
@@ -181,23 +164,16 @@ def evaluate_classifier(
         scores = evaluator.score_proba(Y_test, preds, list(sorted(classes)))
 
         for metric in scores:
-            if "fpr" not in metric and "tpr" not in metric:
-                results[metric][indx] = scores[metric]
-            else:
-                results[metric] = scores[metric]
-
+            results[metric][indx] = scores[metric]
         indx += 1
 
     output_clf = {}
     output_clf_str = {}
 
     for key in results:
-        if "fpr" not in key and "tpr" not in key:
-            key_out = generate_score(results[key])
-            output_clf[key] = key_out
-            output_clf_str[key] = print_score(key_out)
-        else:
-            output_clf[key] = results[key]
+        key_out = generate_score(results[key])
+        output_clf[key] = key_out
+        output_clf_str[key] = print_score(key_out)
 
     return {
         "raw": output_clf,
@@ -220,8 +196,6 @@ def _get_arch_mode(arch: str, **kwargs):
         return KFingerprintingForestClassifier()
     elif arch == "varcnn":
         return VarCNNClassifier(**kwargs)
-    elif arch == "varcnnv2":
-        return VarCNNKerasClassifier(**kwargs)
     elif arch == "tam":
         return RobustFingerprintingClassifier(**kwargs)
     elif arch == "holmes":

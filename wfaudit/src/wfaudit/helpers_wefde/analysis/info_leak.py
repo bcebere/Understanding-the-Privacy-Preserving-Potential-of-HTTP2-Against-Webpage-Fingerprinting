@@ -19,7 +19,7 @@ from wfaudit.helpers_wefde.analysis.mi_analyzer import MutualInformationAnalyzer
 import wfaudit.logger as log
 
 
-def _individual_measure(modeler, pool, checkpoint):
+def _individual_measure(modeler, n_procs: int = 10, n_samples: int = 10000):
     """
     Perform information leakage analysis for each feature one-by-one.
 
@@ -30,65 +30,55 @@ def _individual_measure(modeler, pool, checkpoint):
     ----------
     modeler : WebsiteFingerprintModeler
         initialized fingerprinting engine
-    pool : ProcessPool
-        Pool to use for multiprocessing.
-    checkpoint : str
-        Path to ascii file to save individual leakage checkpoint information.
-
     Returns
     -------
     list
         list of leakages where the index of each leakage maps to the feature number
 
     """
-    leakage_indiv = []
-
-    # open a checkpoint file
-    if checkpoint:
-        lines = None
-        if os.path.exists(checkpoint):
-            with open(checkpoint, "r") as tmp_file:
-                past_leaks = [float(line) for line in tmp_file]
-                lines = len(past_leaks)
-                leakage_indiv = past_leaks
-        tmp_file = open(checkpoint, "a+")
-
-    # if a pool has been provided, perform computation in parallel
-    # otherwise do serial computation
-    if checkpoint and lines:
-        features = modeler.data.features[lines:]
-    else:
-        features = modeler.data.features
-    if pool is None:
-        proc_results = map(modeler, features)
-    else:
-        proc_results = pool.imap(modeler, features)
-        pool.close()
-    size = len(modeler.data.features)  # number of features
-
+    features = modeler.data.features
     log.info("Begin individual leakage measurements.")
-    # measure information leakage
-    # log current progress at twenty intervals
-    for leakage in proc_results:
-        leakage_indiv.append(leakage[0])
-        if len(leakage_indiv) - 1 % int(size * 0.05) == 0:
-            log.info(f"Progress InfoLeak: {len(leakage_indiv)}/{size}")
-        if checkpoint:
-            tmp_file.write(f"{str(leakage[0])}\n")
-            tmp_file.flush()
-    log.info("Progress: Done.")
-    if pool is not None:
-        pool.join()
-        pool.restart()
-    if checkpoint:
-        tmp_file.close()
+
+    def _eval_feature(feature):
+        local_res = modeler.information_leakage(
+            clusters=[[feature]],
+            sample_size=n_samples,
+            n_procs=2,
+        )
+        log.info(f"[Leakage] Feature {feature} -> {local_res[0]} bits")
+        return local_res[0]
+
+    leakage_indiv = Parallel(n_jobs=n_procs)(
+        delayed(_eval_feature)(feature) for feature in features
+    )
+
     return leakage_indiv
+
+
+def features_to_category(
+    features: list,
+    features_range: dict,  # offsets for leakage types
+):
+    output = {}
+    if features_range is None:
+        return None
+
+    for feat in features:
+        offset = 0
+        for category in features_range:
+            next_off = features_range[category]
+            if feat < next_off and offset < feat:
+                if category not in output:
+                    output[category] = []
+                output[category].append(feat)
+                break
+
+    return output
 
 
 def print_leakage(
     features_range: dict,  # offsets for leakage types
     leakages_indiv: list,
-    leakages_clusters: list = [0],
     leakages_topfeats: list = [0],
 ):
     summary = {}
@@ -100,7 +90,6 @@ def print_leakage(
             summary[category] = [np.max(y)]
             offset = next_off
 
-    summary["leakage_clusters"] = [leakages_clusters[0]]
     summary["leakage_topfeats"] = [leakages_topfeats[0]]
 
     summary = pd.DataFrame(summary)
@@ -114,6 +103,7 @@ def _evaluate_individual_leakage(
     topn=20,
     nmi_threshold=0.9,
     discrete_threshold=100000,
+    n_samples: int = 10000,
 ):
     # create process pool
     if n_procs > 1:
@@ -145,11 +135,13 @@ def _evaluate_individual_leakage(
         log.info("Begin individual feature analysis.")
 
         # perform individual measure with checkpointing
-        chk_path = outdir / "indiv_checkpoint.txt"
-        leakage_indiv = _individual_measure(modeler, pool, str(chk_path))
+        leakage_indiv = _individual_measure(
+            modeler, n_procs=n_procs, n_samples=n_samples
+        )
 
         # save individual leakage to file
         log.info(f"Saving individual leakage to {indiv_path}.")
+        assert len(leakage_indiv) > 0
         with open(indiv_path, "wb") as fi:
             dill.dump(leakage_indiv, fi)
 
@@ -166,9 +158,8 @@ def _evaluate_individual_leakage(
     sorted_features = list(list(zip(*tuples))[0])
 
     # process into list of non-redundant features
-    cln_path = outdir / "cleaned.pkl"
-    rdn_path = outdir / "redundant.pkl"
-    chk_path = outdir / "prune_checkpoint.txt"
+    cln_path = outdir / f"cleaned_{topn}_thrsh{nmi_threshold}.pkl"
+    chk_path = outdir / f"prune_checkpoint_{topn}_thrsh{nmi_threshold}.txt"
     if cln_path.exists():
         log.info("Loading top non-redundant features from file.")
         with open(cln_path, "rb") as fi:
@@ -176,7 +167,7 @@ def _evaluate_individual_leakage(
     else:
         log.info("Begin feature pruning.")
         try:
-            cleaned, pruned = analyzer.prune(
+            cleaned, _ = analyzer.prune(
                 features=sorted_features,
                 nmi_threshold=nmi_threshold,
                 topn=topn,
@@ -184,11 +175,8 @@ def _evaluate_individual_leakage(
             )
             with open(cln_path, "wb") as fi:
                 dill.dump(cleaned, fi)
-            with open(rdn_path, "wb") as fi:
-                dill.dump(pruned, fi)
         except BaseException:
             cleaned = sorted_features
-            pruned = []
 
     top_feats = dict(tuples)
     relevant_feats = sorted(cleaned, key=lambda x: top_feats[x], reverse=True)
@@ -204,7 +192,7 @@ def _base_evaluate_info_leakage(
     n_procs=0,
     n_samples=50000,
     topn=20,
-    nmi_threshold=0.9,
+    nmi_threshold=0.7,
     discrete_threshold=100000,
     max_instances=100,
     compute_joint: bool = True,
@@ -259,6 +247,7 @@ def _base_evaluate_info_leakage(
         n_procs=n_procs,
         topn=topn,
         nmi_threshold=nmi_threshold,
+        n_samples=n_samples,
     )
 
     indiv_path = outdir / "indiv.pkl"
@@ -272,23 +261,27 @@ def _base_evaluate_info_leakage(
         )
     log.info("Begin cluster leakage measurements.")
 
-    def _eval_and_cache(clusters, joint_leakage: bool, out_file: str):
+    def _eval_and_cache(clusters, out_file: str):
         out_path = outdir / out_file
         if os.path.exists(out_path):
             with open(out_path, "rb") as fi:
                 results = dill.load(fi)
         else:
             results = modeler.information_leakage(
-                clusters=clusters, sample_size=n_samples, joint_leakage=joint_leakage
+                clusters=clusters,
+                sample_size=n_samples,
+                n_procs=n_procs,
             )
             assert len(results) != 0, clusters
             with open(out_path, "wb") as fi:
                 dill.dump(results, fi)
         return results
 
+    top_cats = features_to_category(relevant_feats, features_range)
+    print("Top features", top_cats)
+
     leakages_topfeats = _eval_and_cache(
-        clusters=relevant_feats,
-        joint_leakage=True,
+        clusters=[relevant_feats],
         out_file=f"leakage_joint_topfeats_top{topn}.pkl",
     )
 
@@ -323,7 +316,6 @@ def _base_evaluate_info_leakage(
     return print_leakage(
         features_range=features_range,  # offsets for leakage types
         leakages_indiv=leakage_indiv,
-        # leakages_clusters=leakages_clusters,
         leakages_topfeats=leakages_topfeats,
     )
 
@@ -335,7 +327,7 @@ def evaluate_info_leakage(
     n_procs=0,
     n_samples=50000,
     topn=20,
-    nmi_threshold=0.9,
+    nmi_threshold=0.7,
     discrete_threshold=100000,
     max_instances=100,
     compute_joint: bool = True,
@@ -389,7 +381,7 @@ def evaluate_info_leakage_v2(
     n_procs=0,
     n_samples=50000,
     topn=40,
-    nmi_threshold=0.9,
+    nmi_threshold=0.7,
     discrete_threshold=100000,
     max_instances=100,
 ):
@@ -441,7 +433,7 @@ def exploratory_analysis(
     n_procs=0,
     n_samples=50000,
     topn=20,
-    nmi_threshold=0.9,
+    nmi_threshold=0.7,
     discrete_threshold=100000,
     max_instances=100,
 ):

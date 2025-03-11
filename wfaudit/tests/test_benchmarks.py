@@ -4,6 +4,7 @@ from pathlib import Path
 
 # third party
 import numpy as np
+import pytest
 
 # wfaudit absolute
 from wfaudit import (
@@ -49,7 +50,8 @@ def test_leakage(tmp_path):
     assert "leakage_topfeats" in leakage.columns
 
 
-def test_ml_benchmarks_stats(tmp_path):
+@pytest.mark.parametrize("arch", ["kfpv2", "kfp", "xgboost", "svm", "lr", "rf"])
+def test_ml_benchmarks_stats(tmp_path, arch):
     create_datasets(
         traces=Path("traces"),
         workspace=tmp_path,
@@ -70,20 +72,20 @@ def test_ml_benchmarks_stats(tmp_path):
     assert features == saved_features
 
     # Test ML benchmark
-    for arch in ["kfpv2", "kfp", "xgboost", "svm", "lr", "rf"]:
-        output_ml = tmp_path / f"output_ml_{arch}"
-        ml_score, scores_by_domain = evaluate_ml(
-            workspace=output_ml, wefde_features_dir=output_features, arch=arch
-        )
-        assert output_ml.exists()
-        assert max(ml_score) <= 1
-        print("ML", arch, print_score(ml_score))
-        assert len(scores_by_domain.keys()) == 3
-        for label in [0, 1, 2]:
-            assert label in scores_by_domain
+    output_ml = tmp_path / f"output_ml_{arch}"
+    ml_score, scores_by_domain = evaluate_ml(
+        workspace=output_ml, wefde_features_dir=output_features, arch=arch
+    )
+    assert output_ml.exists()
+    assert max(ml_score) <= 1
+    print("ML", arch, print_score(ml_score))
+    assert len(scores_by_domain.keys()) == 3
+    for label in [0, 1, 2]:
+        assert label in scores_by_domain
 
 
-def test_ml_benchmarks_raw(tmp_path):
+@pytest.mark.parametrize("arch", ["varcnnv2", "xgboost", "varcnn", "holmes", "tam"])
+def test_ml_benchmarks_raw(tmp_path, arch):
     create_datasets(
         traces=Path("traces"),
         workspace=tmp_path,
@@ -96,20 +98,14 @@ def test_ml_benchmarks_raw(tmp_path):
     with open(workspace / "y.npy", "rb") as f:
         y = np.load(f)
 
-    # Test ML benchmark
-    for arch in ["holmes", "tam", "varcnn", "xgboost"]:
-        output_ml = tmp_path / f"output_ml_{arch}"
-        ml_score, scores_by_domain = evaluate_ml_rawts(
-            X,
-            y,
-            workspace=output_ml,
-            arch=arch,
-            train_epochs=10,
-        )
-        print(ml_score)
-        assert output_ml.exists()
-        assert max(ml_score) <= 1
-        print("ML", arch, print_score(ml_score))
-        assert len(scores_by_domain.keys()) == 3
-        for label in [0, 1, 2]:
-            assert label in scores_by_domain
+    output_ml = tmp_path / f"output_ml_{arch}"
+    ml_score, scores_by_domain = evaluate_ml_rawts(
+        X, y, workspace=output_ml, arch=arch, epochs=10, n_packet_features=X.shape[-1]
+    )
+    print(ml_score)
+    assert output_ml.exists()
+    assert max(ml_score) <= 1
+    print("ML", arch, print_score(ml_score))
+    assert len(scores_by_domain.keys()) == 3
+    for label in [0, 1, 2]:
+        assert label in scores_by_domain

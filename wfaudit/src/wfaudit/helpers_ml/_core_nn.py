@@ -10,8 +10,7 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader, TensorDataset
-from tqdm import tqdm
+from torch.utils.data import DataLoader, TensorDataset, WeightedRandomSampler
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -28,30 +27,6 @@ def enable_reproducible_results(random_state: int = 0) -> None:
 enable_reproducible_results(42)
 
 
-class EarlyStopping:
-    def __init__(self, patience=5, min_delta=0):
-        """
-        Args:
-            patience (int): How many epochs to wait before stopping if no improvement.
-            min_delta (float): Minimum change to qualify as an improvement.
-        """
-        self.patience = patience
-        self.min_delta = min_delta
-        self.best_loss = 999999999
-        self.counter = 0
-
-    def __call__(self, val_loss):
-        if val_loss < self.best_loss - self.min_delta:
-            self.best_loss = val_loss
-            self.counter = 0  # Reset counter if loss improves
-        else:
-            self.counter += 1  # Increment counter if no improvement
-            if self.counter >= self.patience:
-                print("Early stopping triggered!")
-                return True
-        return False
-
-
 class BasicNNClassifier:
     def __init__(
         self,
@@ -60,13 +35,13 @@ class BasicNNClassifier:
         batch_size: int = 1024,
         lr: float = 1e-3,
         device=DEVICE,
-        train_epochs: int = 100,
+        epochs: int = 100,
         criterion=torch.nn.CrossEntropyLoss,
     ) -> None:
         self.batch_size = batch_size
         self.lr = lr
         self.device = device
-        self.train_epochs = train_epochs
+        self.epochs = epochs
         self.criterion = criterion()
         self.model = model
 
@@ -82,7 +57,7 @@ class BasicNNClassifier:
             return torch.nn.Softmax(dim=-1)(logits).cpu().numpy().squeeze()
 
     def predict(self, X: np.ndarray) -> np.ndarray:
-        return np.argmax(self.predict_proba(X))
+        return np.argmax(self.predict_proba(X), axis=-1)  # Ensure correct axis
 
     def _check_tensor(self, X: torch.Tensor) -> torch.Tensor:
         if isinstance(X, torch.Tensor):
@@ -106,13 +81,11 @@ class BasicNNClassifier:
         test_dataset = TensorDataset(test_data, test_labels)
 
         # Create train sampler
-        class_sample_count = np.unique(y_train, return_counts=True)[1]
-        weight = 1.0 / class_sample_count
-        samples_weight = weight[y_train]
-        samples_weight = torch.from_numpy(samples_weight)
-        sampler = torch.utils.data.sampler.WeightedRandomSampler(
-            samples_weight, len(samples_weight)
-        )
+        class_counts = np.bincount(y_train)  # Count class occurrences
+        class_weights = 1.0 / (class_counts + 1e-6)  # Avoid division by zero
+        samples_weight = torch.tensor([class_weights[label] for label in y_train])
+
+        sampler = WeightedRandomSampler(samples_weight, len(samples_weight))
 
         return train_dataset, test_dataset, sampler
 
@@ -125,7 +98,7 @@ class BasicNNClassifier:
 
         train_dataset, test_dataset, train_sampler = self._datasets(X, y)
         optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
-        early_stopping = EarlyStopping(patience=10)
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.5)
 
         loader = DataLoader(
             train_dataset,
@@ -133,7 +106,13 @@ class BasicNNClassifier:
             sampler=train_sampler,
             pin_memory=False,
         )
-        for epoch in tqdm(range(self.train_epochs)):
+
+        patience = 15
+        best_loss = 9999
+        best_model_state = None
+        counter = 0
+
+        for epoch in range(self.epochs):
             self.model.train()
             train_loss = 0
 
@@ -146,24 +125,41 @@ class BasicNNClassifier:
 
                 loss.backward()
                 optimizer.step()
-                train_loss += loss.data.cpu().numpy()
+                train_loss += loss.data.item()
+
+            scheduler.step()
+
+            if len(loader) > 0:
+                train_loss /= len(loader)  # Normalize by number of batches
 
             with torch.no_grad():
                 self.model.eval()
                 X_val, y_val = test_dataset.tensors
                 preds = self.model(X_val)
-                val_loss = self.criterion(preds, y_val).cpu().numpy()
 
-            if epoch % 10 == 0:
+                val_loss = self.criterion(preds, y_val).item()
+
+            if epoch % 100 == 0:
                 print(
-                    f"Epoch {epoch}: train_loss = {train_loss} validation_loss: {val_loss}"
+                    f"Epoch {epoch}: train_loss = {train_loss} validation_loss: {val_loss}."
                 )
 
-            if early_stopping(val_loss):
-                print(
-                    f"Epoch {epoch}: Stopping early: train_loss = {train_loss} validation_loss: {val_loss}"
-                )
-                break
+            if val_loss < best_loss:
+                best_loss = val_loss
+                best_model_state = self.model.state_dict()
+                counter = 0  # Reset counter if loss improves
+            else:
+                counter += 1  # Increment counter if no improvement
+                if counter >= patience:
+                    print(
+                        f"Epoch {epoch}: Stopping early: train_loss = {train_loss} val_loss: {val_loss}."
+                    )
+                    break
+
+        # Restore the best model
+        if best_model_state is not None:
+            self.model.load_state_dict(best_model_state)
+            print("Restored the best model with val_loss:", best_loss)
 
     @staticmethod
     def name() -> str:
