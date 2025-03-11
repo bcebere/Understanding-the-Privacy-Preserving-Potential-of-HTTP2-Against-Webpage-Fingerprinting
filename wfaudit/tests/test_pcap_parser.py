@@ -11,6 +11,7 @@ import pytest
 from wfaudit import (
     create_datasets,
     merge_pcap_csvs,
+    prepare_features,
     prepare_ts_datasets,
     prepare_ts_datasets_for_nns_1C,
     prepare_ts_datasets_for_nns_3C,
@@ -124,6 +125,7 @@ def test_prepare_nn_datasets_simple(tmp_path):
     merge_pcap_csvs(workspace=tmp_path)
 
     prepare_ts_datasets(workspace=tmp_path)
+    prepare_features(workspace=tmp_path, conn_limit=1)
     prepare_ts_datasets_for_nns_1C(workspace=tmp_path)
 
     output = tmp_path / "output_ml"
@@ -139,7 +141,7 @@ def test_prepare_nn_datasets_simple(tmp_path):
 
     assert len(X) == len(y)
     assert X.shape[1] == 1  # size, ts
-    assert X.shape[2] == 154
+    assert X.shape[2] == 19
 
 
 def test_prepare_nn_datasets(tmp_path):

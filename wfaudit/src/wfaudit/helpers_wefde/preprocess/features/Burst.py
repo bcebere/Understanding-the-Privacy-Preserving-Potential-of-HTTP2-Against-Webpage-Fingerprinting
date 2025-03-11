@@ -29,6 +29,9 @@ def get_burst_features(times, sizes, topn: int = 4, conn_limit: int = 5):
     # global
     burst_features = get_burst_features_per_connection(sizes.tolist(), topn=topn)
 
+    if conn_limit <= 1:
+        return burst_features
+
     # per connection
     conn_idxs = split_by_value(times, 0)
 

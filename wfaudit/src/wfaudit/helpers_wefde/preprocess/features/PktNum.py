@@ -5,6 +5,8 @@ from wfaudit.helpers_wefde.preprocess.features.common import split_by_value
 # packet number features
 def get_packet_counts(times, sizes, conn_limit: int = 5):
     features = [len(times)]
+    if conn_limit <= 1:
+        return features
 
     # per connection
     conn_idxs = split_by_value(times, 0)

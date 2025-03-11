@@ -21,6 +21,9 @@ def get_time_features(times, sizes, conn_limit: int = 5):
     # global
     features = get_time_features_per_connection(times)
 
+    if conn_limit <= 1:
+        return features
+
     # per connection
     conn_idxs = split_by_value(times, 0)
 

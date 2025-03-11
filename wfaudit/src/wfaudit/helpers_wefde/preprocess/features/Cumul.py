@@ -80,6 +80,9 @@ def get_cumul_features(times, packets, feature_cnt=6, conn_limit: int = 10):
     features = get_cumul_features_per_connection(
         packets.tolist(), feature_cnt=feature_cnt
     )
+    if conn_limit <= 1:
+        return features
+
     # per connection
     conn_idxs = split_by_value(times, 0)
 

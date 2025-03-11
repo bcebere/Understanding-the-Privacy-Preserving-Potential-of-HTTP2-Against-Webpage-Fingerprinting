@@ -363,10 +363,11 @@ def prepare_ts_datasets(
 
 def prepare_features(
     workspace=Path("workspace"),
+    conn_limit: int = 5,
 ):
     time_series_traces = workspace / Path("output_wefde")
     if not time_series_traces.exists():
-        log.error("Missing output_wefde data. Call prepare_ts_datasets first")
+        log.error("Missing output_wefde data. Call prepare_ts_datasets first!")
         return
 
     output = workspace / Path("eval_features")
@@ -375,17 +376,17 @@ def prepare_features(
     return prepare_wefde_features(
         trace_path=time_series_traces,
         out_path=output,
+        conn_limit=conn_limit,
     )
 
 
 def prepare_ts_datasets_for_nns_1C(
     workspace=Path("workspace"),
 ):
-    prepare_features(workspace=workspace)
     wefde_path = workspace / Path("eval_features")
 
     if not wefde_path.exists():
-        log.error("Missing output_wefde features")
+        log.error("Missing output_wefde features. Run prepare_features first!")
         return
 
     with open(wefde_path / "FeaturePositions.json", "r") as f:
@@ -423,8 +424,8 @@ def prepare_ts_datasets_for_nns_3C(
     class_cnt_limit=1024,
 ):  # id, full_id
     in_workspace = workspace / Path("output_csv_full")
-    if not workspace.exists():
-        log.error("Missing output_csv_full data")
+    if not in_workspace.exists():
+        log.error("Missing output_csv_full data. Run merge_pcaps_csv first!")
         return
 
     output = workspace / Path("output_ml")
