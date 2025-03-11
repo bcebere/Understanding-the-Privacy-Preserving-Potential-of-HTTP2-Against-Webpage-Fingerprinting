@@ -14,18 +14,7 @@ from wfaudit.helpers_wefde.analysis.info_leak import (
     evaluate_info_leakage_v2,
     exploratory_analysis,
 )
-from wfaudit.helpers_wefde.preprocess.extract import prepare_wefde_features
 import wfaudit.logger as log
-
-
-def prepare_features(
-    time_series_traces=Path("output_wefde"), output=Path("output_features")
-):
-    output.mkdir(parents=True, exist_ok=True)
-    return prepare_wefde_features(
-        trace_path=time_series_traces,
-        out_path=output,
-    )
 
 
 def evaluate_ml(
@@ -225,22 +214,3 @@ def evaluate_exploratory_ml(
             workspace=Path("output_ml"),
         )
         print("Evaluate", idx, cluster, print_score(generate_score(scores)))
-
-
-def evaluate_all(
-    time_series_traces=Path("output_wefde"),
-    output_features=Path("output_features"),
-    output_leakage=Path("output_leakage"),
-    output_ml=Path("output_ml"),
-):
-    features_range = prepare_features(
-        time_series_traces=time_series_traces, output=output_features
-    )
-
-    leakage = evaluate_leakage(
-        features_range, workspace=output_leakage, wefde_features_dir=output_features
-    )
-
-    score = evaluate_ml(workspace=output_ml, wefde_features_dir=output_features)
-
-    return features_range, leakage, score

@@ -1,6 +1,7 @@
 # stdlib
 import glob
 import hashlib
+import json
 from pathlib import Path
 from random import shuffle
 from typing import Optional
@@ -9,9 +10,12 @@ from typing import Optional
 from joblib import Parallel, delayed
 import numpy as np
 import pandas as pd
+from sklearn.preprocessing import StandardScaler
 from tqdm import tqdm
 
 # wfaudit absolute
+from wfaudit.helpers_wefde.analysis.data_utils import load_wefde_features
+from wfaudit.helpers_wefde.preprocess.extract import prepare_wefde_features
 import wfaudit.logger as log
 from wfaudit.processing import process_pcap
 
@@ -284,7 +288,7 @@ def prepare_ts_datasets(
     class_cnt_limit=1024,
 ):  # id, full_id
     in_workspace = workspace / Path("output_csv_full")
-    if not workspace.exists():
+    if not in_workspace.exists():
         log.error("Missing output_csv_full data")
         return
 
@@ -357,12 +361,66 @@ def prepare_ts_datasets(
         real_idx += 1
 
 
-def prepare_ts_datasets_for_nns(
+def prepare_features(
+    workspace=Path("workspace"),
+):
+    time_series_traces = workspace / Path("output_wefde")
+    if not time_series_traces.exists():
+        log.error("Missing output_wefde data. Call prepare_ts_datasets first")
+        return
+
+    output = workspace / Path("eval_features")
+    output.mkdir(parents=True, exist_ok=True)
+
+    return prepare_wefde_features(
+        trace_path=time_series_traces,
+        out_path=output,
+    )
+
+
+def prepare_ts_datasets_for_nns_1C(
+    workspace=Path("workspace"),
+):
+    prepare_features(workspace=workspace)
+    wefde_path = workspace / Path("eval_features")
+
+    if not wefde_path.exists():
+        log.error("Missing output_wefde features")
+        return
+
+    with open(wefde_path / "FeaturePositions.json", "r") as f:
+        features = json.load(f)
+
+    output = workspace / Path("output_ml")
+    output.mkdir(parents=True, exist_ok=True)
+
+    X, y = load_wefde_features(wefde_path)
+    start_off = 0
+    for feat in features:
+        end_off = features[feat]
+        X[:, start_off:end_off] = StandardScaler().fit_transform(
+            X[:, start_off:end_off]
+        )
+        start_off = end_off
+
+    X = np.expand_dims(X, axis=1)
+
+    X = np.asarray(X)
+    y = np.asarray(y)
+
+    with open(output / "X_1C.npy", "wb") as f:
+        np.save(f, X)
+    with open(output / "y_1C.npy", "wb") as f:
+        np.save(f, y)
+
+    return X, y
+
+
+def prepare_ts_datasets_for_nns_3C(
     workspace=Path("workspace"),
     ID_COL="file_order",
     domain_limit=50,
     class_cnt_limit=1024,
-    n_bins: int = 20,
 ):  # id, full_id
     in_workspace = workspace / Path("output_csv_full")
     if not workspace.exists():
@@ -397,32 +455,6 @@ def prepare_ts_datasets_for_nns(
 
     def _preprocess(arr):
         return np.log1p(arr + 1e-6)
-
-    def _binning(data):
-        N = len(data)
-        bin_size = N // n_bins  # could be 0 if n_bins > N
-        bins = []
-        start_idx = 0
-
-        for i in range(n_bins):
-            end_idx = N if i == n_bins - 1 else (start_idx + bin_size)
-            bin_sum = float(data[start_idx:end_idx].sum())
-            bins.append(bin_sum)
-            start_idx = end_idx
-
-        return bins
-
-    def _bin_all(sizes, times, directions, direction):
-        dir_sizes = sizes[directions == direction]
-        dir_sizes = _binning(dir_sizes)
-
-        dir_ts = times[directions == direction]
-        dir_ts = _binning(dir_ts)
-
-        dir_dir = directions[directions == direction]
-        dir_dir = _binning(dir_dir)
-
-        return dir_sizes, dir_ts, dir_dir
 
     def _pad(arr, arrsize: int = padlimit):
         arr = np.asarray(arr).tolist()
@@ -466,27 +498,16 @@ def prepare_ts_datasets_for_nns(
         domain_repeats[local_token] += 1
 
         local_sizes = clean_ts_data[real_idx]["length"].values
-        local_direction = clean_ts_data[real_idx]["direction"].values
+        local_sizes = _preprocess(local_sizes)
+        local_sizes = _pad(local_sizes)
+
+        local_dir = clean_ts_data[real_idx]["direction"].values
+        local_dir = _pad(local_dir)
+
         timestamps = clean_ts_data[real_idx]["relative_timestamp"].copy()
         timestamps[timestamps < 0] = 0  # WTF
         local_ts = timestamps.values
-
-        out_sizes, out_ts, out_dir = _bin_all(
-            local_sizes, local_ts, local_direction, direction=1
-        )
-        in_sizes, in_ts, in_dir = _bin_all(
-            local_sizes, local_ts, local_direction, direction=-1
-        )
-
-        local_sizes = np.asarray(out_sizes + in_sizes)
-        local_ts = np.asarray(out_ts + in_ts)
-        local_dir = np.asarray(out_dir + in_dir)
-
-        local_sizes = _preprocess(local_sizes)
-        local_sizes = _pad(local_sizes, arrsize=2 * n_bins)
-
-        local_dir = _pad(local_dir, arrsize=2 * n_bins)
-        local_ts = _pad(local_ts, arrsize=2 * n_bins)
+        local_ts = _pad(local_ts)
 
         assert len(local_ts) == len(local_sizes)
 
@@ -498,9 +519,9 @@ def prepare_ts_datasets_for_nns(
     X = np.asarray(X)
     y = np.asarray(y)
 
-    with open(output / "X.npy", "wb") as f:
+    with open(output / "X_3C.npy", "wb") as f:
         np.save(f, X)
-    with open(output / "y.npy", "wb") as f:
+    with open(output / "y_3C.npy", "wb") as f:
         np.save(f, y)
 
     return X, y
@@ -525,6 +546,8 @@ def create_datasets(
 
     # Create Time-Series datasets
     prepare_ts_datasets(workspace=workspace)
+    prepare_features(workspace=workspace)
 
     # Create datasets for NNs
-    prepare_ts_datasets_for_nns(workspace=workspace)
+    prepare_ts_datasets_for_nns_1C(workspace=workspace)
+    prepare_ts_datasets_for_nns_3C(workspace=workspace)
