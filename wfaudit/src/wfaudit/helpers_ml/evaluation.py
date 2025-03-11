@@ -22,6 +22,7 @@ from wfaudit.helpers_ml.robustfp import RobustFingerprintingClassifier
 from wfaudit.helpers_ml.serialization import load_from_file, save_to_file
 from wfaudit.helpers_ml.svm import SVMClassifier
 from wfaudit.helpers_ml.varcnn import VarCNNClassifier
+from wfaudit.helpers_ml.varcnn3d import VarCNN3DClassifier
 from wfaudit.helpers_ml.xgb import XGBoostClassifier
 import wfaudit.logger as log
 
@@ -196,6 +197,8 @@ def _get_arch_mode(arch: str, **kwargs):
         return KFingerprintingForestClassifier()
     elif arch == "varcnn":
         return VarCNNClassifier(**kwargs)
+    elif arch == "varcnn3d":
+        return VarCNN3DClassifier(**kwargs)
     elif arch == "tam":
         return RobustFingerprintingClassifier(**kwargs)
     elif arch == "holmes":

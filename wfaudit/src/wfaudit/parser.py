@@ -452,10 +452,7 @@ def prepare_ts_datasets_for_nns_3C(
         ID_COL=ID_COL,
     )
 
-    padlimit = min(max(lens), 1000)
-
-    def _preprocess(arr):
-        return np.log1p(arr + 1e-6)
+    padlimit = min(int(np.median(lens)) + 10, 1000)
 
     def _pad(arr, arrsize: int = padlimit):
         arr = np.asarray(arr).tolist()
@@ -499,7 +496,7 @@ def prepare_ts_datasets_for_nns_3C(
         domain_repeats[local_token] += 1
 
         local_sizes = clean_ts_data[real_idx]["length"].values
-        local_sizes = _preprocess(local_sizes)
+        local_sizes = local_sizes / 1024  # KB
         local_sizes = _pad(local_sizes)
 
         local_dir = clean_ts_data[real_idx]["direction"].values

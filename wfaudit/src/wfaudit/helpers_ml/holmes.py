@@ -17,29 +17,16 @@ from wfaudit.helpers_ml._core_nn import DEVICE, BasicNNClassifier
 
 class ConvBlock1d(nn.Module):
     """
-    A 1D convolutional block consisting of two convolutional layers followed by batch normalization
-    and ReLU activation, with a residual connection.
+    A 1D convolutional block: two conv layers -> batch norm -> ReLU, plus a residual connection.
     """
 
-    def __init__(self, in_channels, out_channels, kernel_size, dilation=1):
+    def __init__(self, in_channels, out_channels, kernel_size=3):
         super(ConvBlock1d, self).__init__()
         self.net = nn.Sequential(
-            nn.Conv1d(
-                in_channels=in_channels,
-                out_channels=out_channels,
-                kernel_size=kernel_size,
-                dilation=dilation,
-                padding="same",
-            ),
+            nn.Conv1d(in_channels, out_channels, kernel_size, padding="same"),
             nn.BatchNorm1d(out_channels),
             nn.ReLU(),
-            nn.Conv1d(
-                in_channels=out_channels,
-                out_channels=out_channels,
-                kernel_size=kernel_size,
-                dilation=dilation,
-                padding="same",
-            ),
+            nn.Conv1d(out_channels, out_channels, kernel_size, padding="same"),
             nn.BatchNorm1d(out_channels),
             nn.ReLU(),
         )
@@ -48,160 +35,85 @@ class ConvBlock1d(nn.Module):
             if in_channels != out_channels
             else None
         )
-        if self.downsample is not None:
-            self.downsample.weight.data.normal_(0, 0.01)
         self.last_relu = nn.ReLU()
 
     def forward(self, x):
         out = self.net(x)
         res = x if self.downsample is None else self.downsample(x)
         return self.last_relu(out + res)
-
-
-class ConvBlock2d(nn.Module):
-    """
-    A 2D convolutional block consisting of two convolutional layers followed by batch normalization
-    and ReLU activation, with a residual connection.
-    """
-
-    def __init__(self, in_channels, out_channels, kernel_size):
-        super(ConvBlock2d, self).__init__()
-        self.net = nn.Sequential(
-            nn.Conv2d(
-                in_channels=in_channels,
-                out_channels=out_channels,
-                kernel_size=kernel_size,
-                stride=1,
-                padding="same",
-            ),
-            nn.BatchNorm2d(out_channels, eps=1e-05, momentum=0.1, affine=True),
-            nn.ReLU(),
-            nn.Conv2d(
-                in_channels=out_channels,
-                out_channels=out_channels,
-                kernel_size=kernel_size,
-                stride=1,
-                padding="same",
-            ),
-            nn.BatchNorm2d(out_channels, eps=1e-05, momentum=0.1, affine=True),
-            nn.ReLU(),
-        )
-        self.downsample = (
-            nn.Conv2d(in_channels, out_channels, 1)
-            if in_channels != out_channels
-            else None
-        )
-        if self.downsample is not None:
-            self.downsample.weight.data.normal_(0, 0.01)
-        self.last_relu = nn.ReLU()
-
-    def forward(self, x):
-        out = self.net(x)
-        res = x if self.downsample is None else self.downsample(x)
-        return self.last_relu(out + res)
-
-
-class Encoder2d(nn.Module):
-    """
-    A 2D convolutional encoder consisting of multiple ConvBlock2d layers followed by max pooling and dropout.
-    """
-
-    def __init__(self, in_channels, out_channels, conv_num_layers):
-        super(Encoder2d, self).__init__()
-        layers = []
-        cur_in_channels = in_channels
-        cur_out_channels = 32
-        for i in range(conv_num_layers):
-            layers.append(ConvBlock2d(cur_in_channels, cur_out_channels, (3, 7)))
-            if i < conv_num_layers - 1:
-                layers.append(nn.MaxPool2d((1, 3)))
-            else:
-                layers.append(nn.MaxPool2d((2, 2)))
-            layers.append(nn.Dropout(0.1))
-            cur_in_channels = cur_out_channels
-            cur_out_channels = cur_out_channels * 2
-            if i == conv_num_layers - 2:
-                cur_out_channels = out_channels
-        self.layers = nn.Sequential(*layers)
-
-    def forward(self, x):
-        x = self.layers(x)
-        return x
 
 
 class Encoder1d(nn.Module):
     """
-    A 1D convolutional encoder consisting of multiple ConvBlock1d layers followed by max pooling and dropout.
+    A stack of ConvBlock1d layers, each optionally followed by MaxPool1d and dropout.
     """
 
-    def __init__(self, in_channels, out_channels, conv_num_layers):
+    def __init__(self, in_channels, out_channels, conv_num_layers=4):
         super(Encoder1d, self).__init__()
         layers = []
-        cur_in_channels = in_channels
-        cur_out_channels = 128
+        current_in = in_channels
+        hidden = 128
         for i in range(conv_num_layers):
-            layers.append(ConvBlock1d(cur_in_channels, cur_out_channels, 3))
+            layers.append(ConvBlock1d(current_in, hidden, 3))
             if i < conv_num_layers - 1:
                 layers.append(nn.MaxPool1d(3))
                 layers.append(nn.Dropout(0.3))
-            cur_in_channels = cur_out_channels
-            cur_out_channels = cur_out_channels * 2
+            current_in = hidden
+            hidden = hidden * 2
+            # Override the final hidden dimension just before the last layer:
             if i == conv_num_layers - 2:
-                cur_out_channels = out_channels
+                hidden = out_channels
+
         self.layers = nn.Sequential(*layers)
 
     def forward(self, x):
-        x = self.layers(x)
-        return x
+        return self.layers(x)
 
 
 class Holmes(nn.Module):
     """
-    The main model class combining 2D and 1D convolutional encoders, followed by an adaptive average pooling and classification.
+    A purely 1D CNN for binary classification on data of shape (batch, 3, 360).
     """
 
-    def __init__(self, num_classes):
+    def __init__(self, num_classes=2):
         super(Holmes, self).__init__()
-        in_channels_1d = 16
-        conv_num_layers_1d = 4
-        out_channels_2d = 64
-        conv_num_layers_2d = 2
-        emb_size = 128
+        # We start with 3 input channels (since input is (N,3,360)).
+        in_channels_1d = 3
+        emb_size = 128  # final embedding dimension from the 1D encoder
 
-        self.in_channels_1d = in_channels_1d
-        self.encoder2d = Encoder2d(
-            in_channels=1,
-            out_channels=out_channels_2d,
-            conv_num_layers=conv_num_layers_2d,
-        )
         self.encoder1d = Encoder1d(
             in_channels=in_channels_1d,
             out_channels=emb_size,
-            conv_num_layers=conv_num_layers_1d,
+            conv_num_layers=4,  # or however many you want
         )
-        self.classifier = nn.AdaptiveAvgPool1d(1)
+
+        # We'll use an adaptive average pool to go from [batch, emb_size, some_length] -> [batch, emb_size, 1]
+        self.global_pool = nn.AdaptiveAvgPool1d(1)
+
+        # Final linear layer to get 2 logits for binary classification
+        self.final_linear = nn.Linear(emb_size, num_classes)
+
         self._initialize_weights()
 
     def forward(self, x):
-        x = self.encoder2d(x)
-        x = x.view(x.shape[0], self.in_channels_1d, -1)
-        x = self.encoder1d(x)
-        x = self.classifier(x)
-        x = x.view(x.shape[0], -1)
+        """
+        x shape: [batch_size, 3, 360]
+        """
+        x = self.encoder1d(x)  # [batch, 128, some_length]
+        x = self.global_pool(x)  # [batch, 128, 1]
+        x = x.view(x.size(0), -1)  # [batch, 128]
+        x = self.final_linear(x)  # [batch, 2]
         return x
 
     def _initialize_weights(self):
-        """
-        Initialize the weights of the model.
-        """
         for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
+            if isinstance(m, nn.Conv1d):
+                n = (m.kernel_size[0]) * m.out_channels
                 m.weight.data.normal_(0, math.sqrt(2.0 / n))
                 if m.bias is not None:
                     m.bias.data.zero_()
-            elif isinstance(m, nn.BatchNorm2d):
-                m.weight.data.fill_(1)
+            elif isinstance(m, nn.BatchNorm1d):
+                m.weight.data.fill_(1.0)
                 m.bias.data.zero_()
             elif isinstance(m, nn.Linear):
                 m.weight.data.normal_(0, 0.01)
@@ -212,7 +124,7 @@ class HolmesClassifier:
     def __init__(
         self,
         num_classes: int = 2,
-        batch_size: int = 512,
+        batch_size: int = 128,
         lr: float = 1e-3,
         device=DEVICE,
         epochs: int = 100,
@@ -232,9 +144,8 @@ class HolmesClassifier:
 
     def fit(self, X: np.ndarray, y: np.ndarray) -> "HolmesClassifier":
         X = np.asarray(X)
-        assert len(X.shape) == 3
-        X = np.expand_dims(X, axis=1)
         y = np.asarray(y)
+        assert len(X.shape) == 3
 
         self.model.fit(X, y)
         return self
@@ -242,14 +153,12 @@ class HolmesClassifier:
     def predict_proba(self, X: np.ndarray) -> np.ndarray:
         X = np.asarray(X)
         assert len(X.shape) == 3
-        X = np.expand_dims(X, axis=1)
 
         return self.model.predict_proba(X)
 
     def predict(self, X: np.ndarray) -> np.ndarray:
         X = np.asarray(X)
         assert len(X.shape) == 3
-        X = np.expand_dims(X, axis=1)
 
         return self.model.predict(X)
 

@@ -78,7 +78,7 @@ class VarCNNClassifier:
     def __init__(
         self,
         num_classes: int = 2,
-        batch_size: int = 128,
+        batch_size: int = 512,
         lr: float = 1e-3,
         device=DEVICE,
         epochs: int = 100,
@@ -96,7 +96,7 @@ class VarCNNClassifier:
             criterion=criterion,
         )
 
-    def fit(self, X: np.ndarray, y: np.ndarray) -> "VarCNN":
+    def fit(self, X: np.ndarray, y: np.ndarray) -> "VarCNNClassifier":
         X = np.asarray(X)
         y = np.asarray(y)
 
