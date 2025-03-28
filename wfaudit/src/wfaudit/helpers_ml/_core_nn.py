@@ -3,6 +3,7 @@
 ########################
 
 # stdlib
+import gc
 import random
 
 # third party
@@ -160,6 +161,9 @@ class BasicNNClassifier:
         if best_model_state is not None:
             self.model.load_state_dict(best_model_state)
             print("Restored the best model with val_loss:", best_loss)
+
+        gc.collect()
+        torch.cuda.empty_cache()
 
     @staticmethod
     def name() -> str:

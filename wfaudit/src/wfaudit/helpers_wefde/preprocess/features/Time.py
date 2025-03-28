@@ -8,20 +8,21 @@ from wfaudit.helpers_wefde.preprocess.features.common import split_by_value
 # time includes relative timestamps. 0 means a new connection.
 def get_time_features_per_connection(times):
     if len(times) == 0:
-        return [0, 0, 0]
+        return [0, 0, 0, 0]
 
     return [
         float(np.max(times)),
         float(np.mean(times)),
         float(np.std(times)),
+        float(np.sum(times)),
     ]
 
 
-def get_time_features(times, sizes, conn_limit: int = 5):
+def get_time_features(times, sizes, multi_conn: int = True, conn_limit: int = 5):
     # global
-    features = get_time_features_per_connection(times)
+    features = []  # get_time_features_per_connection(times)
 
-    if conn_limit <= 1:
+    if conn_limit <= 0 or not multi_conn:
         return features
 
     # per connection
@@ -37,6 +38,6 @@ def get_time_features(times, sizes, conn_limit: int = 5):
 
         features += conn_times_features
 
-    assert len(features) == (conn_limit + 1) * 3
+    assert len(features) == (conn_limit) * 4
 
     return features

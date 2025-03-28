@@ -163,6 +163,7 @@ def evaluate_classifier(
         classes = classes.union(pred_labels)
 
         scores = evaluator.score_proba(Y_test, preds, list(sorted(classes)))
+        del model
 
         for metric in scores:
             results[metric][indx] = scores[metric]

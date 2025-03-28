@@ -17,4 +17,4 @@ from .parser import prepare_ts_datasets_for_nns_1C  # noqa: F401
 from .parser import prepare_ts_datasets_for_nns_3C  # noqa: F401
 from .parser import process_raw_pcaps  # noqa: F401; noqa: F401
 
-logger.add(sink=sys.stderr, level="DEBUG")
+logger.add(sink=sys.stderr, level="INFO")

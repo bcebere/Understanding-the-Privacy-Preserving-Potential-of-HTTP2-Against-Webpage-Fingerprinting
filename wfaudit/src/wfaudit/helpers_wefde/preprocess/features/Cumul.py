@@ -73,14 +73,17 @@ def get_cumul_features_per_connection(packets, feature_cnt=5):
     return features
 
 
-def get_cumul_features(times, packets, feature_cnt=6, conn_limit: int = 10):
+def get_cumul_features(
+    times, packets, multi_conn: bool = True, feature_cnt=6, conn_limit: int = 10
+):
     packets = np.asarray(packets)
 
     # global
-    features = get_cumul_features_per_connection(
-        packets.tolist(), feature_cnt=feature_cnt
-    )
-    if conn_limit <= 1:
+    features = (
+        []
+    )  # get_cumul_features_per_connection(packets.tolist(), feature_cnt=feature_cnt)
+
+    if conn_limit <= 0 or not multi_conn:
         return features
 
     # per connection
@@ -94,5 +97,5 @@ def get_cumul_features(times, packets, feature_cnt=6, conn_limit: int = 10):
             packets[conn_idx].tolist(), feature_cnt=feature_cnt
         )
 
-    assert len(features) == (conn_limit + 1) * (2 + feature_cnt), features
+    assert len(features) == (conn_limit) * (2 + feature_cnt), features
     return features

@@ -40,7 +40,9 @@ def enumerate_files(dir, splitter="-", extension=""):
     return file_list
 
 
-def extract(times, sizes, conn_limit: int = 5, debug_path="./"):
+def extract(
+    times, sizes, multi_conn: bool = True, conn_limit: int = 5, debug_path="./"
+):
     """
     extract features from a parsed website trace
     """
@@ -48,19 +50,35 @@ def extract(times, sizes, conn_limit: int = 5, debug_path="./"):
     features = []
 
     # Transmission size features
-    features.extend(PktNum.get_packet_counts(times, sizes, conn_limit=conn_limit))
+    features.extend(
+        PktNum.get_packet_counts(
+            times, sizes, multi_conn=multi_conn, conn_limit=conn_limit
+        )
+    )
     feature_pos["PACKET_NUMBER"] = len(features)
 
     # inter packet time + transmission time feature
-    features.extend(Time.get_time_features(times, sizes, conn_limit=conn_limit))
+    features.extend(
+        Time.get_time_features(
+            times, sizes, multi_conn=multi_conn, conn_limit=conn_limit
+        )
+    )
     feature_pos["PKT_TIME"] = len(features)
 
     # Bursts (knn)
-    features.extend(Burst.get_burst_features(times, sizes, conn_limit=conn_limit))
+    features.extend(
+        Burst.get_burst_features(
+            times, sizes, multi_conn=multi_conn, conn_limit=conn_limit
+        )
+    )
     feature_pos["BURST"] = len(features)
 
     # CUMUL features
-    features.extend(Cumul.get_cumul_features(times, sizes, conn_limit=conn_limit))
+    features.extend(
+        Cumul.get_cumul_features(
+            times, sizes, multi_conn=multi_conn, conn_limit=conn_limit
+        )
+    )
     feature_pos["CUMUL"] = len(features)
 
     # output FeaturePos
@@ -74,7 +92,7 @@ def task_handler(args):
     """
     handle feature extraction for each trace instance assigned to batch
     """
-    filepath, out_path, conn_limit = args
+    filepath, out_path, multi_conn, conn_limit = args
 
     # load trace file
     x = pd.read_csv(filepath, sep=" ", header=None)
@@ -88,6 +106,7 @@ def task_handler(args):
     features = extract(
         times,
         sizes,
+        multi_conn=multi_conn,
         conn_limit=conn_limit,
         debug_path=out_path,
     )
@@ -105,7 +124,9 @@ def task_handler(args):
                 fout.write(repr(x) + " ")
 
 
-def prepare_wefde_features(trace_path, out_path, conn_limit: int = 5):
+def prepare_wefde_features(
+    trace_path, out_path, multi_conn: bool = True, conn_limit: int = 5
+):
     """
     start batches to handle feature extraction
     """
@@ -116,7 +137,12 @@ def prepare_wefde_features(trace_path, out_path, conn_limit: int = 5):
     for _ in tqdm(
         pool.imap(
             task_handler,
-            zip(file_list, itertools.repeat(out_path), itertools.repeat(conn_limit)),
+            zip(
+                file_list,
+                itertools.repeat(out_path),
+                itertools.repeat(multi_conn),
+                itertools.repeat(conn_limit),
+            ),
         ),
         total=len(file_list),
     ):

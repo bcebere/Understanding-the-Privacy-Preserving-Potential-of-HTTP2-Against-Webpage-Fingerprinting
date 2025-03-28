@@ -26,7 +26,9 @@ def process_raw_pcaps(
     traces=Path("traces"),
     workspace=Path("workspace"),
     unlink_after_processing=True,
+    buffer_tcp: bool = True,
     n_jobs=8,
+    files=None,
 ):
     """
     Args:
@@ -36,12 +38,15 @@ def process_raw_pcaps(
     """
     if not traces.exists():
         log.error("missing traces folder")
-        return
+        return []
     workspace.mkdir(parents=True, exist_ok=True)
     output = workspace / "output_csv_single"
     output.mkdir(parents=True, exist_ok=True)
 
-    files = glob.glob(str(traces / "*.pcap"))
+    if files is None:
+        files = glob.glob(str(traces / "*.pcap"))
+
+    print(f"Parsing {len(files)} PCAPS to {workspace}")
     shuffle(files)
 
     def _parse_single_pcap(filename):
@@ -59,7 +64,7 @@ def process_raw_pcaps(
             return
         log.debug(f"Parsing {filename}")
         try:
-            session = process_pcap(filename)
+            session = process_pcap(filename, buffer_tcp=buffer_tcp)
         except BaseException as e:
             log.error(
                 f"failed to parse pcap. moving to graveyard {filename}, error = {e}"
@@ -82,6 +87,8 @@ def process_raw_pcaps(
             filename.unlink()
 
     Parallel(n_jobs=n_jobs)(delayed(_parse_single_pcap)(filename) for filename in files)
+
+    return files
 
 
 def merge_pcap_csvs(workspace=Path("workspace"), pd_lim: int = 10000) -> None:
@@ -351,6 +358,8 @@ def prepare_ts_datasets(
         )
         timestamps = clean_ts_data[real_idx]["relative_timestamp"].copy()
         timestamps[timestamps < 0] = 0  # WTF
+        timestamps[timestamps > 1000] = 0  # Parsing bug
+
         local_ts = timestamps.values
         assert len(local_ts) == len(local_sizes)
         assert (local_ts >= 0).all(), timestamps.values
@@ -364,18 +373,20 @@ def prepare_ts_datasets(
 def prepare_features(
     workspace=Path("workspace"),
     conn_limit: int = 5,
+    multi_conn: bool = True,
 ):
     time_series_traces = workspace / Path("output_wefde")
     if not time_series_traces.exists():
         log.error("Missing output_wefde data. Call prepare_ts_datasets first!")
         return
 
-    output = workspace / Path("eval_features")
+    output = workspace / Path("output_features")
     output.mkdir(parents=True, exist_ok=True)
 
     return prepare_wefde_features(
         trace_path=time_series_traces,
         out_path=output,
+        multi_conn=multi_conn,
         conn_limit=conn_limit,
     )
 
@@ -383,7 +394,7 @@ def prepare_features(
 def prepare_ts_datasets_for_nns_1C(
     workspace=Path("workspace"),
 ):
-    wefde_path = workspace / Path("eval_features")
+    wefde_path = workspace / Path("output_features")
 
     if not wefde_path.exists():
         log.error("Missing output_wefde features. Run prepare_features first!")
@@ -396,6 +407,7 @@ def prepare_ts_datasets_for_nns_1C(
     output.mkdir(parents=True, exist_ok=True)
 
     X, y = load_wefde_features(wefde_path)
+
     start_off = 0
     for feat in features:
         end_off = features[feat]
@@ -413,8 +425,6 @@ def prepare_ts_datasets_for_nns_1C(
         np.save(f, X)
     with open(output / "y_1C.npy", "wb") as f:
         np.save(f, y)
-
-    return X, y
 
 
 def prepare_ts_datasets_for_nns_3C(
@@ -452,7 +462,7 @@ def prepare_ts_datasets_for_nns_3C(
         ID_COL=ID_COL,
     )
 
-    padlimit = min(int(np.median(lens)) + 10, 1000)
+    padlimit = min(int(np.median(lens)) + 10, 500)
 
     def _pad(arr, arrsize: int = padlimit):
         arr = np.asarray(arr).tolist()
@@ -463,6 +473,15 @@ def prepare_ts_datasets_for_nns_3C(
         assert len(arr) == arrsize
 
         return np.asarray(arr)
+
+    def _stats(arr):
+        return [
+            len(arr),
+            float(np.max(arr)),
+            float(np.mean(arr)),
+            float(np.std(arr)),
+            float(np.sum(arr)),
+        ]
 
     real_idx = 0
     domain_repeats = {}
@@ -497,14 +516,22 @@ def prepare_ts_datasets_for_nns_3C(
 
         local_sizes = clean_ts_data[real_idx]["length"].values
         local_sizes = local_sizes / 1024  # KB
+        local_sizes_stats = _stats(local_sizes)
+        local_sizes = np.asarray(list(local_sizes_stats) + list(local_sizes))
         local_sizes = _pad(local_sizes)
 
         local_dir = clean_ts_data[real_idx]["direction"].values
+        local_dir_stats = _stats(local_dir)
+        local_dir = np.asarray(list(local_dir_stats) + list(local_dir))
         local_dir = _pad(local_dir)
 
         timestamps = clean_ts_data[real_idx]["relative_timestamp"].copy()
         timestamps[timestamps < 0] = 0  # WTF
+        timestamps[timestamps > 1000] = 0  # Parsing bug
+
         local_ts = timestamps.values
+        local_ts_stats = _stats(local_ts)
+        local_ts = np.asarray(list(local_ts_stats) + list(local_ts))
         local_ts = _pad(local_ts)
 
         assert len(local_ts) == len(local_sizes)

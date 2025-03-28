@@ -43,12 +43,12 @@ def _individual_measure(modeler, n_procs: int = 10, n_samples: int = 10000):
         local_res = modeler.information_leakage(
             clusters=[[feature]],
             sample_size=n_samples,
-            n_procs=2,
+            n_procs=n_procs,
         )
         log.info(f"[Leakage] Feature {feature} -> {local_res[0]} bits")
         return local_res[0]
 
-    leakage_indiv = Parallel(n_jobs=n_procs)(
+    leakage_indiv = Parallel(n_jobs=1)(
         delayed(_eval_feature)(feature) for feature in features
     )
 

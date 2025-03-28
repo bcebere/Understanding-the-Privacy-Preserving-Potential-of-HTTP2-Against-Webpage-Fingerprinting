@@ -96,7 +96,7 @@ class TimeSeries:
                 )
                 latest_clump_end_timestamp = c.latest_timestamp
         else:
-            latest_timestamp = 0.0
+            latest_timestamp = None
 
             for packet, direction in self.packets:
                 if "TLS" not in packet and "QUIC" not in packet:
@@ -119,6 +119,8 @@ class TimeSeries:
 
                 packet_len = len(packet)
                 packet_timestamp = float(packet.frame_info.time_epoch)
+                if latest_timestamp is None:
+                    latest_timestamp = packet_timestamp
 
                 results.append(
                     [
