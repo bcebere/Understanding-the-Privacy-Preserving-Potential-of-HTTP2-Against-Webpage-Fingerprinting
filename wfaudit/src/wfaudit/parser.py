@@ -91,7 +91,7 @@ def process_raw_pcaps(
     return files
 
 
-def merge_pcap_csvs(workspace=Path("workspace"), pd_lim: int = 10000) -> None:
+def merge_pcap_csvs(workspace=Path("workspace"), pd_lim: int = 1000) -> None:
     """
     Args:
         workspace: The folder which contains the post-processed pcaps --- output_csv_single.
@@ -111,8 +111,18 @@ def merge_pcap_csvs(workspace=Path("workspace"), pd_lim: int = 10000) -> None:
     batch_idx = 0
 
     static_files = glob.glob(str(in_workspace / "static*.csv"))
+
+    # check existing files
+    if (output / f"static_data_batch{batch_idx}.csv").exists():
+        for batch_idx in range(10000):
+            if not (output / f"static_data_batch{batch_idx}.csv").exists():
+                break
+        print(f"found {batch_idx} batches")
+        if batch_idx > 50:
+            static_files = []
+
     print("static files", len(static_files))
-    for fidx, filename in enumerate(static_files):
+    for fidx, filename in tqdm(enumerate(static_files)):
         static_filename = Path(filename)
         base = static_filename.name.split("static_")[1]
         temporal_base = "temporal_" + base
@@ -182,29 +192,35 @@ def merge_pcap_csvs(workspace=Path("workspace"), pd_lim: int = 10000) -> None:
             index=False,
         )
 
-    full_data_static = None
-    full_data_temporal = None
+    print(f"collected {batch_idx} CSVs")
+    dfs_static, dfs_temporal = [], []
 
-    for batch in range(0, batch_idx + 1):
+    for batch in tqdm(range(0, batch_idx + 1)):
         static_batch = Path(output / f"static_data_batch{batch}.csv")
         temporal_batch = Path(output / f"temporal_data_batch{batch}.csv")
         if not static_batch.exists():
             break
 
-        batch_data_static = pd.read_csv(static_batch)
-        batch_data_temporal = pd.read_csv(temporal_batch)
+        dfs_static.append(pd.read_csv(static_batch, engine="pyarrow"))
+        dfs_temporal.append(pd.read_csv(temporal_batch, engine="pyarrow"))
 
-        if full_data_static is None:
-            full_data_static = batch_data_static
-            full_data_temporal = batch_data_temporal
-        else:
-            full_data_static = pd.concat(
-                [full_data_static, batch_data_static], ignore_index=True
-            )
-            full_data_temporal = pd.concat(
-                [full_data_temporal, batch_data_temporal], ignore_index=True
-            )
+        # if full_data_static is None:
+        #    full_data_static = batch_data_static
+        #    full_data_temporal = batch_data_temporal
+        # else:
+        #    full_data_static = pd.concat(
+        #        [full_data_static, batch_data_static], ignore_index=True
+        #    )
+        #    full_data_temporal = pd.concat(
+        #        [full_data_temporal, batch_data_temporal], ignore_index=True
+        #    )
 
+    print(f"static {len(dfs_static)} CSVs")
+    full_data_static = pd.concat(dfs_static, ignore_index=True, copy=False)
+    print(f"temporal {len(dfs_temporal)} CSVs")
+    full_data_temporal = pd.concat(dfs_temporal, ignore_index=True, copy=False)
+
+    print("saving !!")
     full_data_static.to_csv(
         output / "static_data.csv",
         index=False,
