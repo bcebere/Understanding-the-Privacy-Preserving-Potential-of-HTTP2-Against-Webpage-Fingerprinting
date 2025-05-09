@@ -91,7 +91,12 @@ def process_raw_pcaps(
     return files
 
 
-def merge_pcap_csvs(workspace=Path("workspace"), pd_lim: int = 1000) -> None:
+def merge_pcap_csvs(
+    workspace=Path("workspace"),
+    pd_lim: int = 1000,
+    temporal_lim: int = None,
+    cache: bool = False,
+) -> None:
     """
     Args:
         workspace: The folder which contains the post-processed pcaps --- output_csv_single.
@@ -101,27 +106,13 @@ def merge_pcap_csvs(workspace=Path("workspace"), pd_lim: int = 1000) -> None:
     if not in_workspace.exists():
         log.error("Missing output_csv_single folder")
         return
-
-    output = workspace / Path("output_csv_full")
-    output.mkdir(parents=True, exist_ok=True)
-
-    full_static_csv: Optional[pd.DataFrame] = None
-    full_temporal_csv: Optional[pd.DataFrame] = None
-    cnt = 0
-    batch_idx = 0
-
     static_files = glob.glob(str(in_workspace / "static*.csv"))
 
-    # check existing files
-    if (output / f"static_data_batch{batch_idx}.csv").exists():
-        for batch_idx in range(10000):
-            if not (output / f"static_data_batch{batch_idx}.csv").exists():
-                break
-        print(f"found {batch_idx} batches")
-        if batch_idx > 50:
-            static_files = []
-
     print("static files", len(static_files))
+    buffer_static = []
+    buffer_temporal = []
+    temporal_total_len = 0
+
     for fidx, filename in tqdm(enumerate(static_files)):
         static_filename = Path(filename)
         base = static_filename.name.split("static_")[1]
@@ -131,10 +122,14 @@ def merge_pcap_csvs(workspace=Path("workspace"), pd_lim: int = 1000) -> None:
         assert static_filename.exists()
         assert temporal_filename.exists()
         try:
-            local_static_csv = pd.read_csv(static_filename)
-            local_temporal_csv = pd.read_csv(temporal_filename)
-        except BaseException as e:
-            print("failed to read csv", e)
+            local_static_csv = pd.read_csv(static_filename, engine="pyarrow")
+            if temporal_lim is None:
+                local_temporal_csv = pd.read_csv(temporal_filename, engine="pyarrow")
+            else:
+                local_temporal_csv = pd.read_csv(
+                    temporal_filename, engine="pyarrow"
+                ).head(temporal_lim)
+        except BaseException:
             continue
 
         original_ids = local_static_csv["id"].values[0]
@@ -150,85 +145,38 @@ def merge_pcap_csvs(workspace=Path("workspace"), pd_lim: int = 1000) -> None:
         local_static_csv["full_id"] = hashed_id
         local_temporal_csv["full_id"] = hashed_id
 
-        if full_static_csv is None:
-            full_static_csv = local_static_csv
-            full_temporal_csv = local_temporal_csv
-        else:
-            full_static_csv = pd.concat(
-                [full_static_csv, local_static_csv], ignore_index=True
+        buffer_static.append(local_static_csv)
+        buffer_temporal.append(local_temporal_csv)
+
+        temporal_total_len += len(local_temporal_csv)
+
+        if len(buffer_temporal) % 1000 == 0:
+            print(
+                "processed temporal series ",
+                temporal_total_len,
+                temporal_total_len / (len(buffer_temporal) + 1),
             )
-            full_temporal_csv = pd.concat(
-                [full_temporal_csv, local_temporal_csv], ignore_index=True
-            )
 
-        if cnt % 1000 == 0:
-            log.debug(f"merge  batch {cnt}, {full_static_csv.shape}")
+    print(f"static {len(buffer_static)} CSVs")
+    full_data_static = pd.concat(buffer_static, ignore_index=True, copy=False)
+    print(f"temporal {len(buffer_temporal)} CSVs")
+    full_data_temporal = pd.concat(buffer_temporal, ignore_index=True, copy=False)
 
-        if len(full_static_csv) > pd_lim:
-            assert full_static_csv is not None
-            assert full_temporal_csv is not None
+    return full_data_static, full_data_temporal
 
-            full_static_csv.to_csv(
-                output / f"static_data_batch{batch_idx}.csv",
-                index=False,
-            )
-            full_temporal_csv.to_csv(
-                output / f"temporal_data_batch{batch_idx}.csv",
-                index=False,
-            )
-            batch_idx += 1
-            full_static_csv = None
-            full_temporal_csv = None
+    # print("saving !!")
+    if cache:
+        output = workspace / Path("output_csv_full")
+        output.mkdir(parents=True, exist_ok=True)
 
-        cnt += 1
-
-    if full_temporal_csv is not None:
-        full_static_csv.to_csv(
-            output / f"static_data_batch{batch_idx}.csv",
+        full_data_static.to_csv(
+            output / "static_data.csv",
             index=False,
         )
-        full_temporal_csv.to_csv(
-            output / f"temporal_data_batch{batch_idx}.csv",
+        full_data_temporal.to_csv(
+            output / "temporal_data.csv",
             index=False,
         )
-
-    print(f"collected {batch_idx} CSVs")
-    dfs_static, dfs_temporal = [], []
-
-    for batch in tqdm(range(0, batch_idx + 1)):
-        static_batch = Path(output / f"static_data_batch{batch}.csv")
-        temporal_batch = Path(output / f"temporal_data_batch{batch}.csv")
-        if not static_batch.exists():
-            break
-
-        dfs_static.append(pd.read_csv(static_batch, engine="pyarrow"))
-        dfs_temporal.append(pd.read_csv(temporal_batch, engine="pyarrow"))
-
-        # if full_data_static is None:
-        #    full_data_static = batch_data_static
-        #    full_data_temporal = batch_data_temporal
-        # else:
-        #    full_data_static = pd.concat(
-        #        [full_data_static, batch_data_static], ignore_index=True
-        #    )
-        #    full_data_temporal = pd.concat(
-        #        [full_data_temporal, batch_data_temporal], ignore_index=True
-        #    )
-
-    print(f"static {len(dfs_static)} CSVs")
-    full_data_static = pd.concat(dfs_static, ignore_index=True, copy=False)
-    print(f"temporal {len(dfs_temporal)} CSVs")
-    full_data_temporal = pd.concat(dfs_temporal, ignore_index=True, copy=False)
-
-    print("saving !!")
-    full_data_static.to_csv(
-        output / "static_data.csv",
-        index=False,
-    )
-    full_data_temporal.to_csv(
-        output / "temporal_data.csv",
-        index=False,
-    )
 
 
 def _discrete_columns(
@@ -270,6 +218,7 @@ def _prepare_time_series(
     lens = []
     sizes = []
     rel_times = []
+    print("processing time series")
     for idx, group in tqdm(groups):
         if idx not in static_ids:
             continue
@@ -305,31 +254,17 @@ def _prepare_time_series(
 
 
 def prepare_ts_datasets(
+    static_data,
+    temporal_data,
     workspace=Path("workspace"),
     ID_COL="file_order",
     domain_limit=50,
     class_cnt_limit=1024,
 ):  # id, full_id
-    in_workspace = workspace / Path("output_csv_full")
-    if not in_workspace.exists():
-        log.error("Missing output_csv_full data")
-        return
-
     output = workspace / Path("output_wefde")
     output.mkdir(parents=True, exist_ok=True)
 
-    full_data_static = pd.read_csv(in_workspace / "static_data.csv")
-    full_data_temporal = pd.read_csv(in_workspace / "temporal_data.csv")
-
-    static_data = full_data_static
-    constant = _constant_columns(static_data)
-    static_data = static_data.drop(columns=constant)
-
-    static_ids = static_data[ID_COL].values
-
-    temporal_data = full_data_temporal[full_data_temporal[ID_COL].isin(static_ids)]
-    static_data = static_data[static_data[ID_COL].isin(temporal_data[ID_COL].values)]
-
+    print("process time series")
     (clean_static_data, clean_ts_data, _) = _prepare_time_series(
         static_data,
         temporal_data,
@@ -340,11 +275,13 @@ def prepare_ts_datasets(
     domain_repeats = {}
     domain_label = {}
 
+    print("process labels")
     experiment_labels = []
     for ridx, static_row in clean_static_data.iterrows():
         encoded_label = static_row["label"]
         experiment_labels.append(encoded_label)
 
+    print("process wefde features")
     experiment_labels = list(sorted(list(set(experiment_labels))))
     for ridx, static_row in clean_static_data.iterrows():
         local_token = static_row["label"]
@@ -444,29 +381,15 @@ def prepare_ts_datasets_for_nns_1C(
 
 
 def prepare_ts_datasets_for_nns_3C(
+    static_data,
+    temporal_data,
     workspace=Path("workspace"),
     ID_COL="file_order",
     domain_limit=50,
     class_cnt_limit=1024,
 ):  # id, full_id
-    in_workspace = workspace / Path("output_csv_full")
-    if not in_workspace.exists():
-        log.error("Missing output_csv_full data. Run merge_pcaps_csv first!")
-        return
-
     output = workspace / Path("output_ml")
     output.mkdir(parents=True, exist_ok=True)
-
-    static_data = pd.read_csv(in_workspace / "static_data.csv")
-    full_data_temporal = pd.read_csv(in_workspace / "temporal_data.csv")
-
-    constant = _constant_columns(static_data)
-    static_data = static_data.drop(columns=constant)
-
-    static_ids = static_data[ID_COL].values
-
-    temporal_data = full_data_temporal[full_data_temporal[ID_COL].isin(static_ids)]
-    static_data = static_data[static_data[ID_COL].isin(temporal_data[ID_COL].values)]
 
     (
         clean_static_data,
@@ -568,27 +491,17 @@ def prepare_ts_datasets_for_nns_3C(
     return X, y
 
 
-def create_datasets(
-    traces=Path("traces"),
+def prepare_datasets(
     workspace=Path("workspace"),
-    unlink_after_processing=True,
+    conn_limit: int = 5,
+    multi_conn: bool = True,
 ):
-    workspace.mkdir(parents=True, exist_ok=True)
-
-    # Parse raw pcaps
-    process_raw_pcaps(
-        traces=traces,
-        workspace=workspace,
-        unlink_after_processing=unlink_after_processing,
-    )
-
-    # Merge CSV in a single dataset
-    merge_pcap_csvs(workspace=workspace)
-
-    # Create Time-Series datasets
-    prepare_ts_datasets(workspace=workspace)
-    prepare_features(workspace=workspace)
-
-    # Create datasets for NNs
+    print("merge datasets")
+    static_data, ts_data = merge_pcap_csvs(workspace=workspace)
+    print("prepare wefde data")
+    prepare_ts_datasets(static_data, ts_data, workspace=workspace)
+    print("prepare wefde features")
+    prepare_features(workspace=workspace, conn_limit=conn_limit)
+    print("prepare NN features")
     prepare_ts_datasets_for_nns_1C(workspace=workspace)
-    prepare_ts_datasets_for_nns_3C(workspace=workspace)
+    prepare_ts_datasets_for_nns_3C(static_data, ts_data, workspace=workspace)
