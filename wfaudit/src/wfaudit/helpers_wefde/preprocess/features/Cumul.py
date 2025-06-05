@@ -74,7 +74,7 @@ def get_cumul_features_per_connection(packets, feature_cnt=5):
 
 
 def get_cumul_features(
-    times, packets, multi_conn: bool = True, feature_cnt=6, conn_limit: int = 10
+    times, packets, multi_conn: bool = True, feature_cnt=8, conn_limit: int = 10
 ):
     packets = np.asarray(packets)
 
@@ -93,9 +93,16 @@ def get_cumul_features(
         conn_idxs += [list(range(len(packets)))] * (conn_limit - len(conn_idxs))
 
     for idx, conn_idx in enumerate(conn_idxs[:conn_limit]):
-        features += get_cumul_features_per_connection(
+        cumul_raw_stats = get_cumul_features_per_connection(
             packets[conn_idx].tolist(), feature_cnt=feature_cnt
         )
 
-    assert len(features) == (conn_limit) * (2 + feature_cnt), features
+        cumul_uniq_stats = get_cumul_features_per_connection(
+            np.unique(packets[conn_idx]).astype(float).tolist(), feature_cnt=feature_cnt
+        )
+
+        features += cumul_raw_stats
+        features += cumul_uniq_stats
+
+    assert len(features) == 2 * (conn_limit) * (2 + feature_cnt), features
     return features

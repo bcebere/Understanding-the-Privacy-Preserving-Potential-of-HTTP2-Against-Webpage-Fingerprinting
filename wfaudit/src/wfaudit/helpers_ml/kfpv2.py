@@ -60,7 +60,6 @@ class KFingerprintingForestClassifier:
         n_jobs=4,
         random_state=42,
     ):
-
         if forest is not None:
             self.forest = forest
         else:

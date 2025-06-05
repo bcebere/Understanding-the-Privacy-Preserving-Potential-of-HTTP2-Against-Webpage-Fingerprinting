@@ -83,6 +83,7 @@ def process_raw_pcaps(
         static_data.to_csv(output_csv_static, index=False)
         temporal_data.to_csv(output_csv_temporal, index=False)
 
+        print("Done parsing", filename)
         if unlink_after_processing:
             filename.unlink()
 
@@ -108,6 +109,7 @@ def merge_pcap_csvs(
         return
     static_files = glob.glob(str(in_workspace / "static*.csv"))
 
+    print(in_workspace)
     print("static files", len(static_files))
     buffer_static = []
     buffer_temporal = []
@@ -129,7 +131,8 @@ def merge_pcap_csvs(
                 local_temporal_csv = pd.read_csv(
                     temporal_filename, engine="pyarrow"
                 ).head(temporal_lim)
-        except BaseException:
+        except BaseException as e:
+            print("failed to read", filename, e)
             continue
 
         original_ids = local_static_csv["id"].values[0]

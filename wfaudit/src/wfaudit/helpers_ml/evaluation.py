@@ -208,6 +208,11 @@ def _get_arch_mode(arch: str, **kwargs):
         raise RuntimeError(arch)
 
 
+def _dataframe_hash(df: pd.DataFrame) -> str:
+    cols = sorted(list(df.columns))
+    return str(abs(pd.util.hash_pandas_object(df[cols].fillna(0)).sum()))
+
+
 def _evaluate_static_models_cv(
     arch: str,  # = "xgboost"
     testname: str,
@@ -217,7 +222,11 @@ def _evaluate_static_models_cv(
     use_cache: bool = True,
     **kwargs,
 ):
-    bkp_file = workspace / f"eval_ts_flow_ho_{len(input_data)}_{arch}_{testname}.json"
+    hash_data = pd.DataFrame(np.asarray(input_data).reshape(len(input_data), -1)).copy()
+    hash_data["label"] = labels
+    hash_data.columns = hash_data.columns.astype(str)
+    data_hash = _dataframe_hash(hash_data)
+    bkp_file = workspace / f"eval_{data_hash}_{arch}_{testname}.json"
 
     score = None
     if bkp_file.exists() and use_cache:
@@ -232,7 +241,9 @@ def _evaluate_static_models_cv(
         )
         if use_cache:
             save_to_file(bkp_file, score)
-    # log.error(f" >>> test = {testname}, score = {score['str']['f1_score_macro']}")
+    log.error(
+        f" >>> test = {testname}, datalen = {len(input_data)} score = {score['str']['f1_score_macro']}"
+    )
     return score
 
 
