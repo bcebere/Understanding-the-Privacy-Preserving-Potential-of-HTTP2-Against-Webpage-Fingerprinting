@@ -8,7 +8,7 @@ import numpy as np
 from wfaudit.helpers_wefde.preprocess.features.common import split_by_value
 
 
-def get_burst_features_per_connection(bursts, topn=10):
+def get_burst_features_per_connection(bursts: list, topn: int):
     if len(bursts) < topn:
         bursts += [0] * (topn - len(bursts))
 
@@ -23,7 +23,7 @@ def get_burst_features_per_connection(bursts, topn=10):
 
 # times are relative to previous packet. 0 means a new connection
 def get_burst_features(
-    times, sizes, multi_conn: bool = True, topn: int = 10, conn_limit: int = 5
+    times, sizes, multi_conn: bool = True, topn: int = 20, conn_limit: int = 5
 ):
     sizes = np.abs(np.asarray(sizes))
 
@@ -53,9 +53,11 @@ def get_burst_features(
 
     # Extract first conn_limit - 1 connections
     for idx, conn_idx in enumerate(conn_idxs[: conn_limit - 1]):
+        print("Eval single conn", conn_idx)
         _, conn_burst_uniq_features = _process_connection(conn_idx)
         burst_features += conn_burst_uniq_features
     # Aggregate the rest of the connections together
+    print("Aggreagte the rest of conns")
     extra_conns = np.concatenate(conn_idxs[conn_limit - 1 :])
     _, conn_burst_uniq_features = _process_connection(extra_conns)
     burst_features += conn_burst_uniq_features

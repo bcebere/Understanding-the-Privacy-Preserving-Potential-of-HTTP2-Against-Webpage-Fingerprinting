@@ -117,6 +117,7 @@ def evaluate_leakage(
     compute_joint: bool = True,
     compress_results: bool = True,
     debug_correctness: bool = False,
+    dataset_split: bool = False,
 ):
     if not wefde_features_dir.exists():
         log.error("WeFDE features not extracted")
@@ -136,4 +137,5 @@ def evaluate_leakage(
         compute_joint=compute_joint,
         compress_results=compress_results,
         debug_correctness=debug_correctness,
+        dataset_split=dataset_split,
     )

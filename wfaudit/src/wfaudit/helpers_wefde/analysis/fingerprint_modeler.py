@@ -34,6 +34,7 @@ class WebsiteFingerprintModeler:
             else [1 / len(self.sites)] * len(self.sites)
         )
         self.discrete_threshold = discrete_threshold
+        print("WebsiteFingerprint Modeler with discrete threshold ", discrete_threshold)
         self._sample_cache: dict[tuple[int, int], tuple[np.ndarray, np.ndarray]] = {}
 
     # ------------------------------------------------------------------
@@ -73,7 +74,12 @@ class WebsiteFingerprintModeler:
 
     # ------------------------------------------------------------------
     def information_leakage(
-        self, clusters, *, sample_size: int = 5000, n_procs: int = 2
+        self,
+        clusters,
+        *,
+        sample_size: int = 5000,
+        n_procs: int = 2,
+        X_eval=None,
     ):
         if not clusters:
             return []
@@ -81,38 +87,64 @@ class WebsiteFingerprintModeler:
         H_C = self.max_information_leakage()
         priors_log2 = np.log2(self.website_priors)[:, None]  # (sites,1)
 
+        print(
+            f"Approximate Information leakage using {sample_size} samples from clusters {clusters}"
+        )
+
         results = []
         for cluster in clusters:
-            kdes = [self._make_kde_for_cluster_and_site(cluster, s) for s in self.sites]
-            log.info(f"[Cluster {cluster}] Constructed KDEs : {len(kdes)}")
+            for dbgfeat in cluster:
+                log.info(
+                    f"[Cluster {cluster}] Feature {dbgfeat} unique values ---> {len(np.unique(self.data.get_feature(dbgfeat)))}"
+                )
 
-            X_samp, _ = self._draw_samples(kdes, sample_size)
+            kdes = [self._make_kde_for_cluster_and_site(cluster, s) for s in self.sites]
+            log.info(
+                f"[Cluster {cluster}] Constructed KDEs : {len(kdes)} {self.discrete_threshold}"
+            )
+
+            if X_eval is None:
+                X_samp, _ = self._draw_samples(kdes, sample_size)
+            else:
+                X_samp = X_eval[:, cluster]
+
             if X_samp.size == 0:
                 results.append(0.0)
                 continue
 
             # log p(x|site) in parallel
+            # def _logp(kde):
+            #    with np.errstate(divide="ignore"):
+            #        return np.log2(kde.predict(X_samp))
             def _logp(kde):
-                with np.errstate(divide="ignore"):
-                    return np.log2(kde.predict(X_samp))
+                p = kde.predict(X_samp)  # (N,)
+                p = np.maximum(p, np.finfo(float).tiny)
+                return np.log2(p)
 
             logp = np.array(
                 Parallel(n_jobs=n_procs)(delayed(_logp)(k) for k in kdes)
             )  # (sites,N)
             lp = logp + priors_log2
             max_lp = lp.max(axis=0, keepdims=True)
-            post = 2 ** (lp - max_lp)
-            post /= post.sum(axis=0, keepdims=True)
 
-            # logp = np.zeros_like(post)
-            # np.log2(post, where=post > 0, out=logp)
+            post = np.exp2(lp - max_lp)  # still may contain NaN/inf
+            sum_cols = post.sum(axis=0, keepdims=True)
+            missing = sum_cols == 0  # True if every pdf(x)=0
+            if missing.any():
+                post[:, missing] = 1.0 / len(self.sites)  # revert to the priors
+                sum_cols[missing] = 1.0
+            post /= sum_cols
+
+            # post = 2 ** (lp - max_lp)
+            # post /= post.sum(axis=0, keepdims=True)
+
             logp = np.log2(np.clip(post, 1e-300, 1.0))
 
             H_post = -np.sum(post * logp, axis=0)
-            # H_post = -np.sum(post * np.log2(post, where=post > 0
             H_C_given_f = H_post.mean()
 
             if np.isnan(H_C_given_f):
+                print("X_C_given_f has NaNs", H_post, H_C_given_f)
                 raise
 
             # 6. I(C; f) = H(C) - H(C|f).

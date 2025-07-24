@@ -8,7 +8,7 @@ import numpy as np
 from wfaudit.helpers_wefde.preprocess.features.common import split_by_value
 
 
-def get_cumul_features_per_connection(packets, feature_cnt=5):
+def get_cumul_features_per_connection(packets: list, feature_cnt: int):
     if len(packets) == 0:
         packets = [0]
     # Calculate Features
@@ -76,7 +76,7 @@ def get_cumul_features_per_connection(packets, feature_cnt=5):
 
 
 def get_cumul_features(
-    times, packets, multi_conn: bool = True, feature_cnt=10, conn_limit: int = 10
+    times, packets, multi_conn: bool = True, feature_cnt=20, conn_limit: int = 10
 ):
     packets = np.asarray(packets)
 

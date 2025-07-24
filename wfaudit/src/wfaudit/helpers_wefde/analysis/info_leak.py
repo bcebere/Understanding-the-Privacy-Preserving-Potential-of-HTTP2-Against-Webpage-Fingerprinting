@@ -1,7 +1,5 @@
 # Adapted from https://github.com/notem/reWeFDE
 # stdlib
-import copy
-import hashlib
 import os
 from pathlib import Path
 
@@ -80,7 +78,8 @@ def print_leakage(
     features_range: dict,  # offsets for leakage types
     leakages_indiv: list,
     relevant_features: list,
-    leakages_topfeats: list = [0],
+    leakages_syn_topfeats: list = [0],
+    leakages_holdout_topfeats: list = [0],
     compress_results: bool = True,
 ):
     if compress_results:
@@ -93,7 +92,10 @@ def print_leakage(
                 summary[category] = [np.max(y)]
                 offset = next_off
 
-        summary["leakage_topfeats"] = [leakages_topfeats[0]]
+        if leakages_syn_topfeats is not None:
+            summary["lk_syn"] = [leakages_syn_topfeats[0]]
+        if leakages_holdout_topfeats is not None:
+            summary["lk_ho"] = [leakages_holdout_topfeats[0]]
 
         summary = pd.DataFrame(summary)
     else:
@@ -275,13 +277,12 @@ def _base_evaluate_info_leakage(
         )
     log.info(f"Begin cluster leakage measurements using  {n_samples}")
 
-    def _eval_and_cache(clusters, out_file: str):
+    def _eval_and_cache(clusters, out_file: str, X_eval=None):
         out_path = outdir / out_file
         if os.path.exists(out_path):
             with open(out_path, "rb") as fi:
                 results = dill.load(fi)
         else:
-            print("Running information leakage on CPUs = ", n_procs)
             modeler = WebsiteFingerprintModeler(
                 feature_data, discrete_threshold=discrete_threshold
             )
@@ -289,27 +290,43 @@ def _base_evaluate_info_leakage(
                 clusters=clusters,
                 sample_size=n_samples,
                 n_procs=n_procs,
+                X_eval=X_eval,
             )
             assert len(results) != 0, clusters
             with open(out_path, "wb") as fi:
                 dill.dump(results, fi)
+        log.debug(f"Leakage {out_file} ---> {results}")
         return results
 
     top_cats = features_to_category(relevant_feats, features_range)
     print("Top features", top_cats)
 
-    leakages_topfeats = _eval_and_cache(
+    # Eval on synthetic data
+    leakages_syn_topfeats = _eval_and_cache(
         clusters=[relevant_feats],
-        out_file=f"leakage_joint_topfeats_top{topn}.pkl",
+        out_file=f"leakage_joint_topfeats_syn_top{topn}.pkl",
     )
+    # Eval on held-out. Might lead to NaNs due to unseen values
+    leakages_holdout_topfeats = None
+    try:
+        X_eval, _ = feature_data.get_test_data()
+        if X_eval is not None:
+            leakages_holdout_topfeats = _eval_and_cache(
+                clusters=[relevant_feats],
+                out_file=f"leakage_joint_topfeats_holdout_top{topn}.pkl",
+                X_eval=X_eval,
+            )
+    except BaseException as e:
+        print("Holdout analysis failed", e)
 
-    log.info(f"Non-redundant leakage results: {leakages_topfeats} bits.")
+    log.info(f"Non-redundant leakage results: {leakages_syn_topfeats} bits.")
 
     log.info("Finished execution.")
     return print_leakage(
         features_range=features_range,  # offsets for leakage types
         leakages_indiv=leakage_indiv,
-        leakages_topfeats=leakages_topfeats,
+        leakages_syn_topfeats=leakages_syn_topfeats,
+        leakages_holdout_topfeats=leakages_holdout_topfeats,
         relevant_features=relevant_feats,
         compress_results=compress_results,
     )
@@ -328,6 +345,7 @@ def evaluate_info_leakage(
     compute_joint: bool = True,
     compress_results: bool = True,
     debug_correctness: bool = False,
+    dataset_split: bool = False,
 ):
     """
     Run the full information leakage analysis on a processed dataset.
@@ -356,7 +374,10 @@ def evaluate_info_leakage(
     # prepare feature dataset
     log.info("Loading dataset.")
     feature_data = WebsiteData(
-        features_path, debug_correctness=debug_correctness, max_instances=max_instances
+        features_path,
+        debug_correctness=debug_correctness,
+        dataset_split=dataset_split,
+        max_instances=max_instances,
     )
     return _base_evaluate_info_leakage(
         feature_data=feature_data,
@@ -371,150 +392,3 @@ def evaluate_info_leakage(
         compute_joint=compute_joint,
         compress_results=compress_results,
     )
-
-
-def zz_exploratory_analysis(
-    X,
-    y,
-    min_cluster_size: int,
-    output_path: str,  # where to save the leakages
-    features_range: dict,  # the offsets of each feature
-    n_procs=0,
-    n_samples=50000,
-    topn=20,
-    nmi_threshold=0.7,
-    discrete_threshold=100000,
-    max_instances=100,
-):
-    """
-    Identify clusters of similar leakage.
-
-    Parameters
-    ----------
-    X, y :
-        features and labels
-    output_path : str
-        Operating system file path to the directory where analysis results should be saved.
-    n_procs : int
-        Number of processes to use for parallelism.
-        If 0 is used, auto-detect based on number of system CPUs.
-    n_samples : int
-        Number of samples to use when performing monte-carlo estimation when running the fingerprint modeler.
-    topn : int
-        Top number of features to analyze during joint analysis.
-    nmi_threshold : float
-        Cut-off value for determining redundant features. Should be a percentage value.
-
-    Returns
-    -------
-    float
-        Combined feature leakage (in bits)
-    """
-    # prepare feature dataset
-    feature_data = WebsiteData(X, y, max_instances=max_instances)
-    log.info(f"Loaded {len(feature_data.sites)} sites.")
-    log.info(f"Loaded {len(feature_data)} instances.")
-
-    # directory to save results
-    outdir = Path(output_path)
-    outdir.mkdir(parents=True, exist_ok=True)
-
-    if n_procs == 0:
-        n_procs = cpu_count() - 1
-
-    modeler, relevant_feats, leakage_indiv = _evaluate_individual_leakage(
-        feature_data,
-        outdir=outdir,
-        n_procs=n_procs,
-        topn=topn,
-        nmi_threshold=nmi_threshold,
-    )
-
-    tuples = list(zip(feature_data.features, leakage_indiv))
-    tuples = sorted(tuples, key=lambda x: (-x[1], x[0]))
-    # sorted_features = list(list(zip(*tuples))[0])
-    top_feats = dict(tuples)
-
-    log.info(f"Relevant features = {relevant_feats} total = {len(relevant_feats)}")
-    log.info(f"Leakage dict: {top_feats}")
-
-    def _eval_and_cache(features, out_file: str = None):
-        if out_file is None:
-            cluster_hash = "_".join(map(str, sorted(features)))
-            md5_hash = hashlib.md5()
-            md5_hash.update(cluster_hash.encode("utf-8"))
-            cluster_hash = md5_hash.hexdigest()
-            out_file = f"cluster_len{len(features)}_{cluster_hash}.pkl"
-            # log.debug(f'Evaluation output: {out_file}')
-
-        out_path = outdir / out_file
-
-        if os.path.exists(out_path):
-            with open(out_path, "rb") as fi:
-                results = dill.load(fi)
-        else:
-            results = modeler.information_leakage(
-                clusters=features, sample_size=n_samples, joint_leakage=True
-            )
-            assert len(results) != 0, features
-            with open(out_path, "wb") as fi:
-                dill.dump(results, fi)
-        return float(results[0])
-
-    joint_leakage = _eval_and_cache(
-        features=relevant_feats, out_file="cleaned_leakage.pkl"
-    )
-
-    log.info(f"Non-redudant leakage results: {joint_leakage} bits.")
-    top_features = copy.deepcopy(relevant_feats)
-    relevant_feats = relevant_feats[:topn]
-
-    max_cluster_size = min(int(joint_leakage) + 20, len(relevant_feats))
-
-    candidates = []
-    for test_size in range(min_cluster_size, max_cluster_size):
-        log.info(f"Test clusters of size {test_size}/{len(relevant_feats)}")
-        if test_size > len(relevant_feats):
-            log.info(f"Less than {test_size} features remained!! Exiting...")
-            break
-        cluster_subsets = [
-            relevant_feats[i : i + test_size] for i in range(0, len(relevant_feats), 1)
-        ]
-
-        cluster_size_leakages = Parallel(n_jobs=n_procs)(
-            delayed(_eval_and_cache)(features=cluster)
-            for cidx, cluster in enumerate(cluster_subsets)
-        )
-
-        cluster_leakages_sorted = sorted(
-            enumerate(cluster_size_leakages), key=lambda x: x[1], reverse=True
-        )
-        rem_feats = set(relevant_feats)
-
-        for tidx, leakage in cluster_leakages_sorted:
-            log.debug(
-                f"Leakage {leakage}/{joint_leakage} with cluster {cluster_subsets[tidx]}"
-            )
-            if joint_leakage <= leakage or abs(leakage - joint_leakage) <= 0.1:
-                log.info(
-                    f"Cluster {cluster_subsets[tidx]} is a candidate!. Leakage {leakage}/{joint_leakage}"
-                )
-                candidates.append((cluster_subsets[tidx], leakage))
-                local_set = set(cluster_subsets[tidx])
-                if local_set.issubset(rem_feats):
-                    rem_feats.difference_update(local_set)
-                    log.info(
-                        f"Dropping features {cluster_subsets[tidx]} from benchmarks!!"
-                    )
-
-        rem_feats = list(rem_feats)
-        relevant_feats = sorted(rem_feats, key=lambda x: top_feats[x], reverse=True)
-
-    log.info(f"Redundant fingerprints =  {len(candidates)}")
-    results = []
-    for idx, (candidate, cand_leak) in enumerate(candidates):
-        log.info(f" [{idx}] {cand_leak} bits >>> {candidate}")
-        results.append((candidate, cand_leak))
-    log.info("Finished exploration.")
-
-    return top_features, results

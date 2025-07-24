@@ -1,7 +1,6 @@
 # stdlib
 import glob
 import hashlib
-import json
 from pathlib import Path
 from random import shuffle
 from typing import Optional
@@ -10,7 +9,6 @@ from typing import Optional
 from joblib import Parallel, delayed
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import StandardScaler
 from tqdm import tqdm
 
 # wfaudit absolute
@@ -362,20 +360,20 @@ def prepare_ts_datasets_for_nns_1C(
         log.error("Missing output_wefde features. Run prepare_features first!")
         raise
 
-    with open(wefde_path / "FeaturePositions.json", "r") as f:
-        features = json.load(f)
+    # with open(wefde_path / "FeaturePositions.json", "r") as f:
+    #    features = json.load(f)
 
     output = workspace / Path("output_ml")
     output.mkdir(parents=True, exist_ok=True)
 
     X, y = load_wefde_features(wefde_path)
-    start_off = 0
-    for feat in features:
-        end_off = features[feat]
-        X[:, start_off:end_off] = StandardScaler().fit_transform(
-            X[:, start_off:end_off]
-        )
-        start_off = end_off
+    # start_off = 0
+    # for feat in features:
+    #    end_off = features[feat]
+    #    X[:, start_off:end_off] = StandardScaler().fit_transform(
+    #        X[:, start_off:end_off]
+    #    )
+    #    start_off = end_off
 
     X = np.expand_dims(X, axis=1)
 

@@ -76,8 +76,13 @@ def task_handler(filepath: str, out_path: str, conn_limit: int):
 
     # load trace file
     x = pd.read_csv(filepath, sep=" ", header=None)
+
     times = x.iloc[:, 0].astype(float).values.tolist()
-    sizes = x.iloc[:, 1].astype(int).values.tolist()
+
+    HTTP2_DEF_WINDOW_SIZE = 65535
+    sizes = x.iloc[:, 1].astype(float).values
+    sizes /= HTTP2_DEF_WINDOW_SIZE
+    sizes = sizes.tolist()
 
     # extract features (saving feature positions only for the first trace)
     if len(times) < 4:

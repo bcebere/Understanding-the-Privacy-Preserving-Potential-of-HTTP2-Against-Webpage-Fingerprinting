@@ -81,6 +81,7 @@ class KDE:
 
         # Replace zero bandwidths with a small positive number
         self.bw = self.bw + (self.bw == 0.0) * 0.001
+
         if np.any(self.bw <= 0):
             raise ValueError("All bandwidths must be > 0 after adjustments.")
 

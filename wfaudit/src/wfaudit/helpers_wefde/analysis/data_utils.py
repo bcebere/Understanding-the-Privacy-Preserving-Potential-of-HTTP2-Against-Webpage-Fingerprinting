@@ -1,7 +1,6 @@
 # Adapted from https://github.com/notem/reWeFDE
 
 # stdlib
-import copy
 import csv
 import json
 import os
@@ -9,11 +8,48 @@ from pathlib import Path
 
 # third party
 import numpy as np
-from numpy.random import default_rng
+from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 
 # wfaudit absolute
 import wfaudit.logger as log
+
+
+def interleaved_label_shuffle(y):
+    y = np.array(y)
+    classes = np.unique(y)
+    per_class = {cls: np.where(y == cls)[0] for cls in classes}
+
+    # Shuffle indices within each class
+    for idxs in per_class.values():
+        np.random.shuffle(idxs)
+
+    # Determine how many evenly interleaved rounds we can do
+    min_count = min(len(idxs) for idxs in per_class.values())
+
+    # Interleave evenly
+    interleaved_indices = []
+    for i in range(min_count):
+        for cls in classes:
+            interleaved_indices.append(per_class[cls][i])
+
+    # Collect the leftovers
+    leftover_indices = []
+    for cls in classes:
+        leftover_indices.extend(per_class[cls][min_count:])
+
+    # Shuffle leftovers and append
+    np.random.shuffle(leftover_indices)
+    final_indices = interleaved_indices + leftover_indices
+
+    shuffled_y = y[final_indices]
+
+    # ✅ Sanity checks
+    assert len(shuffled_y) == len(y)
+    # assert np.all(np.bincount(shuffled_y) == np.bincount(y))
+    print("Label correlation:", np.corrcoef(y, shuffled_y)[0, 1])
+
+    return shuffled_y
 
 
 class WebsiteData(object):
@@ -25,6 +61,7 @@ class WebsiteData(object):
         self,
         directory,
         debug_correctness: bool = False,
+        dataset_split: bool = False,
         max_instances: int = 1000,
     ):
         features_range_path = Path(directory) / "FeaturePositions.json"
@@ -42,28 +79,27 @@ class WebsiteData(object):
                 "DANGER !!! Running WefDE with shuffled labels. ---> Must return 0 bits leakage !!!"
             )
 
-            #  Ensure label counts preserved
-            original_counts = np.bincount(Y)
-            orig_labels = copy.deepcopy(Y)
+            # Corrupt Y
+            Y = interleaved_label_shuffle(Y)
 
-            overlap_rate = 999
-            while overlap_rate > 0.01:
-                print("Overlap not good. RETRY!")
-                rng = default_rng()
-                shuffled_labels = rng.permutation(Y)
-                shuffled_counts = np.bincount(shuffled_labels)
-                assert np.array_equal(original_counts, shuffled_counts)
+        if dataset_split:
+            X_tr, X_te, y_tr, y_te = train_test_split(
+                X, Y, test_size=0.3, stratify=Y, random_state=42
+            )
 
-                Y = copy.deepcopy(shuffled_labels)
+            self._X = X_tr
+            self._Y = y_tr
 
-                # Check overlap rate
-                overlap_rate = np.mean(orig_labels == shuffled_labels)
-                print(f"Overlap rate (same position): {overlap_rate:.4f}")
+            self._X_test = X_te
+            self._Y_test = y_te
+            print("Train-test split", len(self._X), len(self._X_test))
+        else:
+            self._X = X
+            self._Y = Y
 
-            X += np.random.normal(0, 1e-1, X.shape)
-
-        self._X = X
-        self._Y = Y
+            self._X_test = None
+            self._Y_test = None
+            print("Full data split", len(self._X))
 
         self.features = list(range(self._X.shape[1]))
         self.sites = list(range(len(np.unique(self._Y))))
@@ -71,6 +107,9 @@ class WebsiteData(object):
 
     def __len__(self):
         return self._X.shape[0]
+
+    def get_test_data(self):
+        return self._X_test, self._Y_test
 
     def get_labels(self):
         """
