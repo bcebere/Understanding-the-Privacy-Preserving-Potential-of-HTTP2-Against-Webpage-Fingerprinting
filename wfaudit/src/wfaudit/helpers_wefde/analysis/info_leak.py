@@ -13,13 +13,13 @@ import pandas as pd
 from pathos.multiprocessing import ProcessPool as Pool, cpu_count
 
 # wfaudit absolute
-from wfaudit.helpers_wefde.analysis.data_utils import WebsiteData, WebsiteData_v2
+from wfaudit.helpers_wefde.analysis.data_utils import WebsiteData
 from wfaudit.helpers_wefde.analysis.fingerprint_modeler import WebsiteFingerprintModeler
 from wfaudit.helpers_wefde.analysis.mi_analyzer import MutualInformationAnalyzer
 import wfaudit.logger as log
 
 
-def _individual_measure(modeler, n_procs: int = 10, n_samples: int = 10000):
+def _individual_measure(modeler, n_procs: int, n_samples: int):
     """
     Perform information leakage analysis for each feature one-by-one.
 
@@ -29,7 +29,7 @@ def _individual_measure(modeler, n_procs: int = 10, n_samples: int = 10000):
     Parameters
     ----------
     modeler : WebsiteFingerprintModeler
-        initialized fingerprinting engine
+        initialized fingerprinting engie
     Returns
     -------
     list
@@ -79,20 +79,28 @@ def features_to_category(
 def print_leakage(
     features_range: dict,  # offsets for leakage types
     leakages_indiv: list,
+    relevant_features: list,
     leakages_topfeats: list = [0],
+    compress_results: bool = True,
 ):
-    summary = {}
-    offset = 0
-    if features_range is not None:
-        for category in features_range:
-            next_off = features_range[category]
-            y = leakages_indiv[offset:next_off]
-            summary[category] = [np.max(y)]
-            offset = next_off
+    if compress_results:
+        summary = {}
+        offset = 0
+        if features_range is not None:
+            for category in features_range:
+                next_off = features_range[category]
+                y = leakages_indiv[offset:next_off]
+                summary[category] = [np.max(y)]
+                offset = next_off
 
-    summary["leakage_topfeats"] = [leakages_topfeats[0]]
+        summary["leakage_topfeats"] = [leakages_topfeats[0]]
 
-    summary = pd.DataFrame(summary)
+        summary = pd.DataFrame(summary)
+    else:
+        mask = np.zeros_like(leakages_indiv, dtype=bool)
+        mask[relevant_features] = True
+
+        summary = leakages_indiv * mask
     return summary
 
 
@@ -126,11 +134,14 @@ def _evaluate_individual_leakage(
 
     # load previous leakage measurements if possible
     indiv_path = outdir / "indiv.pkl"
+    print("Testing for individual cache", indiv_path)
     if indiv_path.exists():
+        print(f"Indiv cache found {indiv_path}")
         with open(indiv_path, "rb") as fi:
             log.info("Loading individual leakage measures from file.")
             leakage_indiv = dill.load(fi)
     else:
+        print(f"Indiv cache missing {indiv_path}")
         # otherwise do individual measure
         log.info("Begin individual feature analysis.")
 
@@ -146,7 +157,6 @@ def _evaluate_individual_leakage(
             dill.dump(leakage_indiv, fi)
 
     # perform combined information leakage measurements
-    # initialize MI analyzer
     analyzer = MutualInformationAnalyzer(feature_data, pool=pool)
 
     # sort the list of features by their individual leakage
@@ -182,7 +192,7 @@ def _evaluate_individual_leakage(
     relevant_feats = sorted(cleaned, key=lambda x: top_feats[x], reverse=True)
     relevant_feats = relevant_feats[:topn]
 
-    return modeler, analyzer, relevant_feats, leakage_indiv
+    return relevant_feats, leakage_indiv
 
 
 def _base_evaluate_info_leakage(
@@ -196,6 +206,7 @@ def _base_evaluate_info_leakage(
     discrete_threshold=100000,
     max_instances=100,
     compute_joint: bool = True,
+    compress_results: bool = True,
 ):
     """
     Run the full information leakage analysis on a processed dataset.
@@ -241,13 +252,14 @@ def _base_evaluate_info_leakage(
     if n_procs == 0:
         n_procs = cpu_count() - 1
 
-    modeler, analyzer, relevant_feats, leakage_indiv = _evaluate_individual_leakage(
+    relevant_feats, leakage_indiv = _evaluate_individual_leakage(
         feature_data,
         outdir=outdir,
         n_procs=n_procs,
         topn=topn,
+        discrete_threshold=discrete_threshold,
         nmi_threshold=nmi_threshold,
-        n_samples=n_samples,
+        n_samples=5000,  # we use full size only for the final cluster
     )
 
     indiv_path = outdir / "indiv.pkl"
@@ -258,8 +270,10 @@ def _base_evaluate_info_leakage(
         return print_leakage(
             features_range=features_range,  # offsets for leakage types
             leakages_indiv=leakage_indiv,
+            relevant_features=relevant_feats,
+            compress_results=compress_results,
         )
-    log.info("Begin cluster leakage measurements.")
+    log.info(f"Begin cluster leakage measurements using  {n_samples}")
 
     def _eval_and_cache(clusters, out_file: str):
         out_path = outdir / out_file
@@ -267,6 +281,10 @@ def _base_evaluate_info_leakage(
             with open(out_path, "rb") as fi:
                 results = dill.load(fi)
         else:
+            print("Running information leakage on CPUs = ", n_procs)
+            modeler = WebsiteFingerprintModeler(
+                feature_data, discrete_threshold=discrete_threshold
+            )
             results = modeler.information_leakage(
                 clusters=clusters,
                 sample_size=n_samples,
@@ -287,36 +305,13 @@ def _base_evaluate_info_leakage(
 
     log.info(f"Non-redundant leakage results: {leakages_topfeats} bits.")
 
-    # cluster non-redundant features
-    # cst_path = outdir / f"clusters_top{topn}.pkl"
-    # chk_path = outdir / f"prune_checkpoint_top{topn}.txt"
-    # if cst_path.exists():
-    #    log.info("Loading clusters from file.")
-    #    with open(cst_path, "rb") as fi:
-    #        clusters = dill.load(fi)
-    # else:
-    #    log.info("Begin feature clustering.")
-    #    try:
-    #        clusters, _ = analyzer.cluster(relevant_feats, checkpoint=str(chk_path))
-    #        with open(cst_path, "wb") as fi:
-    #            dill.dump(clusters, fi)
-    #    except BaseException:
-    #        clusters = [relevant_feats]
-
-    # perform joint information leakage measurement
-    # log.info(f"Identified {len(clusters)} clusters.")
-    # leakages_clusters = _eval_and_cache(
-    #    clusters=clusters, joint_leakage=True, out_file=f"leakage_joint_clusters_top{topn}.pkl"
-    # )
-    # log.info(
-    #    f"Non-redundant clusters joint leakage results: {leakages_clusters} bits. Clusters {len(clusters)}"
-    # )
-
     log.info("Finished execution.")
     return print_leakage(
         features_range=features_range,  # offsets for leakage types
         leakages_indiv=leakage_indiv,
         leakages_topfeats=leakages_topfeats,
+        relevant_features=relevant_feats,
+        compress_results=compress_results,
     )
 
 
@@ -331,6 +326,8 @@ def evaluate_info_leakage(
     discrete_threshold=100000,
     max_instances=100,
     compute_joint: bool = True,
+    compress_results: bool = True,
+    debug_correctness: bool = False,
 ):
     """
     Run the full information leakage analysis on a processed dataset.
@@ -358,7 +355,9 @@ def evaluate_info_leakage(
     """
     # prepare feature dataset
     log.info("Loading dataset.")
-    feature_data = WebsiteData(features_path, max_instances=max_instances)
+    feature_data = WebsiteData(
+        features_path, debug_correctness=debug_correctness, max_instances=max_instances
+    )
     return _base_evaluate_info_leakage(
         feature_data=feature_data,
         output_path=output_path,
@@ -370,61 +369,11 @@ def evaluate_info_leakage(
         discrete_threshold=discrete_threshold,
         max_instances=max_instances,
         compute_joint=compute_joint,
+        compress_results=compress_results,
     )
 
 
-def evaluate_info_leakage_v2(
-    X: np.ndarray,
-    y: np.ndarray,
-    output_path: str,  # where to save the leakages
-    features_range: dict,  # the offsets of each feature
-    n_procs=0,
-    n_samples=50000,
-    topn=40,
-    nmi_threshold=0.7,
-    discrete_threshold=100000,
-    max_instances=100,
-):
-    """
-    Run the full information leakage analysis on a processed dataset.
-
-    Parameters
-    ----------
-    X, y: dataset
-    output_path : str
-        Operating system file path to the directory where analysis results should be saved.
-    n_procs : int
-        Number of processes to use for parallelism.
-        If 0 is used, auto-detect based on number of system CPUs.
-    n_samples : int
-        Number of samples to use when performing monte-carlo estimation when running the fingerprint modeler.
-    topn : int
-        Top number of features to analyze during joint analysis.
-    nmi_threshold : float
-        Cut-off value for determining redundant features. Should be a percentage value.
-
-    Returns
-    -------
-    float
-        Combined feature leakage (in bits)
-    """
-    # prepare feature dataset
-    log.info("Loading dataset.")
-    feature_data = WebsiteData_v2(X, y, max_instances=max_instances)
-    return _base_evaluate_info_leakage(
-        feature_data=feature_data,
-        output_path=output_path,
-        features_range=features_range,
-        n_procs=n_procs,
-        n_samples=n_samples,
-        topn=topn,
-        nmi_threshold=nmi_threshold,
-        discrete_threshold=discrete_threshold,
-        max_instances=max_instances,
-    )
-
-
-def exploratory_analysis(
+def zz_exploratory_analysis(
     X,
     y,
     min_cluster_size: int,
@@ -462,7 +411,7 @@ def exploratory_analysis(
         Combined feature leakage (in bits)
     """
     # prepare feature dataset
-    feature_data = WebsiteData_v2(X, y, max_instances=max_instances)
+    feature_data = WebsiteData(X, y, max_instances=max_instances)
     log.info(f"Loaded {len(feature_data.sites)} sites.")
     log.info(f"Loaded {len(feature_data)} instances.")
 
@@ -473,7 +422,7 @@ def exploratory_analysis(
     if n_procs == 0:
         n_procs = cpu_count() - 1
 
-    modeler, analyzer, relevant_feats, leakage_indiv = _evaluate_individual_leakage(
+    modeler, relevant_feats, leakage_indiv = _evaluate_individual_leakage(
         feature_data,
         outdir=outdir,
         n_procs=n_procs,

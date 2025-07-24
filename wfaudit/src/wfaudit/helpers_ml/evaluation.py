@@ -133,8 +133,6 @@ def evaluate_classifier(
         classes = np.ravel(Y)
     classes = set(classes)
 
-    enable_reproducible_results(seed)
-
     X = np.asarray(X)
     Y = LabelEncoder().fit_transform(Y)
     Y = np.asarray(Y)
@@ -209,8 +207,17 @@ def _get_arch_mode(arch: str, **kwargs):
 
 
 def _dataframe_hash(df: pd.DataFrame) -> str:
-    cols = sorted(list(df.columns))
-    return str(abs(pd.util.hash_pandas_object(df[cols].fillna(0)).sum()))
+    # Ensure column order is stable
+    cols = sorted(df.columns)
+
+    # Normalize index (if you don't care about it)
+    df_normalized = df[cols].fillna(0).copy()
+    df_normalized.index = range(len(df_normalized))  # reset index
+
+    # Use hash with index=False
+    hashes = pd.util.hash_pandas_object(df_normalized, index=False)
+
+    return str(abs(hashes.sum()))
 
 
 def _evaluate_static_models_cv(
@@ -258,6 +265,8 @@ def evaluate_by_domain(
     use_cache: bool = True,
     **kwargs,
 ):
+    enable_reproducible_results(0)
+
     scores = []
     scores_by_domain = {}
     if filtered_labels is None:
@@ -300,6 +309,7 @@ def evaluate_multiclass(
     use_cache: bool = True,
     **kwargs,
 ):
+    print("Labels", pd.Series(labels).value_counts())
     score = _evaluate_static_models_cv(
         arch,
         f"{label}_multiclass",

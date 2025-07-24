@@ -81,9 +81,10 @@ class VarCNNClassifier:
         batch_size: int = 512,
         lr: float = 1e-3,
         device=DEVICE,
-        epochs: int = 100,
+        epochs: int = 1000,
         criterion=torch.nn.CrossEntropyLoss,
     ) -> None:
+        print("VarCNN with out", num_classes)
         model = VarCNN(num_classes=num_classes).to(device)
 
         self.model = BasicNNClassifier(

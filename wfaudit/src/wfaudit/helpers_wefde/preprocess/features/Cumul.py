@@ -9,6 +9,8 @@ from wfaudit.helpers_wefde.preprocess.features.common import split_by_value
 
 
 def get_cumul_features_per_connection(packets, feature_cnt=5):
+    if len(packets) == 0:
+        packets = [0]
     # Calculate Features
 
     features = []
@@ -74,7 +76,7 @@ def get_cumul_features_per_connection(packets, feature_cnt=5):
 
 
 def get_cumul_features(
-    times, packets, multi_conn: bool = True, feature_cnt=8, conn_limit: int = 10
+    times, packets, multi_conn: bool = True, feature_cnt=10, conn_limit: int = 10
 ):
     packets = np.asarray(packets)
 
@@ -90,19 +92,27 @@ def get_cumul_features(
     conn_idxs = split_by_value(times, 0)
 
     if len(conn_idxs) < conn_limit:
-        conn_idxs += [list(range(len(packets)))] * (conn_limit - len(conn_idxs))
+        conn_idxs += [[]] * (conn_limit - len(conn_idxs))
 
-    for idx, conn_idx in enumerate(conn_idxs[:conn_limit]):
+    for idx, conn_idx in enumerate(conn_idxs[: conn_limit - 1]):
         cumul_raw_stats = get_cumul_features_per_connection(
             packets[conn_idx].tolist(), feature_cnt=feature_cnt
         )
-
-        cumul_uniq_stats = get_cumul_features_per_connection(
-            np.unique(packets[conn_idx]).astype(float).tolist(), feature_cnt=feature_cnt
-        )
-
         features += cumul_raw_stats
-        features += cumul_uniq_stats
 
-    assert len(features) == 2 * (conn_limit) * (2 + feature_cnt), features
+    # Aggregate the rest of the connections together
+    extra_conns = np.concatenate(conn_idxs[conn_limit - 1 :])
+    if len(extra_conns) > 0:
+        cumul_raw_stats_extra = get_cumul_features_per_connection(
+            packets[extra_conns].tolist(), feature_cnt=feature_cnt
+        )
+    else:
+        cumul_raw_stats_extra = get_cumul_features_per_connection(
+            [], feature_cnt=feature_cnt
+        )
+    features += cumul_raw_stats_extra
+
+    assert len(features) == (conn_limit) * (2 + feature_cnt), features
+
+    # print("  >> CUMUL", features)
     return features

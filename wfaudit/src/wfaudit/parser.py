@@ -17,7 +17,7 @@ from tqdm import tqdm
 from wfaudit.helpers_wefde.analysis.data_utils import load_wefde_features
 from wfaudit.helpers_wefde.preprocess.extract import prepare_wefde_features
 import wfaudit.logger as log
-from wfaudit.processing import process_pcap
+from wfaudit.processing import process_pcap, process_pcap_via_json
 
 np.set_printoptions(suppress=True)
 
@@ -29,6 +29,7 @@ def process_raw_pcaps(
     buffer_tcp: bool = True,
     n_jobs=8,
     files=None,
+    use_json=False,
 ):
     """
     Args:
@@ -55,21 +56,28 @@ def process_raw_pcaps(
         output_csv_static = output / f"static_data_{stem}.csv"
         output_csv_temporal = output / f"temporal_data_{stem}.csv"
         if not filename.exists():
+            print("Missing file !!!", filename)
             return
 
         if output_csv_temporal.exists():
             if unlink_after_processing:
                 log.debug(f"dropping  {filename}")
-                filename.unlink()
+                if unlink_after_processing:
+                    filename.unlink()
+            print("temporal file already done", filename)
             return
         log.debug(f"Parsing {filename}")
         try:
-            session = process_pcap(filename, buffer_tcp=buffer_tcp)
+            if use_json:
+                session = process_pcap_via_json(filename, buffer_tcp=buffer_tcp)
+            else:
+                session = process_pcap(filename, buffer_tcp=buffer_tcp)
         except BaseException as e:
             log.error(
                 f"failed to parse pcap. moving to graveyard {filename}, error = {e}"
             )
             filename.unlink()
+
             return
 
         label = stem.split("_")[1]
@@ -261,7 +269,7 @@ def prepare_ts_datasets(
     temporal_data,
     workspace=Path("workspace"),
     ID_COL="file_order",
-    domain_limit=50,
+    domain_limit=1000,
     class_cnt_limit=1024,
 ):  # id, full_id
     output = workspace / Path("output_wefde")
@@ -329,7 +337,6 @@ def prepare_ts_datasets(
 def prepare_features(
     workspace=Path("workspace"),
     conn_limit: int = 5,
-    multi_conn: bool = True,
 ):
     time_series_traces = workspace / Path("output_wefde")
     if not time_series_traces.exists():
@@ -342,7 +349,6 @@ def prepare_features(
     return prepare_wefde_features(
         trace_path=time_series_traces,
         out_path=output,
-        multi_conn=multi_conn,
         conn_limit=conn_limit,
     )
 
@@ -354,7 +360,7 @@ def prepare_ts_datasets_for_nns_1C(
 
     if not wefde_path.exists():
         log.error("Missing output_wefde features. Run prepare_features first!")
-        return
+        raise
 
     with open(wefde_path / "FeaturePositions.json", "r") as f:
         features = json.load(f)
@@ -363,7 +369,6 @@ def prepare_ts_datasets_for_nns_1C(
     output.mkdir(parents=True, exist_ok=True)
 
     X, y = load_wefde_features(wefde_path)
-
     start_off = 0
     for feat in features:
         end_off = features[feat]
@@ -388,7 +393,7 @@ def prepare_ts_datasets_for_nns_3C(
     temporal_data,
     workspace=Path("workspace"),
     ID_COL="file_order",
-    domain_limit=50,
+    domain_limit=1000,
     class_cnt_limit=1024,
 ):  # id, full_id
     output = workspace / Path("output_ml")
@@ -497,14 +502,16 @@ def prepare_ts_datasets_for_nns_3C(
 def prepare_datasets(
     workspace=Path("workspace"),
     conn_limit: int = 5,
-    multi_conn: bool = True,
 ):
     print("merge datasets")
     static_data, ts_data = merge_pcap_csvs(workspace=workspace)
     print("prepare wefde data")
     prepare_ts_datasets(static_data, ts_data, workspace=workspace)
+
     print("prepare wefde features")
     prepare_features(workspace=workspace, conn_limit=conn_limit)
+
     print("prepare NN features")
     prepare_ts_datasets_for_nns_1C(workspace=workspace)
+
     prepare_ts_datasets_for_nns_3C(static_data, ts_data, workspace=workspace)

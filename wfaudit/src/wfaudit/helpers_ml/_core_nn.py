@@ -108,7 +108,7 @@ class BasicNNClassifier:
             pin_memory=False,
         )
 
-        patience = 15
+        patience = 50
         best_loss = 9999
         best_model_state = None
         counter = 0

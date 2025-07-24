@@ -1,84 +1,19 @@
 # Adapted from https://github.com/notem/reWeFDE
 
 # stdlib
+import copy
 import csv
+import json
 import os
+from pathlib import Path
 
 # third party
 import numpy as np
+from numpy.random import default_rng
+from sklearn.preprocessing import LabelEncoder
 
 # wfaudit absolute
 import wfaudit.logger as log
-
-
-class WebsiteData_v2(object):
-    """
-    Object-wrapper to conveniently manage dataset
-    """
-
-    def __init__(self, X, y, **kwargs):
-        self._X, self._Y = X, y
-        self.features = list(range(self._X.shape[1]))
-        self.sites = list(range(len(np.unique(self._Y))))
-        log.info(f"total samples = {len(self._X)} unique labels = {len(self.sites)}")
-
-    def __len__(self):
-        return self._X.shape[0]
-
-    def get_labels(self):
-        """
-        Return Y
-
-        Returns
-        -------
-        ndarray
-
-        """
-        return self._Y
-
-    def get_site(self, label, feature=None):
-        """
-        Return X for given site.
-
-        Parameters
-        ----------
-        label : int
-            The site label to load
-        feature : int
-            The feature number to load.
-            Load all features if None.
-
-        Returns
-        -------
-        ndarray
-
-        """
-        f = [True if y == label else False for y in self._Y]
-        if feature is not None:
-            return self._X[f, feature]
-        return self._X[f, :]
-
-    def get_feature(self, feature, site=None):
-        """
-        Return all X for a specific feature
-
-        Parameters
-        ----------
-        feature : int
-            The feature which to load.
-        site : int
-            The site which to load.
-            Load from all sites if None.
-
-        Returns
-        -------
-        ndarray
-
-        """
-        if site is not None:
-            f = [True if y == site else False for y in self._Y]
-            return self._X[f, feature]
-        return self._X[:, feature]
 
 
 class WebsiteData(object):
@@ -86,8 +21,50 @@ class WebsiteData(object):
     Object-wrapper to conveniently manage dataset
     """
 
-    def __init__(self, directory, **kwargs):
-        self._X, self._Y = load_wefde_features(directory, **kwargs)
+    def __init__(
+        self,
+        directory,
+        debug_correctness: bool = False,
+        max_instances: int = 1000,
+    ):
+        features_range_path = Path(directory) / "FeaturePositions.json"
+        if not features_range_path.exists():
+            raise RuntimeError("Missing feature ranges")
+
+        with open(features_range_path, "r") as f:
+            self._features_range = json.load(f)
+
+        X, Y = load_wefde_features(directory, max_instances=max_instances)
+        print("X ", directory, max_instances, X.shape)
+
+        if debug_correctness:  # Sanity checks for checking the WefDe correctnes
+            print(
+                "DANGER !!! Running WefDE with shuffled labels. ---> Must return 0 bits leakage !!!"
+            )
+
+            #  Ensure label counts preserved
+            original_counts = np.bincount(Y)
+            orig_labels = copy.deepcopy(Y)
+
+            overlap_rate = 999
+            while overlap_rate > 0.01:
+                print("Overlap not good. RETRY!")
+                rng = default_rng()
+                shuffled_labels = rng.permutation(Y)
+                shuffled_counts = np.bincount(shuffled_labels)
+                assert np.array_equal(original_counts, shuffled_counts)
+
+                Y = copy.deepcopy(shuffled_labels)
+
+                # Check overlap rate
+                overlap_rate = np.mean(orig_labels == shuffled_labels)
+                print(f"Overlap rate (same position): {overlap_rate:.4f}")
+
+            X += np.random.normal(0, 1e-1, X.shape)
+
+        self._X = X
+        self._Y = Y
+
         self.features = list(range(self._X.shape[1]))
         self.sites = list(range(len(np.unique(self._Y))))
         log.info(f"total samples = {len(self._X)} unique labels = {len(self.sites)}")
@@ -156,12 +133,16 @@ def load_wefde_features(
     extension=".features",
     delimiter=" ",
     split_at="-",
-    max_classes=1024,
-    min_instances=1,
-    max_instances=500,
+    max_classes=1000,
+    min_instances=100,
+    max_instances=1000,
 ):
     """
     Load feature files from a directory.
+
+
+    Each file name is expected to look like  ``<class><split_at><instance><extension>``,
+    e.g. ``42-007.features``.
 
     Parameters
     ----------
@@ -177,7 +158,7 @@ def load_wefde_features(
         Instance number is ignored.
     max_classes : int
         Maximum number of classes to load.
-    max_instances : int
+    min_instances : int
         Minimum number of instances acceptable per class.
         If a class has less than this number of instances, the all instances of the class are discarded.
     max_instances : int
@@ -192,6 +173,7 @@ def load_wefde_features(
     """
     X = []  # feature instances
     Y = []  # site labels
+
     for root, dirs, files in os.walk(directory):
         # filter for feature files
         files = [fi for fi in files if fi.endswith(extension)]
@@ -223,6 +205,7 @@ def load_wefde_features(
                 Y.extend([int(cls) - 1 for _ in range(len(features))])
                 class_counter[int(cls)] = class_counter.get(int(cls), 0) + len(features)
 
+    print("loaded", len(X))
     # trim data to minimum instance count
     counts = {y: Y.count(y) for y in set(Y)}
     new_X, new_Y = [], []
@@ -235,12 +218,11 @@ def load_wefde_features(
     # adjust labels such that they are assigned a number from 0..N
     # (required when labels are non-numerical or does not start at 0)
     # try to keep the class numbers the same if numerical
-    labels = list(set(Y))
-    labels.sort()
-    d = dict()
-    for i in range(len(labels)):
-        d[labels[i]] = i
-    Y = list(map(lambda x: d[x], Y))
+    le = LabelEncoder()
+    Y = le.fit_transform(Y)
+
+    Y = np.asarray(Y)
+    X = np.asarray(X, dtype=float)
 
     # return X and Y as numpy arrays
-    return np.asarray(X), np.asarray(Y)
+    return X, Y
