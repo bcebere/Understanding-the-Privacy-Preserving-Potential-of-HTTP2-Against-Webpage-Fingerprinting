@@ -82,6 +82,9 @@ class WebsiteData(object):
             # Corrupt Y
             Y = interleaved_label_shuffle(Y)
 
+            # Corrupt X
+            X += np.random.normal(0, 0.1, X.shape)
+
         if dataset_split:
             X_tr, X_te, y_tr, y_te = train_test_split(
                 X, Y, test_size=0.3, stratify=Y, random_state=42

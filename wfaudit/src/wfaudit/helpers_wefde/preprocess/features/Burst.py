@@ -21,8 +21,18 @@ def get_burst_features_per_connection(bursts: list, topn: int):
     return burst_features
 
 
+def get_burst_features(times, sizes, topn: int = 20):
+    sizes = np.abs(np.asarray(sizes))
+    burst_features = get_burst_features_per_connection(
+        np.unique(sizes).astype(float).tolist(), topn=topn
+    )
+    print("BURST", burst_features)
+
+    return burst_features
+
+
 # times are relative to previous packet. 0 means a new connection
-def get_burst_features(
+def get_burst_featuresi_multi(
     times, sizes, multi_conn: bool = True, topn: int = 20, conn_limit: int = 5
 ):
     sizes = np.abs(np.asarray(sizes))
@@ -57,7 +67,6 @@ def get_burst_features(
         _, conn_burst_uniq_features = _process_connection(conn_idx)
         burst_features += conn_burst_uniq_features
     # Aggregate the rest of the connections together
-    print("Aggreagte the rest of conns")
     extra_conns = np.concatenate(conn_idxs[conn_limit - 1 :])
     _, conn_burst_uniq_features = _process_connection(extra_conns)
     burst_features += conn_burst_uniq_features

@@ -16,6 +16,6 @@ def split_by_value(arr, value):
 
     result = [sublist for sublist in result if len(sublist) > 0]
     for ridx in result:
-        assert arr[ridx[0]] == value, f"Invalid result={result} input={arr}"
+        assert arr[ridx[0]] == value, f"Invalid result={ridx} input={arr[ridx[0]]}"
 
     return result

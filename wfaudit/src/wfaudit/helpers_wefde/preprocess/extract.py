@@ -38,7 +38,7 @@ def enumerate_files(dir, splitter="-", extension=""):
     return file_list
 
 
-def extract(times, sizes, conn_limit: int = 5, debug_path="./"):
+def extract(times, sizes, debug_path="./"):
     """
     extract features from a parsed website trace
     """
@@ -46,19 +46,19 @@ def extract(times, sizes, conn_limit: int = 5, debug_path="./"):
     features = []
 
     # Transmission size features
-    features.extend(PktNum.get_packet_counts(times, sizes, conn_limit=conn_limit))
+    features.extend(PktNum.get_packet_counts(times, sizes))
     feature_pos["PACKET_NUMBER"] = len(features)
 
     # inter packet time + transmission time feature
-    features.extend(Time.get_time_features(times, sizes, conn_limit=conn_limit))
+    features.extend(Time.get_time_features(times, sizes))
     feature_pos["PKT_TIME"] = len(features)
 
     # Bursts (knn)
-    features.extend(Burst.get_burst_features(times, sizes, conn_limit=conn_limit))
+    features.extend(Burst.get_burst_features(times, sizes))
     feature_pos["BURST"] = len(features)
 
     # CUMUL features
-    features.extend(Cumul.get_cumul_features(times, sizes, conn_limit=conn_limit))
+    features.extend(Cumul.get_cumul_features(times, sizes))
     feature_pos["CUMUL"] = len(features)
 
     # output FeaturePos
@@ -68,12 +68,10 @@ def extract(times, sizes, conn_limit: int = 5, debug_path="./"):
     return features
 
 
-def task_handler(filepath: str, out_path: str, conn_limit: int):
+def task_handler(filepath: str, out_path: str):
     """
     handle feature extraction for each trace instance assigned to batch
     """
-    # filepath, out_path, conn_limit = args
-
     # load trace file
     x = pd.read_csv(filepath, sep=" ", header=None)
 
@@ -88,14 +86,14 @@ def task_handler(filepath: str, out_path: str, conn_limit: int):
     if len(times) < 4:
         return
 
+    # print("Processing ", filepath)
     features = extract(
         times,
         sizes,
-        conn_limit=conn_limit,
         debug_path=out_path,
     )
 
-    print(f"{filepath} --> {len(features)} = {features}")
+    print(f"Features {filepath} --> {len(features)} = {features}")
     # save features to file
     dest = os.path.join(out_path, os.path.basename(filepath) + FEATURE_EXT)
     with open(dest, "w") as fout:
@@ -109,15 +107,13 @@ def task_handler(filepath: str, out_path: str, conn_limit: int):
                 fout.write(repr(x) + " ")
 
 
-def prepare_wefde_features(trace_path, out_path, conn_limit: int = 5):
+def prepare_wefde_features(trace_path, out_path):
     """
     start batches to handle feature extraction
     """
     file_list = enumerate_files(trace_path)
-    Parallel(n_jobs=1)(
-        delayed(task_handler)(f, out_path, conn_limit) for f in file_list
-    )
+    Parallel(n_jobs=20)(delayed(task_handler)(f, out_path) for f in file_list)
 
     features = json.load(open(Path(out_path) / "FeaturePositions.json"))
-    print("Features -> ", features)
+    # print("Features -> ", features)
     return features

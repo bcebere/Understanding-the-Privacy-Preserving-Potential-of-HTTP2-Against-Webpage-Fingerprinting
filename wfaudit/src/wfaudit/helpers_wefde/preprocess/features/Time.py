@@ -17,11 +17,17 @@ def get_time_features_per_connection(times):
     ]
 
 
-def get_time_features(times, sizes, multi_conn: int = True, conn_limit: int = 5):
+def get_time_features(times, sizes):
+    # global
+    features = get_time_features_per_connection(times)
+    return features
+
+
+def get_time_features_multi(times, sizes, conn_limit: int = 5):
     # global
     features = []  # get_time_features_per_connection(times)
 
-    if conn_limit <= 0 or not multi_conn:
+    if conn_limit <= 0:
         return features
 
     # per connection

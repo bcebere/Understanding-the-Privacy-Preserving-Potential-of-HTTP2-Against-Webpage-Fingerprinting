@@ -1,14 +1,20 @@
 # stdlib
+from collections import defaultdict
 import glob
 import hashlib
+import json
 from pathlib import Path
 from random import shuffle
-from typing import Optional
+from typing import List, Optional, Tuple
 
 # third party
 from joblib import Parallel, delayed
 import numpy as np
 import pandas as pd
+import pyarrow as pa
+import pyarrow.dataset as ds
+import pyarrow.parquet as pq
+from sklearn.preprocessing import StandardScaler
 from tqdm import tqdm
 
 # wfaudit absolute
@@ -103,6 +109,117 @@ def merge_pcap_csvs(
     pd_lim: int = 1000,
     temporal_lim: int = None,
     cache: bool = False,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Stream merge the individual per PCAP CSVs into two partitioned Parquet files.
+    """
+    in_workspace = workspace / "output_csv_single"
+
+    out_workspace = workspace / "output_csv_merged"
+    out_workspace.mkdir(parents=True, exist_ok=True)
+
+    static_files = glob.glob(str(in_workspace / "static*.csv"))
+    print("static files", len(static_files))
+
+    static_parquet = out_workspace / "static_data.parquet"
+    temporal_parquet = out_workspace / "temporal_data.parquet"
+    if static_parquet.exists() and temporal_parquet.exists():
+        print("Parquet cache found skipping CSV merge.")
+        static_ds = ds.dataset(static_parquet, format="parquet")
+        temporal_ds = ds.dataset(temporal_parquet, format="parquet")
+
+        # static_df   = static_ds.to_table().to_pandas(
+        #    split_blocks=True, self_destruct=True
+        # )
+        # temporal_df = temporal_ds.to_table().to_pandas(
+        #    split_blocks=True, self_destruct=True
+        # )
+        return static_ds, temporal_ds
+
+    # ---------- Parquet writers (created the first time we see schema) ----------
+    pq_static: pq.ParquetWriter = None
+    pq_temporal: pq.ParquetWriter = None
+
+    buf_static, buf_temporal = [], []
+    for fidx, static_filename in enumerate(tqdm(static_files, desc="merge-csvs")):
+        try:
+            s_df = pd.read_csv(
+                static_filename, dtype={"label": "category"}, engine="pyarrow"
+            )
+            t_df = pd.read_csv(
+                in_workspace / static_filename.replace("static_", "temporal_"),
+                engine="pyarrow",
+                dtype={
+                    "relative_timestamp": "float32",
+                    "length": "int32",
+                    "direction": "int8",
+                },
+            )
+            if temporal_lim is not None:
+                t_df = t_df.head(temporal_lim)
+        except BaseException as e:
+            print("Failed to read csv", e, static_filename)
+            continue
+
+        # ------ post‑processing that the original version performed ------
+        original_id, original_label = s_df["id"].iloc[0], s_df["label"].iloc[0]
+        total_dur = t_df["relative_timestamp"].sum()
+        hashed_id = hashlib.sha1(
+            f"{original_id}-{original_label}-{total_dur}-{fidx}".encode()
+        ).hexdigest()
+
+        for df in (s_df, t_df):
+            df["file_order"] = fidx
+            df["full_id"] = hashed_id
+
+        # ------------------- batch‑to‑disk -------------------            ➌
+        buf_static.append(pa.Table.from_pandas(s_df, preserve_index=False))
+        buf_temporal.append(pa.Table.from_pandas(t_df, preserve_index=False))
+
+        if (fidx + 1) % pd_lim == 0:
+            if pq_static is None:  # first batch → open writers
+                pq_static = pq.ParquetWriter(
+                    out_workspace / "static_data.parquet", buf_static[0].schema
+                )
+                pq_temporal = pq.ParquetWriter(
+                    out_workspace / "temporal_data.parquet", buf_temporal[0].schema
+                )
+            for tbl in buf_static:
+                pq_static.write_table(tbl)
+            for tbl in buf_temporal:
+                pq_temporal.write_table(tbl)
+            buf_static.clear(), buf_temporal.clear()
+
+    # ---------- flush leftovers & close ----------
+    if pq_static is None:  # we never triggered the batch flush
+        pq_static = pq.ParquetWriter(
+            out_workspace / "static_data.parquet", buf_static[0].schema
+        )
+        pq_temporal = pq.ParquetWriter(
+            out_workspace / "temporal_data.parquet", buf_temporal[0].schema
+        )
+    for tbl in buf_static:
+        pq_static.write_table(tbl)
+    for tbl in buf_temporal:
+        pq_temporal.write_table(tbl)
+    pq_static.close(), pq_temporal.close()
+
+    # ---------- return *lazy* DataFrames backed by the parquet files ----------
+    static_ds = pa.dataset.dataset(
+        out_workspace / "static_data.parquet", format="parquet"
+    )
+    temporal_ds = pa.dataset.dataset(
+        out_workspace / "temporal_data.parquet", format="parquet"
+    )
+    return static_ds, temporal_ds
+    # return static_ds.to_table().to_pandas(), temporal_ds.to_table().to_pandas()
+
+
+def merge_pcap_csvs_bad(
+    workspace=Path("workspace"),
+    pd_lim: int = 1000,
+    temporal_lim: int = None,
+    cache: bool = False,
 ) -> None:
     """
     Args:
@@ -115,7 +232,6 @@ def merge_pcap_csvs(
         return
     static_files = glob.glob(str(in_workspace / "static*.csv"))
 
-    print(in_workspace)
     print("static files", len(static_files))
     buffer_static = []
     buffer_temporal = []
@@ -173,20 +289,6 @@ def merge_pcap_csvs(
 
     return full_data_static, full_data_temporal
 
-    # print("saving !!")
-    if cache:
-        output = workspace / Path("output_csv_full")
-        output.mkdir(parents=True, exist_ok=True)
-
-        full_data_static.to_csv(
-            output / "static_data.csv",
-            index=False,
-        )
-        full_data_temporal.to_csv(
-            output / "temporal_data.csv",
-            index=False,
-        )
-
 
 def _discrete_columns(
     dataframe: pd.DataFrame, max_classes: int = 10, return_counts: bool = False
@@ -209,7 +311,124 @@ def _constant_columns(dataframe: pd.DataFrame) -> list:
     return _discrete_columns(dataframe, 1)
 
 
-def _prepare_time_series(
+def _prepare_time_series_arrow(
+    static_ds: ds.Dataset,
+    ts_ds: ds.Dataset,
+    ts_limit: Optional[int] = None,
+    ts_pad: int = 0,
+    ID_COL: str = "file_order",  # id, full_id
+    batch_rows: int = 100_000,
+) -> Tuple[
+    pd.DataFrame, List[pd.DataFrame], Tuple[List[int], List[float], List[float]]
+]:
+    """
+    Streaming, low RAM version of `_prepare_time_series` that works on
+    `pyarrow.dataset.Dataset` inputs and **guarantees that each ID is gathered
+    in full even when it spans multiple record batches**.
+    """
+    # ------------------------------------------------------------------ #
+    # 1)  materialise the tiny static table                              #
+    # ------------------------------------------------------------------ #
+    static_df = (
+        static_ds.to_table(columns=[ID_COL, "label"])
+        .to_pandas(split_blocks=True, self_destruct=True)
+        .drop_duplicates(ID_COL)
+    )
+    static_ids = set(static_df[ID_COL].values)
+
+    # ------------------------------------------------------------------ #
+    # 2)  streaming scan with a per ID stash                             #
+    # ------------------------------------------------------------------ #
+    pending = defaultdict(list)  # id  -> list[pd.DataFrame] (fragments)
+    ts_data_clean, final_ids = [], []
+
+    lens, sizes, rel_times = [], [], []
+    print("processing time series (Arrow batches)")
+
+    for batch in tqdm(ts_ds.to_batches(batch_size=batch_rows)):
+        pdf = batch.to_pandas(split_blocks=True, self_destruct=True)
+
+        for idx, grp in pdf.groupby(ID_COL):
+            if idx not in static_ids:
+                continue
+
+            pending[idx].append(
+                grp.drop(columns=["id", "full_id", "duration"], errors="ignore")
+            )
+
+            # If ts_limit is reached, or we know the group is complete, flush now
+            if ts_limit is not None and sum(len(x) for x in pending[idx]) >= ts_limit:
+                _ts_helper_flush_id(
+                    idx,
+                    pending,
+                    ts_data_clean,
+                    final_ids,
+                    lens,
+                    sizes,
+                    rel_times,
+                    ts_limit,
+                    ts_pad,
+                )
+        # (otherwise we wait for more fragments)
+
+    # ------------------------------------------------------------------ #
+    # 3)  flush any IDs that ended in the last batch                     #
+    # ------------------------------------------------------------------ #
+    for idx in list(pending):  # iterate over *copy* we mutate inside
+        _ts_helper_flush_id(
+            idx,
+            pending,
+            ts_data_clean,
+            final_ids,
+            lens,
+            sizes,
+            rel_times,
+            ts_limit,
+            ts_pad,
+        )
+
+    # ------------------------------------------------------------------ #
+    # 4)  re-index the static DF and log stats                           #
+    # ------------------------------------------------------------------ #
+    static_df = static_df.set_index(ID_COL).reindex(final_ids)
+
+    log.debug(
+        f"TS info total={len(lens)}, "
+        f"mean len={np.mean(lens):.2f}, median len={np.median(lens):.0f}, "
+        f"min len={np.min(lens)}, max len={np.max(lens)}"
+    )
+
+    return static_df, ts_data_clean, (lens, sizes, rel_times)
+
+
+def _ts_helper_flush_id(
+    idx, pending, ts_data_clean, final_ids, lens, sizes, rel_times, ts_limit, ts_pad
+):
+    parts = pending.pop(idx)  # remove from stash
+    if len(parts) > 1:
+        print("TS: post-processing parts!!", idx, len(parts))
+    local = pd.concat(parts, ignore_index=True)
+
+    lens.append(len(local))
+    sizes.extend(local["length"].values.tolist())
+    rel_times.extend(local["relative_timestamp"].values.tolist())
+
+    # optional trim/pad exactly like the legacy version
+    if ts_limit is not None:
+        if len(local) > ts_limit:
+            local = local.head(ts_limit)
+        elif len(local) < ts_limit:
+            pad_rows = ts_pad * np.ones((ts_limit - len(local), len(local.columns)))
+            local = pd.concat(
+                [local, pd.DataFrame(pad_rows, columns=local.columns)],
+                ignore_index=True,
+            )
+
+    ts_data_clean.append(local)
+    final_ids.append(idx)
+
+
+def _prepare_time_series_pandas(
     static_data: pd.DataFrame,
     ts_data: pd.DataFrame,
     ts_limit: Optional[int] = None,
@@ -274,11 +493,12 @@ def prepare_ts_datasets(
     output.mkdir(parents=True, exist_ok=True)
 
     print("process time series")
-    (clean_static_data, clean_ts_data, _) = _prepare_time_series(
+    (clean_static_data, clean_ts_data, _) = _prepare_time_series_arrow(
         static_data,
         temporal_data,
         ID_COL=ID_COL,
     )
+    print("processed time series", clean_static_data.shape)
 
     real_idx = 0
     domain_repeats = {}
@@ -334,7 +554,6 @@ def prepare_ts_datasets(
 
 def prepare_features(
     workspace=Path("workspace"),
-    conn_limit: int = 5,
 ):
     time_series_traces = workspace / Path("output_wefde")
     if not time_series_traces.exists():
@@ -347,7 +566,6 @@ def prepare_features(
     return prepare_wefde_features(
         trace_path=time_series_traces,
         out_path=output,
-        conn_limit=conn_limit,
     )
 
 
@@ -360,20 +578,20 @@ def prepare_ts_datasets_for_nns_1C(
         log.error("Missing output_wefde features. Run prepare_features first!")
         raise
 
-    # with open(wefde_path / "FeaturePositions.json", "r") as f:
-    #    features = json.load(f)
+    with open(wefde_path / "FeaturePositions.json", "r") as f:
+        features = json.load(f)
 
     output = workspace / Path("output_ml")
     output.mkdir(parents=True, exist_ok=True)
 
     X, y = load_wefde_features(wefde_path)
-    # start_off = 0
-    # for feat in features:
-    #    end_off = features[feat]
-    #    X[:, start_off:end_off] = StandardScaler().fit_transform(
-    #        X[:, start_off:end_off]
-    #    )
-    #    start_off = end_off
+    start_off = 0
+    for feat in features:
+        end_off = features[feat]
+        X[:, start_off:end_off] = StandardScaler().fit_transform(
+            X[:, start_off:end_off]
+        )
+        start_off = end_off
 
     X = np.expand_dims(X, axis=1)
 
@@ -401,13 +619,14 @@ def prepare_ts_datasets_for_nns_3C(
         clean_static_data,
         clean_ts_data,
         (lens, pkt_sizes, pkt_ts),
-    ) = _prepare_time_series(
+    ) = _prepare_time_series_arrow(
         static_data,
         temporal_data,
         ID_COL=ID_COL,
     )
+    print("Preparing 3d tensor mean len=", np.mean(lens))
 
-    padlimit = min(int(np.median(lens)) + 10, 500)
+    padlimit = min(int(np.median(lens)) + 10, 1000)
 
     def _pad(arr, arrsize: int = padlimit):
         arr = np.asarray(arr).tolist()
@@ -499,7 +718,6 @@ def prepare_ts_datasets_for_nns_3C(
 
 def prepare_datasets(
     workspace=Path("workspace"),
-    conn_limit: int = 5,
 ):
     print("merge datasets")
     static_data, ts_data = merge_pcap_csvs(workspace=workspace)
@@ -507,7 +725,7 @@ def prepare_datasets(
     prepare_ts_datasets(static_data, ts_data, workspace=workspace)
 
     print("prepare wefde features")
-    prepare_features(workspace=workspace, conn_limit=conn_limit)
+    prepare_features(workspace=workspace)
 
     print("prepare NN features")
     prepare_ts_datasets_for_nns_1C(workspace=workspace)
