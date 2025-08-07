@@ -93,7 +93,7 @@ def task_handler(filepath: str, out_path: str):
         debug_path=out_path,
     )
 
-    print(f"Features {filepath} --> {len(features)} = {features}")
+    # print(f"Features {filepath} --> {len(features)} = {features}")
     # save features to file
     dest = os.path.join(out_path, os.path.basename(filepath) + FEATURE_EXT)
     with open(dest, "w") as fout:

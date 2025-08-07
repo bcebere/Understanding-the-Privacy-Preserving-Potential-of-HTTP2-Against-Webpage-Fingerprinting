@@ -82,6 +82,7 @@ def evaluate_ml_rawts(
     metric_key="f1_score_macro",
     arch: str = "xgboost",
     use_cache: bool = True,
+    limit_domains: int = None,
     **kwargs,
 ):
     workspace.mkdir(parents=True, exist_ok=True)
@@ -94,6 +95,7 @@ def evaluate_ml_rawts(
         metric_key=metric_key,
         workspace=workspace,
         use_cache=use_cache,
+        limit_domains=limit_domains,
         **kwargs,
     )
 

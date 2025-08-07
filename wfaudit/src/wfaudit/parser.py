@@ -107,7 +107,7 @@ def process_raw_pcaps(
 def merge_pcap_csvs(
     workspace=Path("workspace"),
     pd_lim: int = 1000,
-    temporal_lim: int = None,
+    temporal_lim: int = 50_000,
     cache: bool = False,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
@@ -128,12 +128,6 @@ def merge_pcap_csvs(
         static_ds = ds.dataset(static_parquet, format="parquet")
         temporal_ds = ds.dataset(temporal_parquet, format="parquet")
 
-        # static_df   = static_ds.to_table().to_pandas(
-        #    split_blocks=True, self_destruct=True
-        # )
-        # temporal_df = temporal_ds.to_table().to_pandas(
-        #    split_blocks=True, self_destruct=True
-        # )
         return static_ds, temporal_ds
 
     # ---------- Parquet writers (created the first time we see schema) ----------
@@ -157,8 +151,8 @@ def merge_pcap_csvs(
             )
             if temporal_lim is not None:
                 t_df = t_df.head(temporal_lim)
-        except BaseException as e:
-            print("Failed to read csv", e, static_filename)
+        except BaseException:
+            print("Failed to read csv", static_filename)
             continue
 
         # ------ post‑processing that the original version performed ------
@@ -314,10 +308,10 @@ def _constant_columns(dataframe: pd.DataFrame) -> list:
 def _prepare_time_series_arrow(
     static_ds: ds.Dataset,
     ts_ds: ds.Dataset,
-    ts_limit: Optional[int] = None,
+    ts_limit: Optional[int] = 50_000,
     ts_pad: int = 0,
     ID_COL: str = "file_order",  # id, full_id
-    batch_rows: int = 100_000,
+    batch_rows: int = 10000,
 ) -> Tuple[
     pd.DataFrame, List[pd.DataFrame], Tuple[List[int], List[float], List[float]]
 ]:
@@ -405,8 +399,6 @@ def _ts_helper_flush_id(
     idx, pending, ts_data_clean, final_ids, lens, sizes, rel_times, ts_limit, ts_pad
 ):
     parts = pending.pop(idx)  # remove from stash
-    if len(parts) > 1:
-        print("TS: post-processing parts!!", idx, len(parts))
     local = pd.concat(parts, ignore_index=True)
 
     lens.append(len(local))
@@ -512,7 +504,7 @@ def prepare_ts_datasets(
 
     print("process wefde features")
     experiment_labels = list(sorted(list(set(experiment_labels))))
-    for ridx, static_row in clean_static_data.iterrows():
+    for ridx, static_row in tqdm(clean_static_data.iterrows()):
         local_token = static_row["label"]
         encoded_label = experiment_labels.index(local_token)
 

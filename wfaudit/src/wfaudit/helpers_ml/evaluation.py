@@ -7,7 +7,13 @@ from typing import Any, Dict, List, Tuple, Union
 # third party
 import numpy as np
 import pandas as pd
-from sklearn.metrics import f1_score, matthews_corrcoef, precision_score, recall_score
+from sklearn.metrics import (
+    f1_score,
+    matthews_corrcoef,
+    precision_score,
+    recall_score,
+    top_k_accuracy_score,
+)
 from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import LabelEncoder
 from tqdm import tqdm
@@ -31,6 +37,12 @@ clf_supported_metrics = [
     "precision_macro",
     "recall_macro",
     "mcc",
+    "acc_top5",
+    "acc_top10",
+    "acc_top20",
+    "f1_top5",
+    "f1_top10",
+    "f1_top20",
 ]
 
 
@@ -65,7 +77,15 @@ class classifier_metrics:
         results = {}
         y_pred = np.argmax(np.asarray(y_pred_proba), axis=1)
 
+        if len(classes) > 2:  # multiclass
+            for k in [5, 10, 20]:
+                results[f"acc_top{k}"] = top_k_accuracy_score(y_test, y_pred_proba, k=k)
+                results[f"f1_top{k}"] = self.topk_f1_score(y_test, y_pred_proba, k=k)
+
         for metric in self.metrics:
+            if metric in results:
+                continue
+
             if metric == "f1_score_macro":
                 results[metric] = f1_score(
                     y_test, y_pred, average="macro", zero_division=0
@@ -80,11 +100,32 @@ class classifier_metrics:
                 )
             elif metric == "mcc":
                 results[metric] = matthews_corrcoef(y_test, y_pred)
+            elif metric in [
+                "acc_top5",
+                "acc_top10",
+                "acc_top20",
+                "f1_top5",
+                "f1_top10",
+                "f1_top20",
+            ]:
+                continue
             else:
                 raise ValueError(f"invalid metric {metric}")
 
         # log.debug(f"evaluate_classifier: {results}")
         return results
+
+    def topk_f1_score(self, y_true, y_proba, k: int):
+        topk_preds = np.argsort(y_proba, axis=1)[:, -k:]  # top k class indices
+        y_pred_top1 = topk_preds[:, -1]  # fallback: top-1 prediction
+
+        # Mask: 1 if true label in top-k preds
+        topk_hit_mask = np.array([y in preds for y, preds in zip(y_true, topk_preds)])
+
+        # Create new predicted labels: if in topk, leave as is, else assign wrong label
+        y_pred_topk = np.where(topk_hit_mask, y_true, y_pred_top1)
+
+        return f1_score(y_true, y_pred_topk, average="macro")  # or 'micro'/'weighted'
 
 
 def enable_reproducible_results(random_state: int = 0) -> None:
@@ -263,6 +304,7 @@ def evaluate_by_domain(
     workspace=Path("workspace"),
     filtered_labels=None,
     use_cache: bool = True,
+    limit_domains: int = 1000,
     **kwargs,
 ):
     enable_reproducible_results(0)
@@ -271,6 +313,9 @@ def evaluate_by_domain(
     scores_by_domain = {}
     if filtered_labels is None:
         filtered_labels = np.unique(labels)
+    if limit_domains is not None:
+        filtered_labels = filtered_labels[:limit_domains]
+
     # print("evaluating filtered labels", filtered_labels)
 
     for domain in tqdm(filtered_labels):
@@ -304,7 +349,6 @@ def evaluate_multiclass(
     label: str,
     data: np.ndarray,
     labels: np.ndarray,
-    metric_key: str = "f1_score_macro",
     workspace=Path("workspace"),
     use_cache: bool = True,
     **kwargs,

@@ -26,7 +26,7 @@ def get_burst_features(times, sizes, topn: int = 20):
     burst_features = get_burst_features_per_connection(
         np.unique(sizes).astype(float).tolist(), topn=topn
     )
-    print("BURST", burst_features)
+    # print("BURST", burst_features)
 
     return burst_features
 

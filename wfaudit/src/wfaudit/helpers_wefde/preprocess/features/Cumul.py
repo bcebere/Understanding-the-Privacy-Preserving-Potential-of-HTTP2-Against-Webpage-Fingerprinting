@@ -83,7 +83,7 @@ def get_cumul_features(times, packets, feature_cnt=20):
         packets.tolist(), feature_cnt=feature_cnt
     )
 
-    print("  >> CUMUL", features)
+    # print("  >> CUMUL", features)
     return features
 
 

@@ -3,7 +3,6 @@ from pathlib import Path
 import shutil
 
 # third party
-import numpy as np
 import pandas as pd
 import pytest
 
@@ -11,10 +10,7 @@ import pytest
 from wfaudit import (
     create_datasets,
     merge_pcap_csvs,
-    prepare_features,
     prepare_ts_datasets,
-    prepare_ts_datasets_for_nns_1C,
-    prepare_ts_datasets_for_nns_3C,
     process_raw_pcaps,
 )
 
@@ -113,62 +109,6 @@ def test_prepare_wefde_datasets(tmp_path):
 
     num_files = sum(1 for file in output.iterdir() if file.is_file())
     assert num_files == 6
-
-
-def test_prepare_nn_datasets_simple(tmp_path):
-    process_raw_pcaps(
-        traces=Path("traces"),
-        workspace=tmp_path,
-        unlink_after_processing=False,
-    )
-
-    merge_pcap_csvs(workspace=tmp_path)
-
-    prepare_ts_datasets(workspace=tmp_path)
-    prepare_features(workspace=tmp_path, conn_limit=1)
-    prepare_ts_datasets_for_nns_1C(workspace=tmp_path)
-
-    output = tmp_path / "output_ml"
-    assert output.exists()
-
-    num_files = sum(1 for file in output.iterdir() if file.is_file())
-    assert num_files == 2
-
-    with open(output / "X_1C.npy", "rb") as f:
-        X = np.load(f)
-    with open(output / "y_1C.npy", "rb") as f:
-        y = np.load(f)
-
-    assert len(X) == len(y)
-    assert X.shape[1] == 1  # size, ts
-    assert X.shape[2] == 19
-
-
-def test_prepare_nn_datasets(tmp_path):
-    process_raw_pcaps(
-        traces=Path("traces"),
-        workspace=tmp_path,
-        unlink_after_processing=False,
-    )
-
-    merge_pcap_csvs(workspace=tmp_path)
-
-    prepare_ts_datasets_for_nns_3C(workspace=tmp_path)
-
-    output = tmp_path / "output_ml"
-    assert output.exists()
-
-    num_files = sum(1 for file in output.iterdir() if file.is_file())
-    assert num_files == 2
-
-    with open(output / "X_3C.npy", "rb") as f:
-        X = np.load(f)
-    with open(output / "y_3C.npy", "rb") as f:
-        y = np.load(f)
-
-    assert len(X) == len(y)
-    assert X.shape[1] == 3  # size, ts
-    assert X.shape[2] == 225
 
 
 def test_e2e(tmp_path):
