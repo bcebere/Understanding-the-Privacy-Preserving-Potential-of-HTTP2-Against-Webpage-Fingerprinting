@@ -165,6 +165,7 @@ def merge_pcap_csvs(
         for df in (s_df, t_df):
             df["file_order"] = fidx
             df["full_id"] = hashed_id
+            df["id"] = df["id"].astype(str)
 
         # ------------------- batch‑to‑disk -------------------            ➌
         buf_static.append(pa.Table.from_pandas(s_df, preserve_index=False))
@@ -178,10 +179,11 @@ def merge_pcap_csvs(
                 pq_temporal = pq.ParquetWriter(
                     out_workspace / "temporal_data.parquet", buf_temporal[0].schema
                 )
-            for tbl in buf_static:
-                pq_static.write_table(tbl)
-            for tbl in buf_temporal:
-                pq_temporal.write_table(tbl)
+            for tbl_static, tbl_temp in zip(buf_static, buf_temporal):
+                if len(tbl_static) == 0 or len(tbl_temp) == 0:
+                    continue
+                pq_static.write_table(tbl_static)
+                pq_temporal.write_table(tbl_temp)
             buf_static.clear(), buf_temporal.clear()
 
     # ---------- flush leftovers & close ----------
@@ -192,10 +194,12 @@ def merge_pcap_csvs(
         pq_temporal = pq.ParquetWriter(
             out_workspace / "temporal_data.parquet", buf_temporal[0].schema
         )
-    for tbl in buf_static:
-        pq_static.write_table(tbl)
-    for tbl in buf_temporal:
-        pq_temporal.write_table(tbl)
+
+    for tbl_static, tbl_temp in zip(buf_static, buf_temporal):
+        if len(tbl_static) == 0 or len(tbl_temp) == 0:
+            continue
+        pq_static.write_table(tbl_static)
+        pq_temporal.write_table(tbl_temp)
     pq_static.close(), pq_temporal.close()
 
     # ---------- return *lazy* DataFrames backed by the parquet files ----------
@@ -546,25 +550,31 @@ def prepare_ts_datasets(
 
 def prepare_features(
     workspace=Path("workspace"),
+    conn_limit=1,
 ):
     time_series_traces = workspace / Path("output_wefde")
     if not time_series_traces.exists():
         log.error("Missing output_wefde data. Call prepare_ts_datasets first!")
         return
 
-    output = workspace / Path("output_features")
+    if conn_limit > 1:
+        output = workspace / Path("output_features_multi")
+    else:
+        output = workspace / Path("output_features_global")
     output.mkdir(parents=True, exist_ok=True)
 
     return prepare_wefde_features(
         trace_path=time_series_traces,
         out_path=output,
+        conn_limit=conn_limit,
     )
 
 
 def prepare_ts_datasets_for_nns_1C(
     workspace=Path("workspace"),
+    conn_setup: str = "multi",
 ):
-    wefde_path = workspace / Path("output_features")
+    wefde_path = workspace / Path(f"output_features_{conn_setup}")
 
     if not wefde_path.exists():
         log.error("Missing output_wefde features. Run prepare_features first!")
@@ -590,9 +600,9 @@ def prepare_ts_datasets_for_nns_1C(
     X = np.asarray(X)
     y = np.asarray(y)
 
-    with open(output / "X_1C.npy", "wb") as f:
+    with open(output / f"X_1C_{conn_setup}.npy", "wb") as f:
         np.save(f, X)
-    with open(output / "y_1C.npy", "wb") as f:
+    with open(output / f"y_1C_{conn_setup}.npy", "wb") as f:
         np.save(f, y)
 
 
@@ -717,9 +727,11 @@ def prepare_datasets(
     prepare_ts_datasets(static_data, ts_data, workspace=workspace)
 
     print("prepare wefde features")
-    prepare_features(workspace=workspace)
+    prepare_features(workspace=workspace, conn_limit=1)
+    prepare_features(workspace=workspace, conn_limit=3)
 
     print("prepare NN features")
-    prepare_ts_datasets_for_nns_1C(workspace=workspace)
+    prepare_ts_datasets_for_nns_1C(workspace=workspace, conn_setup="global")
+    prepare_ts_datasets_for_nns_1C(workspace=workspace, conn_setup="multi")
 
-    prepare_ts_datasets_for_nns_3C(static_data, ts_data, workspace=workspace)
+    # prepare_ts_datasets_for_nns_3C(static_data, ts_data, workspace=workspace)

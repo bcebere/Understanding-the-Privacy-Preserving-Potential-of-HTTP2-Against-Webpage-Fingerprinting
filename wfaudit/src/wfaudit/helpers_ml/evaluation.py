@@ -15,35 +15,41 @@ from sklearn.metrics import (
     top_k_accuracy_score,
 )
 from sklearn.model_selection import StratifiedKFold
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import LabelEncoder, label_binarize
 from tqdm import tqdm
 
 # wfaudit absolute
-from wfaudit.helpers_ml.holmes import HolmesClassifier
-from wfaudit.helpers_ml.kfp import kFingerprinting
+from wfaudit.helpers_ml.df import DFClassifier, HolmesClassifier, VarCNNClassifier
+
+# from wfaudit.helpers_ml.varcnn import VarCNNClassifier
 from wfaudit.helpers_ml.kfpv2 import KFingerprintingForestClassifier
 from wfaudit.helpers_ml.lr import LinearClassifier
 from wfaudit.helpers_ml.rf import RFClassifier
-from wfaudit.helpers_ml.robustfp import RobustFingerprintingClassifier
 from wfaudit.helpers_ml.serialization import load_from_file, save_to_file
-from wfaudit.helpers_ml.svm import SVMClassifier
-from wfaudit.helpers_ml.varcnn import VarCNNClassifier
-from wfaudit.helpers_ml.varcnn3d import VarCNN3DClassifier
+
+# from wfaudit.helpers_ml.varcnn3d import VarCNN3DClassifier
 from wfaudit.helpers_ml.xgb import XGBoostClassifier
 import wfaudit.logger as log
 
-clf_supported_metrics = [
-    "f1_score_macro",
-    "precision_macro",
-    "recall_macro",
-    "mcc",
+clf_extras = [
     "acc_top5",
     "acc_top10",
     "acc_top20",
     "f1_top5",
     "f1_top10",
     "f1_top20",
+    "rank_mean",
+    "rank_median",
+    "confidence_mean",
+    "entropy_mi",
+    "entropy_uncert",
 ]
+clf_supported_metrics = [
+    "f1_score_macro",
+    "precision_macro",
+    "recall_macro",
+    "mcc",
+] + clf_extras
 
 
 class classifier_metrics:
@@ -80,7 +86,19 @@ class classifier_metrics:
         if len(classes) > 2:  # multiclass
             for k in [5, 10, 20]:
                 results[f"acc_top{k}"] = top_k_accuracy_score(y_test, y_pred_proba, k=k)
-                results[f"f1_top{k}"] = self.topk_f1_score(y_test, y_pred_proba, k=k)
+                results[f"f1_top{k}"] = self.topk_recall(y_test, y_pred_proba, k=k)
+            (
+                H_cond,
+                MI_bits,
+                avg_max_conf,
+                mean_rank,
+                median_rank,
+            ) = self.entropy_metrics(y_test, y_pred_proba)
+            results["rank_mean"] = mean_rank
+            results["rank_median"] = median_rank
+            results["confidence_mean"] = avg_max_conf
+            results["entropy_mi"] = MI_bits
+            results["entropy_uncert"] = H_cond
 
         for metric in self.metrics:
             if metric in results:
@@ -100,14 +118,7 @@ class classifier_metrics:
                 )
             elif metric == "mcc":
                 results[metric] = matthews_corrcoef(y_test, y_pred)
-            elif metric in [
-                "acc_top5",
-                "acc_top10",
-                "acc_top20",
-                "f1_top5",
-                "f1_top10",
-                "f1_top20",
-            ]:
+            elif metric in clf_extras:
                 continue
             else:
                 raise ValueError(f"invalid metric {metric}")
@@ -115,7 +126,7 @@ class classifier_metrics:
         # log.debug(f"evaluate_classifier: {results}")
         return results
 
-    def topk_f1_score(self, y_true, y_proba, k: int):
+    def topk_recall(self, y_true, y_proba, k: int):
         topk_preds = np.argsort(y_proba, axis=1)[:, -k:]  # top k class indices
         y_pred_top1 = topk_preds[:, -1]  # fallback: top-1 prediction
 
@@ -126,6 +137,50 @@ class classifier_metrics:
         y_pred_topk = np.where(topk_hit_mask, y_true, y_pred_top1)
 
         return f1_score(y_true, y_pred_topk, average="macro")  # or 'micro'/'weighted'
+
+    def topk_f1_score(self, y_true, y_proba, k, average="macro"):
+        n, C = y_proba.shape
+        topk = np.argpartition(y_proba, -k, axis=1)[:, -k:]
+        Y_true = label_binarize(y_true, classes=np.arange(C))
+        Y_pred = np.zeros_like(Y_true, dtype=int)
+        Y_pred[np.arange(n)[:, None], topk] = 1
+        return f1_score(Y_true, Y_pred, average=average, zero_division=0)
+
+    def entropy_metrics(self, y_true, probs):
+        # Per-trace prediction entropy  H_i = -Σ p_i log2 p_i  ----------
+        eps = 1e-12  # to avoid log(0)
+        entropy_per_trace = -(probs * np.log2(probs + eps)).sum(axis=1)  # shape (M,)
+
+        # Average (conditional) entropy  H(Y|X)
+        H_cond = entropy_per_trace.mean()
+
+        # Prior entropy  H(Y)  (uniform case)
+        N = probs.shape[1]
+        H_prior = np.log2(N)
+
+        # Mutual information  I(Y;X) = H(Y) - H(Y|X)
+        MI_bits = H_prior - H_cond
+
+        # Confidence metrics --------------------------------------------
+        max_confidence = probs.max(axis=1)  # attacker top-1 probability
+        avg_max_conf = max_confidence.mean()
+
+        # Rank of the correct class ------------------------------------
+        ordered = np.argsort(-probs, axis=1)  # descending order
+        true_ranks = np.array(
+            [
+                np.where(row == y)[0][0] + 1  # +1 rank starts at 1
+                for row, y in zip(ordered, y_true)
+            ]
+        )
+        median_rank = np.median(true_ranks)
+        mean_rank = true_ranks.mean()
+
+        print(f"H(Y|X)  : {H_cond:.3f} bits (prior={H_prior:.2f})")
+        print(f"MI      : {MI_bits:.3f} bits")
+        print(f"Avg max confidence : {avg_max_conf:.3f}")
+        print(f"Mean / median true-label rank : {mean_rank:.1f} / {median_rank}")
+        return H_cond, MI_bits, avg_max_conf, mean_rank, median_rank
 
 
 def enable_reproducible_results(random_state: int = 0) -> None:
@@ -225,24 +280,18 @@ def evaluate_classifier(
 def _get_arch_mode(arch: str, **kwargs):
     if arch == "xgboost":
         return XGBoostClassifier()
-    elif arch == "svm":
-        return SVMClassifier()
     elif arch == "lr":
         return LinearClassifier()
     elif arch == "rf":
         return RFClassifier()
-    elif arch == "kfp":
-        return kFingerprinting()
     elif arch == "kfpv2":
         return KFingerprintingForestClassifier()
     elif arch == "varcnn":
         return VarCNNClassifier(**kwargs)
-    elif arch == "varcnn3d":
-        return VarCNN3DClassifier(**kwargs)
-    elif arch == "tam":
-        return RobustFingerprintingClassifier(**kwargs)
     elif arch == "holmes":
         return HolmesClassifier(**kwargs)
+    elif arch == "df":
+        return DFClassifier(**kwargs)
     else:
         raise RuntimeError(arch)
 

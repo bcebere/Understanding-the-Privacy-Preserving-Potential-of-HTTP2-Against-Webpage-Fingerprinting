@@ -71,28 +71,16 @@ class Encoder1d(nn.Module):
 
 
 class Holmes(nn.Module):
-    """
-    A purely 1D CNN for binary classification on data of shape (batch, 3, 360).
-    """
-
-    def __init__(self, num_classes=2):
-        super(Holmes, self).__init__()
-        # We start with 3 input channels (since input is (N,3,360)).
-        in_channels_1d = 3
-        emb_size = 128  # final embedding dimension from the 1D encoder
-
+    def __init__(self, in_channels: int, num_classes: int):
+        super().__init__()
+        emb_size = 128
         self.encoder1d = Encoder1d(
-            in_channels=in_channels_1d,
+            in_channels=in_channels,  # <- 2 for your data
             out_channels=emb_size,
-            conv_num_layers=4,  # or however many you want
+            conv_num_layers=4,
         )
-
-        # We'll use an adaptive average pool to go from [batch, emb_size, some_length] -> [batch, emb_size, 1]
         self.global_pool = nn.AdaptiveAvgPool1d(1)
-
-        # Final linear layer to get 2 logits for binary classification
         self.final_linear = nn.Linear(emb_size, num_classes)
-
         self._initialize_weights()
 
     def forward(self, x):
@@ -123,29 +111,47 @@ class Holmes(nn.Module):
 class HolmesClassifier:
     def __init__(
         self,
-        num_classes: int = 2,
-        batch_size: int = 200,
-        lr: float = 1e-3,
+        batch_size=200,
+        lr=1e-3,
         device=DEVICE,
-        epochs: int = 100,
+        epochs=100,
         criterion=torch.nn.CrossEntropyLoss,
-    ) -> None:
-        model = Holmes(num_classes=num_classes).to(device)
-
-        self.model = BasicNNClassifier(
-            model,
-            num_classes=num_classes,
-            batch_size=batch_size,
-            lr=lr,
-            device=device,
-            epochs=epochs,
-            criterion=criterion,
-        )
+    ):
+        self.batch_size = batch_size
+        self.lr = lr
+        self.device = device
+        self.epochs = epochs
+        self.criterion = criterion
+        self.model = None  # will be constructed in fit()
 
     def fit(self, X: np.ndarray, y: np.ndarray) -> "HolmesClassifier":
         X = np.asarray(X)
         y = np.asarray(y)
-        assert len(X.shape) == 3
+        assert X.ndim == 3  # (N, C, L)
+        in_channels = X.shape[1]
+        num_classes = int(np.unique(y).size)
+
+        # (optional) normalize per-channel using train stats
+        mu = X.mean(axis=(0, 2), keepdims=True)
+        sigma = X.std(axis=(0, 2), keepdims=True) + 1e-6
+        X = (X - mu) / sigma
+
+        net = Holmes(in_channels=in_channels, num_classes=num_classes).to(self.device)
+        self.model = BasicNNClassifier(
+            net,
+            num_classes=num_classes,
+            batch_size=self.batch_size,
+            lr=self.lr,
+            device=self.device,
+            epochs=self.epochs,
+            criterion=self.criterion,
+        )
+
+        # If you can, ensure the train DataLoader uses drop_last=True
+        # and (optionally) reduce BN momentum:
+        for m in net.modules():
+            if isinstance(m, nn.BatchNorm1d):
+                m.momentum = 0.01
 
         self.model.fit(X, y)
         return self

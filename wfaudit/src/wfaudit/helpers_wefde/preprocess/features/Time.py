@@ -17,43 +17,39 @@ def get_time_features_per_connection(times):
     ]
 
 
-def get_time_features(times, sizes):
-    # global
-    features = get_time_features_per_connection(times)
-    return features
-
-
-def get_time_features_multi(times, sizes, conn_limit: int = 5):
-    # global
-    features = []  # get_time_features_per_connection(times)
-
-    if conn_limit <= 0:
+def get_time_features(times, sizes, conn_limit: int = 1):
+    if conn_limit == 1:
+        # global
+        features = get_time_features_per_connection(times)
+        # print(" >>> Time global", features)
         return features
+    else:
+        features = []  # get_time_features_per_connection(times)
 
-    # per connection
-    conn_idxs = split_by_value(times, 0)
+        # per connection
+        conn_idxs = split_by_value(times, 0)
 
-    if len(conn_idxs) < conn_limit:
-        conn_idxs += [[]] * (conn_limit - len(conn_idxs))
+        if len(conn_idxs) < conn_limit:
+            conn_idxs += [[]] * (conn_limit - len(conn_idxs))
 
-    times = np.asarray(times)
-    # Extract conn_limit - 1 connections
-    for idx, conn_idx in enumerate(conn_idxs[: conn_limit - 1]):
-        conn_times = times[conn_idx].tolist()
-        conn_times_features = get_time_features_per_connection(conn_times)
+        times = np.asarray(times)
+        # Extract conn_limit - 1 connections
+        for idx, conn_idx in enumerate(conn_idxs[: conn_limit - 1]):
+            conn_times = times[conn_idx].tolist()
+            conn_times_features = get_time_features_per_connection(conn_times)
+            features += conn_times_features
+
+        # Aggregate the rest of the connections
+        extra_conns = np.concatenate(conn_idxs[conn_limit - 1 :])
+        if len(extra_conns) > 0:
+            conn_times_features = get_time_features_per_connection(
+                times[extra_conns].tolist()
+            )
+        else:
+            conn_times_features = get_time_features_per_connection([])
         features += conn_times_features
 
-    # Aggregate the rest of the connections
-    extra_conns = np.concatenate(conn_idxs[conn_limit - 1 :])
-    if len(extra_conns) > 0:
-        conn_times_features = get_time_features_per_connection(
-            times[extra_conns].tolist()
-        )
-    else:
-        conn_times_features = get_time_features_per_connection([])
-    features += conn_times_features
+        assert len(features) == (conn_limit) * 3
 
-    assert len(features) == (conn_limit) * 3
-
-    # print(" >>> TIME", features)
-    return features
+        # print(" >>> TIME multi", features)
+        return features

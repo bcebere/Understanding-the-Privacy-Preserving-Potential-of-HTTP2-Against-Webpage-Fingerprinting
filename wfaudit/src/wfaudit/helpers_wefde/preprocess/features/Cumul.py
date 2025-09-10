@@ -75,56 +75,44 @@ def get_cumul_features_per_connection(packets: list, feature_cnt: int):
     return features
 
 
-def get_cumul_features(times, packets, feature_cnt=20):
+def get_cumul_features(times, packets, feature_cnt=20, conn_limit: int = 1):
     packets = np.asarray(packets)
 
-    # global
-    features = get_cumul_features_per_connection(
-        packets.tolist(), feature_cnt=feature_cnt
-    )
+    if conn_limit == 1:
+        # global
+        features = get_cumul_features_per_connection(
+            packets.tolist(), feature_cnt=feature_cnt
+        )
 
-    # print("  >> CUMUL", features)
-    return features
-
-
-def get_cumul_features_multi(
-    times, packets, multi_conn: bool = True, feature_cnt=20, conn_limit: int = 10
-):
-    packets = np.asarray(packets)
-
-    # global
-    features = (
-        []
-    )  # get_cumul_features_per_connection(packets.tolist(), feature_cnt=feature_cnt)
-
-    if conn_limit <= 0 or not multi_conn:
+        # print("  >> CUMUL Global", features)
         return features
-
-    # per connection
-    conn_idxs = split_by_value(times, 0)
-
-    if len(conn_idxs) < conn_limit:
-        conn_idxs += [[]] * (conn_limit - len(conn_idxs))
-
-    for idx, conn_idx in enumerate(conn_idxs[: conn_limit - 1]):
-        cumul_raw_stats = get_cumul_features_per_connection(
-            packets[conn_idx].tolist(), feature_cnt=feature_cnt
-        )
-        features += cumul_raw_stats
-
-    # Aggregate the rest of the connections together
-    extra_conns = np.concatenate(conn_idxs[conn_limit - 1 :])
-    if len(extra_conns) > 0:
-        cumul_raw_stats_extra = get_cumul_features_per_connection(
-            packets[extra_conns].tolist(), feature_cnt=feature_cnt
-        )
     else:
-        cumul_raw_stats_extra = get_cumul_features_per_connection(
-            [], feature_cnt=feature_cnt
-        )
-    features += cumul_raw_stats_extra
+        features = []
+        # per connection
+        conn_idxs = split_by_value(times, 0)
 
-    assert len(features) == (conn_limit) * (2 + feature_cnt), features
+        if len(conn_idxs) < conn_limit:
+            conn_idxs += [[]] * (conn_limit - len(conn_idxs))
 
-    # print("  >> CUMUL", features)
-    return features
+        for idx, conn_idx in enumerate(conn_idxs[: conn_limit - 1]):
+            cumul_raw_stats = get_cumul_features_per_connection(
+                packets[conn_idx].tolist(), feature_cnt=feature_cnt
+            )
+            features += cumul_raw_stats
+
+        # Aggregate the rest of the connections together
+        extra_conns = np.concatenate(conn_idxs[conn_limit - 1 :])
+        if len(extra_conns) > 0:
+            cumul_raw_stats_extra = get_cumul_features_per_connection(
+                packets[extra_conns].tolist(), feature_cnt=feature_cnt
+            )
+        else:
+            cumul_raw_stats_extra = get_cumul_features_per_connection(
+                [], feature_cnt=feature_cnt
+            )
+        features += cumul_raw_stats_extra
+
+        assert len(features) == (conn_limit) * (2 + feature_cnt), features
+
+        # print("  >> CUMUL Multi", features)
+        return features

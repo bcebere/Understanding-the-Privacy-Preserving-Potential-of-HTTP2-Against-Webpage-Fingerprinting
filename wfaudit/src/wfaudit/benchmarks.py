@@ -18,7 +18,7 @@ import wfaudit.logger as log
 
 def evaluate_ml_from_wefde(
     workspace=Path("output_ml"),
-    wefde_features_dir=Path("output_features"),
+    wefde_features_dir=Path("wefde_features"),
     metric_key="f1_score_macro",
     arch: str = "xgboost",
     filtered_labels=None,
@@ -108,8 +108,8 @@ def evaluate_ml_rawts(
 
 def evaluate_leakage(
     features_range: dict,
-    workspace=Path("output_leakage"),
-    wefde_features_dir=Path("output_features"),
+    workspace=Path("output_wefde"),
+    wefde_features_dir=Path("wefde_features"),
     n_procs=0,
     n_samples=50000,
     topn=20,
