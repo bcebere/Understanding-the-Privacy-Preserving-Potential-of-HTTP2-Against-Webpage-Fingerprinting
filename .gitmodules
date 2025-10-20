@@ -1,3 +1,0 @@
-[submodule "wfaudit/src/wfaudit/helpers_ml/Website-Fingerprinting-Library"]
-	path = wfaudit/src/wfaudit/helpers_ml/Website-Fingerprinting-Library
-	url = https://github.com/Xinhao-Deng/Website-Fingerprinting-Library.git
