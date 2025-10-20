@@ -1,20 +1,16 @@
-# Code adapted from https://github.com/Xinhao-Deng/Website-Fingerprinting-Library/
-########################
-########################
-
-
 # stdlib
 import math
 
 # third party
 import numpy as np
 import torch
-import torch.nn as nn
+from torch import nn
 
 # wfaudit absolute
-from wfaudit.helpers_ml._core_nn import DEVICE, BasicNNClassifier
+from wfaudit.helpers_ml._core_nn import DEVICE, train_model
 
 
+# Holmes
 class ConvBlock1d(nn.Module):
     """
     A 1D convolutional block: two conv layers -> batch norm -> ReLU, plus a residual connection.
@@ -111,62 +107,52 @@ class Holmes(nn.Module):
 class HolmesClassifier:
     def __init__(
         self,
-        batch_size=200,
-        lr=1e-3,
+        batch_size: int = 200,
         device=DEVICE,
-        epochs=100,
-        criterion=torch.nn.CrossEntropyLoss,
-    ):
+        epochs: int = 50,
+    ) -> None:
         self.batch_size = batch_size
-        self.lr = lr
         self.device = device
         self.epochs = epochs
-        self.criterion = criterion
-        self.model = None  # will be constructed in fit()
+        self.model = None
 
     def fit(self, X: np.ndarray, y: np.ndarray) -> "HolmesClassifier":
         X = np.asarray(X)
         y = np.asarray(y)
-        assert X.ndim == 3  # (N, C, L)
-        in_channels = X.shape[1]
-        num_classes = int(np.unique(y).size)
+        print("Training Holmes with", X.shape, y.shape)
 
-        # (optional) normalize per-channel using train stats
-        mu = X.mean(axis=(0, 2), keepdims=True)
-        sigma = X.std(axis=(0, 2), keepdims=True) + 1e-6
-        X = (X - mu) / sigma
-
-        net = Holmes(in_channels=in_channels, num_classes=num_classes).to(self.device)
-        self.model = BasicNNClassifier(
-            net,
-            num_classes=num_classes,
+        n_websites = len(np.unique(y))
+        self.model = train_model(
+            model=Holmes(in_channels=X.shape[1], num_classes=n_websites),
+            X=X,
+            y=y,
             batch_size=self.batch_size,
-            lr=self.lr,
             device=self.device,
             epochs=self.epochs,
-            criterion=self.criterion,
         )
-
-        # If you can, ensure the train DataLoader uses drop_last=True
-        # and (optionally) reduce BN momentum:
-        for m in net.modules():
-            if isinstance(m, nn.BatchNorm1d):
-                m.momentum = 0.01
-
-        self.model.fit(X, y)
         return self
 
-    def predict_proba(self, X: np.ndarray) -> np.ndarray:
-        X = np.asarray(X)
-        assert len(X.shape) == 3
+    def predict_proba(self, X: np.ndarray, batch_size=100) -> np.ndarray:
+        if self.model is None:
+            raise RuntimeError("Fit the model first")
+        self.model.eval()
+        X = torch.from_numpy(np.asarray(X)).float()
+        num_samples = X.shape[0]
 
-        return self.model.predict_proba(X)
+        probs_out = []
+        with torch.no_grad():
+            for start in range(0, num_samples, batch_size):
+                end = min(start + batch_size, num_samples)
+                xb = X[start:end].to(self.device, non_blocking=True)
+
+                logits = self.model(xb)
+                probs = torch.softmax(logits, dim=-1).detach().cpu()
+                probs_out.append(probs)
+
+        return torch.cat(probs_out, dim=0).numpy()
 
     def predict(self, X: np.ndarray) -> np.ndarray:
-        X = np.asarray(X)
-        assert len(X.shape) == 3
-
-        return self.model.predict(X)
+        return np.argmax(self.predict_proba(X), axis=-1)  # Ensure correct axis
 
     @staticmethod
     def name() -> str:

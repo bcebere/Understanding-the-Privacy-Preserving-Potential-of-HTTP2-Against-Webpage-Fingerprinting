@@ -19,15 +19,13 @@ from sklearn.preprocessing import LabelEncoder, label_binarize
 from tqdm import tqdm
 
 # wfaudit absolute
-from wfaudit.helpers_ml.df import DFClassifier, HolmesClassifier, VarCNNClassifier
-
-# from wfaudit.helpers_ml.varcnn import VarCNNClassifier
+from wfaudit.helpers_ml.df import DFClassifier
+from wfaudit.helpers_ml.holmes import HolmesClassifier
 from wfaudit.helpers_ml.kfpv2 import KFingerprintingForestClassifier
 from wfaudit.helpers_ml.lr import LinearClassifier
 from wfaudit.helpers_ml.rf import RFClassifier
 from wfaudit.helpers_ml.serialization import load_from_file, save_to_file
-
-# from wfaudit.helpers_ml.varcnn3d import VarCNN3DClassifier
+from wfaudit.helpers_ml.varcnn import VarCNNClassifier
 from wfaudit.helpers_ml.xgb import XGBoostClassifier
 import wfaudit.logger as log
 
@@ -53,18 +51,6 @@ clf_supported_metrics = [
 
 
 class classifier_metrics:
-    """Helper class for evaluating the performance of the classifier.
-
-    Args:
-        metric: list, default=["f1_score_macro", "precision_macro", "recall_macro",  "mcc",]
-            The type of metric to use for evaluation.
-            Potential values:
-                - "f1_score_macro": F1 score is a harmonic mean of the precision and recall. This version uses the "macro" average: calculate metrics for each label, and find their unweighted mean. This does not take label imbalance into account.
-                - "precision_macro": Precision is defined as the number of true positives over the number of true positives plus the number of false positives. This version(macro) calculates metrics for each label, and finds their unweighted mean.
-                - "recall_macro": Recall is defined as the number of true positives over the number of true positives plus the number of false negatives. This version(macro) calculates metrics for each label, and finds their unweighted mean.
-                - "mcc": The Matthews correlation coefficient is used in machine learning as a measure of the quality of binary and multiclass classifications. It takes into account true and false positives and negatives and is generally regarded as a balanced measure which can be used even if the classes are of very different sizes.
-    """
-
     def __init__(self, metric: Union[str, list] = clf_supported_metrics) -> None:
         if isinstance(metric, str):
             self.metrics = [metric]
