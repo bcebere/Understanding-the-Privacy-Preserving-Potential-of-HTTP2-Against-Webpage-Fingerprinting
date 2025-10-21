@@ -2,7 +2,6 @@
 from collections import defaultdict
 import glob
 import hashlib
-import json
 from pathlib import Path
 from random import shuffle
 from typing import List, Optional, Tuple
@@ -14,11 +13,10 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.dataset as ds
 import pyarrow.parquet as pq
-from sklearn.preprocessing import StandardScaler
 from tqdm import tqdm
 
 # wfaudit absolute
-from wfaudit.helpers_wefde.analysis.data_utils import load_wefde_features
+from wfaudit.helpers_deepse.preprocessing.create_dataset import prepare_deepse_dataset
 from wfaudit.helpers_wefde.preprocess.extract import prepare_wefde_features
 import wfaudit.logger as log
 from wfaudit.processing import process_pcap, process_pcap_via_json
@@ -151,8 +149,8 @@ def merge_pcap_csvs(
             )
             if temporal_lim is not None:
                 t_df = t_df.head(temporal_lim)
-        except BaseException:
-            print("Failed to read csv", static_filename)
+        except BaseException as e:
+            print("Failed to read csv", e, static_filename)
             continue
 
         # ------ post‑processing that the original version performed ------
@@ -210,103 +208,6 @@ def merge_pcap_csvs(
         out_workspace / "temporal_data.parquet", format="parquet"
     )
     return static_ds, temporal_ds
-    # return static_ds.to_table().to_pandas(), temporal_ds.to_table().to_pandas()
-
-
-def merge_pcap_csvs_bad(
-    workspace=Path("workspace"),
-    pd_lim: int = 1000,
-    temporal_lim: int = None,
-    cache: bool = False,
-) -> None:
-    """
-    Args:
-        workspace: The folder which contains the post-processed pcaps --- output_csv_single.
-        pd_lim: how often to batch the CSVs.
-    """
-    in_workspace = workspace / Path("output_csv_single")
-    if not in_workspace.exists():
-        log.error("Missing output_csv_single folder")
-        return
-    static_files = glob.glob(str(in_workspace / "static*.csv"))
-
-    print("static files", len(static_files))
-    buffer_static = []
-    buffer_temporal = []
-    temporal_total_len = 0
-
-    for fidx, filename in tqdm(enumerate(static_files)):
-        static_filename = Path(filename)
-        base = static_filename.name.split("static_")[1]
-        temporal_base = "temporal_" + base
-        temporal_filename = in_workspace / temporal_base
-
-        assert static_filename.exists()
-        assert temporal_filename.exists()
-        try:
-            local_static_csv = pd.read_csv(static_filename, engine="pyarrow")
-            if temporal_lim is None:
-                local_temporal_csv = pd.read_csv(temporal_filename, engine="pyarrow")
-            else:
-                local_temporal_csv = pd.read_csv(
-                    temporal_filename, engine="pyarrow"
-                ).head(temporal_lim)
-        except BaseException as e:
-            print("failed to read", filename, e)
-            continue
-
-        original_ids = local_static_csv["id"].values[0]
-        original_label = local_static_csv["label"].values[0]
-        total_duration = local_temporal_csv["relative_timestamp"].sum()
-        new_id = f"{original_ids}-{original_label}-{total_duration}-{fidx}"
-        hashed_id = hashlib.sha1(new_id.encode())
-        hashed_id = hashed_id.hexdigest()
-
-        local_static_csv["file_order"] = fidx
-        local_temporal_csv["file_order"] = fidx
-
-        local_static_csv["full_id"] = hashed_id
-        local_temporal_csv["full_id"] = hashed_id
-
-        buffer_static.append(local_static_csv)
-        buffer_temporal.append(local_temporal_csv)
-
-        temporal_total_len += len(local_temporal_csv)
-
-        if len(buffer_temporal) % 1000 == 0:
-            print(
-                "processed temporal series ",
-                temporal_total_len,
-                temporal_total_len / (len(buffer_temporal) + 1),
-            )
-
-    print(f"static {len(buffer_static)} CSVs")
-    full_data_static = pd.concat(buffer_static, ignore_index=True, copy=False)
-    print(f"temporal {len(buffer_temporal)} CSVs")
-    full_data_temporal = pd.concat(buffer_temporal, ignore_index=True, copy=False)
-
-    return full_data_static, full_data_temporal
-
-
-def _discrete_columns(
-    dataframe: pd.DataFrame, max_classes: int = 10, return_counts: bool = False
-) -> list:
-    """
-    Find columns containing discrete values in a pandas dataframe.
-    """
-    return [
-        (col, cnt) if return_counts else col
-        for col, vals in dataframe.items()
-        for cnt in [vals.nunique()]
-        if cnt <= max_classes
-    ]
-
-
-def _constant_columns(dataframe: pd.DataFrame) -> list:
-    """
-    Find constant value columns in a pandas dataframe.
-    """
-    return _discrete_columns(dataframe, 1)
 
 
 def _prepare_time_series_arrow(
@@ -477,7 +378,7 @@ def _prepare_time_series_pandas(
     return static_data, ts_data_clean, (lens, sizes, rel_times)
 
 
-def prepare_ts_datasets(
+def prepare_wefde_raw(
     static_data,
     temporal_data,
     workspace=Path("workspace"),
@@ -548,13 +449,13 @@ def prepare_ts_datasets(
         real_idx += 1
 
 
-def prepare_features(
+def prepare_wefde_dataset(
     workspace=Path("workspace"),
-    conn_limit=1,
+    conn_limit=3,
 ):
     time_series_traces = workspace / Path("output_wefde")
     if not time_series_traces.exists():
-        log.error("Missing output_wefde data. Call prepare_ts_datasets first!")
+        log.error("Missing output_wefde data. Call prepare_wefde_raw first!")
         return
 
     if conn_limit > 1:
@@ -570,168 +471,27 @@ def prepare_features(
     )
 
 
-def prepare_ts_datasets_for_nns_1C(
+def prepare_all_datasets(
     workspace=Path("workspace"),
-    conn_setup: str = "multi",
+    n_websites: int = 100,
+    n_traces: int = 500,
+    feature_length: int = 5000,
+    deepse_testtypes=["real", "sanity"],
 ):
-    wefde_path = workspace / Path(f"output_features_{conn_setup}")
-
-    if not wefde_path.exists():
-        log.error("Missing output_wefde features. Run prepare_features first!")
-        raise
-
-    with open(wefde_path / "FeaturePositions.json", "r") as f:
-        features = json.load(f)
-
-    output = workspace / Path("output_ml")
-    output.mkdir(parents=True, exist_ok=True)
-
-    X, y = load_wefde_features(wefde_path)
-    start_off = 0
-    for feat in features:
-        end_off = features[feat]
-        X[:, start_off:end_off] = StandardScaler().fit_transform(
-            X[:, start_off:end_off]
-        )
-        start_off = end_off
-
-    X = np.expand_dims(X, axis=1)
-
-    X = np.asarray(X)
-    y = np.asarray(y)
-
-    with open(output / f"X_1C_{conn_setup}.npy", "wb") as f:
-        np.save(f, X)
-    with open(output / f"y_1C_{conn_setup}.npy", "wb") as f:
-        np.save(f, y)
-
-
-def prepare_ts_datasets_for_nns_3C(
-    static_data,
-    temporal_data,
-    workspace=Path("workspace"),
-    ID_COL="file_order",
-    domain_limit=1000,
-    class_cnt_limit=1024,
-):  # id, full_id
-    output = workspace / Path("output_ml")
-    output.mkdir(parents=True, exist_ok=True)
-
-    (
-        clean_static_data,
-        clean_ts_data,
-        (lens, pkt_sizes, pkt_ts),
-    ) = _prepare_time_series_arrow(
-        static_data,
-        temporal_data,
-        ID_COL=ID_COL,
-    )
-    print("Preparing 3d tensor mean len=", np.mean(lens))
-
-    padlimit = min(int(np.median(lens)) + 10, 1000)
-
-    def _pad(arr, arrsize: int = padlimit):
-        arr = np.asarray(arr).tolist()
-        if len(arr) > arrsize:
-            arr = arr[:arrsize]
-        else:
-            arr = np.pad(arr, (0, arrsize - len(arr)), "constant", constant_values=0)
-        assert len(arr) == arrsize
-
-        return np.asarray(arr)
-
-    def _stats(arr):
-        return [
-            len(arr),
-            float(np.max(arr)),
-            float(np.mean(arr)),
-            float(np.std(arr)),
-            float(np.sum(arr)),
-        ]
-
-    real_idx = 0
-    domain_repeats = {}
-    domain_label = {}
-
-    experiment_labels = []
-    for ridx, static_row in clean_static_data.iterrows():
-        encoded_label = static_row["label"]
-        experiment_labels.append(encoded_label)
-
-    experiment_labels = list(sorted(list(set(experiment_labels))))
-
-    X = []
-    y = []
-
-    for ridx, static_row in clean_static_data.iterrows():
-        local_token = static_row["label"]
-        encoded_label = experiment_labels.index(local_token)
-
-        if local_token not in domain_repeats:
-            if len(domain_repeats) > class_cnt_limit:
-                real_idx += 1
-                continue
-            domain_repeats[local_token] = 0
-            domain_label[local_token] = encoded_label
-
-        if domain_repeats[local_token] >= domain_limit:
-            real_idx += 1
-            continue
-
-        domain_repeats[local_token] += 1
-
-        local_sizes = clean_ts_data[real_idx]["length"].values
-        local_sizes = local_sizes / 1024  # KB
-        local_sizes_stats = _stats(local_sizes)
-        local_sizes = np.asarray(list(local_sizes_stats) + list(local_sizes))
-        local_sizes = _pad(local_sizes)
-
-        local_dir = clean_ts_data[real_idx]["direction"].values
-        local_dir_stats = _stats(local_dir)
-        local_dir = np.asarray(list(local_dir_stats) + list(local_dir))
-        local_dir = _pad(local_dir)
-
-        timestamps = clean_ts_data[real_idx]["relative_timestamp"].copy()
-        timestamps[timestamps < 0] = 0  # WTF
-        timestamps[timestamps > 1000] = 0  # Parsing bug
-
-        local_ts = timestamps.values
-        local_ts_stats = _stats(local_ts)
-        local_ts = np.asarray(list(local_ts_stats) + list(local_ts))
-        local_ts = _pad(local_ts)
-
-        assert len(local_ts) == len(local_sizes)
-
-        X.append([local_dir, local_ts, local_sizes])
-        y.append(encoded_label)
-
-        real_idx += 1
-
-    X = np.asarray(X)
-    y = np.asarray(y)
-
-    with open(output / "X_3C.npy", "wb") as f:
-        np.save(f, X)
-    with open(output / "y_3C.npy", "wb") as f:
-        np.save(f, y)
-
-    return X, y
-
-
-def prepare_datasets(
-    workspace=Path("workspace"),
-):
-    print("merge datasets")
+    print("merge raw datasets")
     static_data, ts_data = merge_pcap_csvs(workspace=workspace)
-    print("prepare wefde data")
-    prepare_ts_datasets(static_data, ts_data, workspace=workspace)
 
-    print("prepare wefde features")
-    prepare_features(workspace=workspace, conn_limit=1)
-    prepare_features(workspace=workspace, conn_limit=3)
+    print("prepare WeFDE data")
+    prepare_wefde_raw(static_data, ts_data, workspace=workspace)
+    prepare_wefde_dataset(workspace=workspace)
 
-    print("prepare NN features")
-    prepare_ts_datasets_for_nns_1C(workspace=workspace, conn_setup="global")
-    prepare_ts_datasets_for_nns_1C(workspace=workspace, conn_setup="multi")
-
-    # prepare_ts_datasets_for_nns_3C(static_data, ts_data, workspace=workspace)
+    print("prepare DeepSE-WF features")
+    for testtype in deepse_testtypes:
+        prepare_deepse_dataset(
+            path_wefde=workspace / "output_wefde",
+            path_out=workspace / "output_deepse" / testtype / "dataset.npz",
+            n_websites=n_websites,
+            n_traces=n_traces,
+            feature_length=feature_length,
+            debug_mode=(testtype != "real"),
+        )

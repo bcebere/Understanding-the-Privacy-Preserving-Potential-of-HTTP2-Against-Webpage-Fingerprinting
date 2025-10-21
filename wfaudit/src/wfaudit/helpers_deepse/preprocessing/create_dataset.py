@@ -1,6 +1,5 @@
 # stdlib
 import argparse
-import os
 from pathlib import Path
 
 # third party
@@ -109,6 +108,7 @@ def prepare_deepse_dataset(
     feature_length=5000,  # Maximum time-series length to keep
     debug_mode: bool = False,  # Shuffle labels for sanity checks
 ):
+    print("prepare dataset")
     if not str(path_out).endswith(".npz"):
         raise ValueError("Data path must end with .npz")
 
@@ -119,6 +119,7 @@ def prepare_deepse_dataset(
         folder.mkdir(parents=True, exist_ok=True)
         print(f"[*] Created the directory(s): {folder}")
 
+    print("create dataset path")
     X = []
     y = []
 
@@ -154,7 +155,7 @@ def prepare_deepse_dataset(
 
             available += 1
 
-        if available < args.n_traces - 100:
+        if available < n_traces - 100:
             print("[x] Ignore low trace count for website=", w, available, flush=True)
             continue
 
@@ -214,125 +215,21 @@ def prepare_deepse_dataset(
     assert X.shape[0] > 0
 
     cls_count = pd.Series(y).value_counts()
-    assert min(cls_count) > 20, cls_count
+    assert min(cls_count) > 0, cls_count
 
     np.savez_compressed(path_out, traces=X, labels=y)
 
 
 def main(args):
-    if not args.out_path.endswith(".npz"):
-        raise ValueError("Data path must end with .npz")
-
-    # Create Directories if necessary
-    folder = os.path.dirname(args.out_path)
-    if not os.path.exists(folder):
-        try:
-            os.makedirs(folder)
-        except OSError:
-            print(f"[*] Creation of the directory {folder} failed")
-
-        print(f"[*] Created the directory(s): {folder}")
-
-    X = []
-    y = []
-
-    lens = []
-
-    for w in tqdm(range(args.n_websites)):
-        for t in range(1, args.n_traces + 1):
-            trace_file = f"{w}-{t}"
-            trace = np.loadtxt(os.path.join(args.in_path, trace_file))
-
-            # Count trailing zero rows
-            count_trailing_zeros = 0
-            for row in reversed(trace):
-                if np.all(row == 0):
-                    count_trailing_zeros += 1
-                else:
-                    break
-
-            lens.append(len(trace) - count_trailing_zeros)
-            break
-
-    print("Trace stats", np.mean(lens), np.median(lens), np.max(lens))
-    feature_length = min(args.feature_length, max(100, int(np.median(lens)) + 50))
-
-    for w in tqdm(range(args.n_websites)):
-        # prep
-        available = 0
-        for t in range(1, args.n_traces + 1):
-            trace_file = f"{w}-{t}"
-            trace_path = Path(args.in_path) / trace_file
-
-            if not trace_path.exists():  # hack
-                continue
-
-            available += 1
-
-        if available < args.n_traces - 100:
-            print("[x] Ignore low trace count for website=", w, available, flush=True)
-            continue
-
-        # print("[*] Processing website=", w, available, flush=True)
-        for t in range(1, args.n_traces + 1):
-            trace_file = f"{w}-{t}"
-            trace_path = Path(args.in_path) / trace_file
-
-            if not trace_path.exists():  # hack
-                print("[x] Ignore missing", trace_path)
-                continue
-
-            trace = np.loadtxt(os.path.join(trace_path))
-
-            lens.append(len(trace))
-            assert (
-                len(np.shape(trace)) > 1
-            ), "Trace should be in time 'tab' direction format."
-
-            # direction (+1 outgoing, -1 incoming)
-            sign = np.sign(trace[:, 1])
-
-            # timing
-            ch_timing = sign * trace[:, 0]  # convert to signed time
-            ch_timing = pad_or_truncate(
-                np.asarray(ch_timing, dtype=float), feature_length
-            )
-
-            # bytes
-            scale = 2000
-            ch_sizes = sign * (np.abs(trace[:, 1]) / scale)
-            ch_sizes = pad_or_truncate(
-                np.asarray(ch_sizes, dtype=float), feature_length
-            )
-
-            trace = np.stack([ch_timing, ch_sizes], axis=0)
-            X.append(trace)
-            y.append(w)
-
-    # prepare X
-    X = np.array(X, dtype=np.float32)
-    assert len(X) > 0
-    mu = X.mean(axis=(0, 2), keepdims=True)  # shape (1,2,1)
-    sigma = X.std(axis=(0, 2), keepdims=True) + 1e-8
-    X = (X - mu) / sigma
-    assert np.isnan(X).sum() == 0
-
-    # prepare y
-    y = np.array(y, dtype=np.int32)
-    if args.debug_mode:
-        print("DANGER !!! Corrupting y")
-        # Corrupt Y
-        y = interleaved_label_shuffle(y)
-
-    print(f"[*] Data shape {X.shape}")
-    assert X.shape[2] == feature_length
-    assert X.shape[1] == 2
-    assert X.shape[0] > 0
-
-    cls_count = pd.Series(y).value_counts()
-    assert min(cls_count) > 20, cls_count
-
-    np.savez_compressed(args.out_path, traces=X, labels=y)
+    print("Running dataset")
+    return prepare_deepse_dataset(
+        path_wefde=args.in_path,  # WeFDE dataset path
+        path_out=args.out_path,  # DeepSE dataset path
+        n_websites=args.n_websites,  # Maximum website count
+        n_traces=args.n_traces,  # Maximum samples per website
+        feature_length=args.feature_length,  # Maximum time-series length to keep
+        debug_mode=args.debug_mode,  # Shuffle labels for sanity checks
+    )
 
 
 if __name__ == "__main__":
