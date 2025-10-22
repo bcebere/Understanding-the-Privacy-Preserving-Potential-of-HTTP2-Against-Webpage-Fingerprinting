@@ -16,7 +16,7 @@ import pyarrow.parquet as pq
 from tqdm import tqdm
 
 # wfaudit absolute
-from wfaudit.helpers_deepse.preprocessing.create_dataset import prepare_deepse_dataset
+from wfaudit.helpers_deepse import prepare_deepse_dataset
 from wfaudit.helpers_wefde.preprocess.extract import prepare_wefde_features
 import wfaudit.logger as log
 from wfaudit.processing import process_pcap, process_pcap_via_json
@@ -225,9 +225,7 @@ def _prepare_time_series_arrow(
     `pyarrow.dataset.Dataset` inputs and **guarantees that each ID is gathered
     in full even when it spans multiple record batches**.
     """
-    # ------------------------------------------------------------------ #
     # 1)  materialise the tiny static table                              #
-    # ------------------------------------------------------------------ #
     static_df = (
         static_ds.to_table(columns=[ID_COL, "label"])
         .to_pandas(split_blocks=True, self_destruct=True)
@@ -235,9 +233,7 @@ def _prepare_time_series_arrow(
     )
     static_ids = set(static_df[ID_COL].values)
 
-    # ------------------------------------------------------------------ #
     # 2)  streaming scan with a per ID stash                             #
-    # ------------------------------------------------------------------ #
     pending = defaultdict(list)  # id  -> list[pd.DataFrame] (fragments)
     ts_data_clean, final_ids = [], []
 
@@ -270,9 +266,7 @@ def _prepare_time_series_arrow(
                 )
         # (otherwise we wait for more fragments)
 
-    # ------------------------------------------------------------------ #
     # 3)  flush any IDs that ended in the last batch                     #
-    # ------------------------------------------------------------------ #
     for idx in list(pending):  # iterate over *copy* we mutate inside
         _ts_helper_flush_id(
             idx,
@@ -286,9 +280,7 @@ def _prepare_time_series_arrow(
             ts_pad,
         )
 
-    # ------------------------------------------------------------------ #
     # 4)  re-index the static DF and log stats                           #
-    # ------------------------------------------------------------------ #
     static_df = static_df.set_index(ID_COL).reindex(final_ids)
 
     log.debug(
@@ -385,8 +377,9 @@ def prepare_wefde_raw(
     ID_COL="file_order",
     domain_limit=1000,
     class_cnt_limit=1024,
+    wefde_folder: str = "output_wefde",
 ):  # id, full_id
-    output = workspace / Path("output_wefde")
+    output = workspace / wefde_folder
     output.mkdir(parents=True, exist_ok=True)
 
     print("process time series")
@@ -452,16 +445,15 @@ def prepare_wefde_raw(
 def prepare_wefde_dataset(
     workspace=Path("workspace"),
     conn_limit=3,
+    wefde_folder: str = "output_wefde",
+    wefde_feats_folder: str = "output_features",
 ):
-    time_series_traces = workspace / Path("output_wefde")
+    time_series_traces = workspace / wefde_folder
     if not time_series_traces.exists():
-        log.error("Missing output_wefde data. Call prepare_wefde_raw first!")
+        log.error(f"Missing {wefde_folder} data. Call prepare_wefde_raw first!")
         return
 
-    if conn_limit > 1:
-        output = workspace / Path("output_features_multi")
-    else:
-        output = workspace / Path("output_features_global")
+    output = workspace / wefde_feats_folder
     output.mkdir(parents=True, exist_ok=True)
 
     return prepare_wefde_features(
@@ -477,18 +469,26 @@ def prepare_all_datasets(
     n_traces: int = 500,
     feature_length: int = 5000,
     deepse_testtypes=["real", "sanity"],
+    wefde_folder: str = "output_wefde",
+    wefde_feats_folder: str = "output_features",
 ):
     print("merge raw datasets")
     static_data, ts_data = merge_pcap_csvs(workspace=workspace)
 
     print("prepare WeFDE data")
-    prepare_wefde_raw(static_data, ts_data, workspace=workspace)
-    prepare_wefde_dataset(workspace=workspace)
+    prepare_wefde_raw(
+        static_data, ts_data, workspace=workspace, wefde_folder=wefde_folder
+    )
+    prepare_wefde_dataset(
+        workspace=workspace,
+        wefde_folder=wefde_folder,
+        wefde_feats_folder=wefde_feats_folder,
+    )
 
     print("prepare DeepSE-WF features")
     for testtype in deepse_testtypes:
         prepare_deepse_dataset(
-            path_wefde=workspace / "output_wefde",
+            path_wefde=workspace / wefde_folder,
             path_out=workspace / "output_deepse" / testtype / "dataset.npz",
             n_websites=n_websites,
             n_traces=n_traces,

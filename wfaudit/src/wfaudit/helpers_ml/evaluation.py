@@ -16,7 +16,6 @@ from sklearn.metrics import (
 )
 from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import LabelEncoder, label_binarize
-from tqdm import tqdm
 
 # wfaudit absolute
 from wfaudit.helpers_ml.df import DFClassifier
@@ -270,7 +269,7 @@ def _get_arch_mode(arch: str, **kwargs):
         return LinearClassifier()
     elif arch == "rf":
         return RFClassifier()
-    elif arch == "kfpv2":
+    elif arch == "kfp":
         return KFingerprintingForestClassifier()
     elif arch == "varcnn":
         return VarCNNClassifier(**kwargs)
@@ -328,55 +327,6 @@ def _evaluate_static_models_cv(
         f" >>> test = {testname}, datalen = {len(input_data)} score = {score['str']['f1_score_macro']}"
     )
     return score
-
-
-def evaluate_by_domain(
-    arch: str,  # = "xgboost"
-    label: str,
-    data: np.ndarray,
-    labels: np.ndarray,
-    metric_key: str = "f1_score_macro",
-    workspace=Path("workspace"),
-    filtered_labels=None,
-    use_cache: bool = True,
-    limit_domains: int = 1000,
-    **kwargs,
-):
-    enable_reproducible_results(0)
-
-    scores = []
-    scores_by_domain = {}
-    if filtered_labels is None:
-        filtered_labels = np.unique(labels)
-    if limit_domains is not None:
-        filtered_labels = filtered_labels[:limit_domains]
-
-    # print("evaluating filtered labels", filtered_labels)
-
-    for domain in tqdm(filtered_labels):
-        horizon_labels = pd.Series(labels).copy()
-        horizon_labels[horizon_labels != domain] = -1
-        horizon_labels[horizon_labels == domain] = 1
-        horizon_labels[horizon_labels == -1] = 0
-
-        score = _evaluate_static_models_cv(
-            arch,
-            f"{label}_{domain}",
-            data,
-            horizon_labels,
-            workspace=workspace,
-            use_cache=use_cache,
-            **kwargs,
-        )
-        if score is None:
-            continue
-        scores.append(score["raw"][metric_key][0])
-        scores_by_domain[int(domain)] = float(score["raw"][metric_key][0])
-        log.debug(
-            f" >>> [{arch}][{domain}] {metric_key} = {scores_by_domain[int(domain)]}"
-        )
-
-    return scores, scores_by_domain
 
 
 def evaluate_multiclass(

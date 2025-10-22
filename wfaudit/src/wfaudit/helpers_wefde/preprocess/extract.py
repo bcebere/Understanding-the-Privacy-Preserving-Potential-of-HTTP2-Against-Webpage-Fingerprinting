@@ -47,19 +47,19 @@ def extract(times, sizes, debug_path: str, conn_limit: int = 1):
 
     # Transmission size features
     features.extend(PktNum.get_packet_counts(times, sizes, conn_limit=conn_limit))
-    feature_pos["PACKET_NUMBER"] = len(features)
+    feature_pos["MI_PKT_COUNT"] = len(features)
 
     # inter packet time + transmission time feature
     features.extend(Time.get_time_features(times, sizes, conn_limit=conn_limit))
-    feature_pos["PKT_TIME"] = len(features)
+    feature_pos["MI_PKT_TIME"] = len(features)
 
     # Bursts (knn)
     features.extend(Burst.get_burst_features(times, sizes, conn_limit=conn_limit))
-    feature_pos["BURST"] = len(features)
+    feature_pos["MI_BURST"] = len(features)
 
     # CUMUL features
     features.extend(Cumul.get_cumul_features(times, sizes, conn_limit=conn_limit))
-    feature_pos["CUMUL"] = len(features)
+    feature_pos["MI_CUMUL"] = len(features)
 
     # output FeaturePos
     with open(os.path.join(debug_path, "FeaturePositions.json"), "w") as fd:

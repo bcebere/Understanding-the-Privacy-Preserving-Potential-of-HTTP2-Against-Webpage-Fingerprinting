@@ -101,17 +101,25 @@ def test_prepare_wefde_datasets(tmp_path):
     static_data, ts_data = merge_pcap_csvs(workspace=tmp_path)
 
     print("Creating wefde raw traces")
-    prepare_wefde_raw(static_data, ts_data, workspace=tmp_path)
+    wefde_folder = "wefde_dbg"
+    prepare_wefde_raw(
+        static_data, ts_data, workspace=tmp_path, wefde_folder=wefde_folder
+    )
 
-    output = tmp_path / "output_wefde"
+    output = tmp_path / wefde_folder
     assert output.exists()
 
     num_files = sum(1 for file in output.iterdir() if file.is_file())
     assert num_files == len(pcaps)
 
     print("Creating wefde features")
-    prepare_wefde_dataset(workspace=tmp_path)
-    output = tmp_path / "output_features_multi"
+    wefde_feats_folder = "wefde_feats_dbg"
+    prepare_wefde_dataset(
+        workspace=tmp_path,
+        wefde_folder=wefde_folder,
+        wefde_feats_folder=wefde_feats_folder,
+    )
+    output = tmp_path / wefde_feats_folder
     assert output.exists()
     num_files = sum(1 for file in output.iterdir() if file.is_file())
     assert num_files == len(pcaps) + 1
@@ -128,9 +136,12 @@ def test_prepare_deepse_datasets(tmp_path, testtype):
     static_data, ts_data = merge_pcap_csvs(workspace=tmp_path)
 
     print("Creating wefde raw traces")
-    prepare_wefde_raw(static_data, ts_data, workspace=tmp_path)
+    wefde_folder = "wefde_dbg"
+    prepare_wefde_raw(
+        static_data, ts_data, workspace=tmp_path, wefde_folder=wefde_folder
+    )
 
-    path_wefde = tmp_path / "output_wefde"
+    path_wefde = tmp_path / wefde_folder
     assert path_wefde.exists()
 
     output = tmp_path / "output_deepse" / testtype / "dataset.npz"
@@ -154,11 +165,15 @@ def test_e2e(tmp_path):
     )
 
     deepse_testtypes = ["real", "sanity111"]
+    wefde_folder = "wefde_dbg"
+    wefde_feats_folder = "wefde_feats_dbg"
     prepare_all_datasets(
         workspace=tmp_path,
         n_websites=3,
         n_traces=2,
         deepse_testtypes=deepse_testtypes,
+        wefde_folder=wefde_folder,
+        wefde_feats_folder=wefde_feats_folder,
     )
 
     output = tmp_path / "output_csv_single"
@@ -166,12 +181,12 @@ def test_e2e(tmp_path):
     is_empty = not any(output.iterdir())
     assert not is_empty
 
-    output = tmp_path / "output_wefde"
+    output = tmp_path / wefde_folder
     assert output.exists()
     num_files = sum(1 for file in output.iterdir() if file.is_file())
     assert num_files == len(pcaps)
 
-    output = tmp_path / "output_features_multi"
+    output = tmp_path / wefde_feats_folder
     assert output.exists()
     num_files = sum(1 for file in output.iterdir() if file.is_file())
     assert num_files == len(pcaps) + 1
@@ -179,3 +194,24 @@ def test_e2e(tmp_path):
     for testtype in deepse_testtypes:
         output = tmp_path / "output_deepse" / testtype / "dataset.npz"
         assert output.exists()
+
+
+def test_preparedbg():
+    tmp_path = Path("datasets")
+
+    wefde_feats_folder = "wefde_feats"
+    prepare_wefde_dataset(
+        workspace=tmp_path,
+        wefde_folder="wefde",
+        wefde_feats_folder=wefde_feats_folder,
+    )
+
+    print("Creating deepse features")
+    output = tmp_path / "deepse" / "dataset.npz"
+    prepare_deepse_dataset(
+        path_wefde=tmp_path / "wefde",
+        path_out=output,
+        n_websites=3,
+        n_traces=500,
+    )
+    assert output.exists()

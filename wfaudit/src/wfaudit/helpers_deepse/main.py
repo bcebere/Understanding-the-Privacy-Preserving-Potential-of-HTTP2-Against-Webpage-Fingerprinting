@@ -12,15 +12,17 @@ from typing import Any, Union
 
 # third party
 import cloudpickle
-from datasets.data_utils import get_split, load_data
-from models.model_utils import train_models
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import StratifiedKFold as CV
 from tabulate import tabulate
 import torch
-from utils.knn import compute_distance, knn_ber, knn_mi
-from utils.utils import get_args_parser
+
+# wfaudit absolute
+from wfaudit.helpers_deepse.datasets.data_utils import get_split, load_data
+from wfaudit.helpers_deepse.models.model_utils import train_models
+from wfaudit.helpers_deepse.utils.knn import compute_distance, knn_ber, knn_mi
+from wfaudit.helpers_deepse.utils.utils import get_args_parser
 
 
 def save_to_file(path: Union[str, Path], model: Any) -> Any:
@@ -42,19 +44,25 @@ def load_from_file(path: Union[str, Path]) -> Any:
 LOG_LVL = logging.INFO
 
 
-def estimate_security(data, embeddings):
+def estimate_security(
+    data,
+    embeddings,
+    knn_measure: str = "squared_l2",
+    ber_k: int = 1,
+    mi_k: int = 5,
+):
     """
     Returns tight DeepSE BER bounds
     """
     # test1 --> test2
-    d12 = compute_distance(embeddings["test1"], embeddings["test2"], args.knn_measure)
-    lb12, ub12 = knn_ber(d12, data["y_test1"], data["y_test2"], args.ber_k)
-    mi12 = knn_mi(d12, data["y_test1"], data["y_test2"], args.mi_k)
+    d12 = compute_distance(embeddings["test1"], embeddings["test2"], knn_measure)
+    lb12, ub12 = knn_ber(d12, data["y_test1"], data["y_test2"], ber_k)
+    mi12 = knn_mi(d12, data["y_test1"], data["y_test2"], mi_k)
 
     # test2 --> test1
-    d21 = compute_distance(embeddings["test2"], embeddings["test1"], args.knn_measure)
-    lb21, ub21 = knn_ber(d21, data["y_test2"], data["y_test1"], args.ber_k)
-    mi21 = knn_mi(d21, data["y_test2"], data["y_test1"], args.mi_k)
+    d21 = compute_distance(embeddings["test2"], embeddings["test1"], knn_measure)
+    lb21, ub21 = knn_ber(d21, data["y_test2"], data["y_test1"], ber_k)
+    mi21 = knn_mi(d21, data["y_test2"], data["y_test1"], mi_k)
 
     # Per-representation bounds on error: strongest LB and UB across directions
     lb_err = max(lb12, lb21)  # tightest lower bound on Bayes error
@@ -64,19 +72,45 @@ def estimate_security(data, embeddings):
     return dict(lb_err=lb_err, ub_err=ub_err, mi=mi)
 
 
-def main(args):
-    total_start = timer()
-    x, y = load_data(args.data_path, args)
+def estimate_mi_ber(
+    data_path: str,
+    results_file: str,
+    n_websites: int = None,
+    n_traces: int = None,
+    feature_length: int = 5000,
+    k_fold: int = 5,
+    random_state: int = 42,
+    embedding_size: int = 512,
+    model: str = "df",
+    device: str = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+    epochs: int = 100,
+    batch_size: int = 200,
+    num_workers: int = 4,
+    knn_measure: str = "squared_l2",
+    ber_k: int = 1,
+    mi_k: int = 5,
+):
+    x, y = load_data(
+        data_path=data_path,
+        feature_length=feature_length,
+        n_traces=n_traces,
+        n_websites=n_websites,
+    )
 
-    cv = CV(n_splits=args.k_fold, shuffle=True, random_state=42)
+    if n_websites is None:
+        n_websites = len(np.unique(y))
+    if n_traces is None:
+        n_traces = int(len(x) / n_websites)
 
-    workspace = Path(args.results_file).parent
+    cv = CV(n_splits=k_fold, shuffle=True, random_state=random_state)
 
-    results = {"acc": [], "ber_lo": [], "ber_hi": [], "mi": []}
+    workspace = Path(results_file).parent
+
+    results = {"ACC": [], "BER_LO": [], "BER_HI": [], "MI_TOTAL": []}
     for cv_count, (train_idx, test_idx) in enumerate(cv.split(x, y), start=1):
         start_cv = timer()
         logging.info(
-            f"------------------- CV RUN {cv_count} OF {args.k_fold} -------------------"
+            f"------------------- CV RUN {cv_count} OF {k_fold} -------------------"
         )
         data = get_split(x, y, train_idx, test_idx)
 
@@ -85,11 +119,20 @@ def main(args):
             logging.info(f"Loading cached embeddings {bkp_path}")
             embeddings, history = load_from_file(bkp_path)
         else:
-            embeddings, history = train_models(data=data, args=args)
+            embeddings, history = train_models(
+                data=data,
+                n_websites=n_websites,
+                embedding_size=embedding_size,
+                model_name=model,
+                epochs=epochs,
+                device=device,
+                batch_size=batch_size,
+                num_workers=num_workers,
+            )
             logging.info(f"Caching {bkp_path}")
             save_to_file(bkp_path, (embeddings, history))
 
-        results["acc"].append(history["test_acc"][-1])
+        results["ACC"].append(history["test_acc"][-1])
 
         table = [
             [
@@ -109,10 +152,16 @@ def main(args):
         logging.info("Estimate Security:")
         table = []
         start = timer()
-        estimates = estimate_security(data, embeddings)
-        results["ber_lo"].append(estimates["lb_err"])
-        results["ber_hi"].append(estimates["ub_err"])
-        results["mi"].append(estimates["mi"])
+        estimates = estimate_security(
+            data,
+            embeddings,
+            knn_measure=knn_measure,
+            ber_k=ber_k,
+            mi_k=mi_k,
+        )
+        results["BER_LO"].append(estimates["lb_err"])
+        results["BER_HI"].append(estimates["ub_err"])
+        results["MI_TOTAL"].append(estimates["mi"])
 
         table.append([estimates["lb_err"], estimates["ub_err"], estimates["mi"]])
 
@@ -131,25 +180,32 @@ def main(args):
 
         logging.info(f"Time CV {cv_count}: {timedelta(seconds=end_cv-start_cv)}\n")
 
-    total_end = timer()
-
-    logging.info(f"Total time: {timedelta(seconds=total_end-total_start)}")
-
     df = pd.DataFrame.from_dict(results)
-    # DataFrame(
-    #    [(k, np.mean(v), np.std(v)) for k, v in results.items()],
-    #    columns=["Value", "Mean", "Std"],
-    # )
-    df.to_csv(args.results_file, index=None)
+    df.to_csv(results_file, index=None)
 
-    table = [[k, np.mean(v), np.std(v)] for k, v in results.items()]
-    table = tabulate(
-        table,
-        headers=["Value", "Mean", "Std"],
-        tablefmt="github",
-        floatfmt=".4f",
+    return df
+
+
+def main(args):
+    results = estimate_mi_ber(
+        data_path=args.data_path,
+        results_file=args.results_file,
+        n_websites=args.n_websites,
+        n_traces=args.n_traces,
+        feature_length=args.feature_length,
+        k_fold=args.k_fold,
+        embedding_size=args.embedding_size,
+        model=args.model,
+        device=args.device,
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        num_workers=args.num_workers,
+        knn_measure=args.knn_measure,
+        ber_k=args.ber_k,
+        mi_k=args.ber_k,
     )
-    logging.info(f"Results:\n\n{table}\n")
+
+    logging.info(f"Results:\n\n{results}\n")
 
 
 if __name__ == "__main__":

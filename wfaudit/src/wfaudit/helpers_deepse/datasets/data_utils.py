@@ -6,13 +6,20 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
 
+# wfaudit absolute
+from wfaudit.helpers_deepse.datasets.dataset import DefaultDataset
 
-def load_data(data_path, args):
+
+def load_data(
+    data_path: str,
+    feature_length: int,
+    n_traces: int = None,
+    n_websites: int = None,
+):
     """Load the Dataset.
 
     Args:
         data_path: Path to the .npz file containing the traces and labels
-        args: Arguments
 
     Returns:
         x: Matrix (n_traces*n_classes x feature_length) containing the traces
@@ -27,16 +34,20 @@ def load_data(data_path, args):
     # Convert data as float32 type
     x = x.astype("float32")
     assert len(x.shape) == 3
-    x = x[:, :, : args.feature_length]
+    x = x[:, :, :feature_length]
 
     y = y.astype("float32")
 
     # reduce dataset if necessary
-    if args.n_traces * args.n_websites < len(y):
+    if (
+        n_traces is not None
+        and n_websites is not None
+        and n_traces * n_websites < len(y)
+    ):
         x, _, y, _ = train_test_split(
             x,
             y,
-            train_size=args.n_traces * args.n_websites,
+            train_size=n_traces * n_websites,
             stratify=y,
             random_state=42,
         )
@@ -91,30 +102,33 @@ def get_split(x, y, train_idx, test_idx):
     return data
 
 
-def get_dataloader(traces, labels, is_training, args):
+def get_dataloader(
+    traces,
+    labels,
+    is_training: bool,
+    batch_size: int = 200,
+    num_workers: int = 4,
+):
     """Get the dataloader for the given data.
 
     Args:
         traces: Traces matrix
         labels: Label array
         is_training: True if the model is for training
-        args: Arguments passed to the script
+        model: str. The model used for creating embeddings
+        batch_size: int. Training batch size
+        num_workers: int. Number of workers for loading the data
+
 
     Returns:
         dataloader: The dataloader
     """
-    if args.model in ["df", "awf_cnn", "var_cnn"]:
-        # third party
-        from datasets.dataset import DefaultDataset
 
-        dataset = DefaultDataset(data=traces, labels=labels)
-
-    else:
-        raise NotImplementedError(f"Model {args.model} not implemented.")
+    dataset = DefaultDataset(data=traces, labels=labels)
 
     return DataLoader(
         dataset,
-        batch_size=args.batch_size,
+        batch_size=batch_size,
         shuffle=is_training,
-        num_workers=args.num_workers,
+        num_workers=num_workers,
     )

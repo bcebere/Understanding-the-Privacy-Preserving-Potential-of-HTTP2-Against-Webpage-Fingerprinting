@@ -10,7 +10,6 @@ class basic_1d(nn.Module):
         self,
         in_filters,
         out_filters,
-        suffix,
         stage=0,
         block=0,
         kernel_size=3,
@@ -80,9 +79,7 @@ class basic_1d(nn.Module):
 
 
 class MyResNet18(nn.Module):
-    def __init__(
-        self, suffix, blocks=None, block=None, numerical_names=None, dilated=False
-    ):
+    def __init__(self, blocks=None, block=None, numerical_names=None, dilated=False):
         super(MyResNet18, self).__init__()
 
         if blocks is None:
@@ -116,7 +113,6 @@ class MyResNet18(nn.Module):
                 block(
                     in_filters=features if stage_id == 0 else features // 2,
                     out_filters=features,
-                    suffix=suffix,
                     stage=stage_id,
                     block=0,
                     dilations=(1, 2) if dilated else (1, 1),
@@ -129,7 +125,6 @@ class MyResNet18(nn.Module):
                     block(
                         in_filters=features,
                         out_filters=features,
-                        suffix=suffix,
                         stage=stage_id,
                         block=block_id,
                         dilations=(4, 8) if dilated else (1, 1),
@@ -153,13 +148,13 @@ class MyResNet18(nn.Module):
 
 
 class VARCNN(nn.Module):
-    def __init__(self, time, include_classifier, args):
+    def __init__(
+        self, include_classifier: bool, n_websites: int, embedding_size: int = 512
+    ):
         """Initialize the VAR-CNN model architecture.
 
         Args:
-            time: boolean, whether to include time as a feature
             include_classifier: Whether to include the classifier or not
-            args: Arguments
 
         Returns:
             model: Pytorch model which implements the VAR-CNN attack neural network
@@ -167,28 +162,27 @@ class VARCNN(nn.Module):
         super(VARCNN, self).__init__()
 
         logging.debug(
-            f"Using VAR-CNN model with {args.embedding_size} embedding "
+            f"Using VAR-CNN model with {embedding_size} embedding "
             + f"size (classifier: {include_classifier})"
         )
 
-        suffix = "time" if time else "dir"
-        self.backbone = MyResNet18(suffix=suffix, block=basic_1d)
+        self.backbone = MyResNet18(block=basic_1d)
 
         self.embedding = nn.Sequential(
             nn.Linear(512, 1024),
             nn.BatchNorm1d(num_features=1024),
             nn.ReLU(),
             nn.Dropout(0.5),
-            nn.Linear(1024, args.embedding_size),
+            nn.Linear(1024, embedding_size),
         )
 
         self.classifier = None
         if include_classifier:
             self.classifier = nn.Sequential(
-                nn.BatchNorm1d(num_features=args.embedding_size),
+                nn.BatchNorm1d(num_features=embedding_size),
                 nn.ReLU(),
                 nn.Dropout(0.5),
-                nn.Linear(args.embedding_size, args.n_websites),
+                nn.Linear(embedding_size, n_websites),
             )
 
     def forward(self, x):

@@ -3,10 +3,12 @@ import sys
 
 # wfaudit relative
 from . import logger  # noqa: F401
-from .benchmarks import evaluate_leakage  # noqa: F401
-from .benchmarks import evaluate_ml  # noqa: F401
+from .benchmarks import audit  # noqa: F401
+from .benchmarks import evaluate_leakage_from_deepse  # noqa: F401
+from .benchmarks import evaluate_leakage_from_wefde  # noqa: F401
+from .benchmarks import evaluate_ml_from_deepse  # noqa: F401
 from .benchmarks import evaluate_ml_from_wefde  # noqa: F401
-from .benchmarks import evaluate_ml_rawts  # noqa: F401
+from .benchmarks import evaluate_shap  # noqa: F401
 from .parser import _prepare_time_series_arrow  # noqa: F401
 from .parser import merge_pcap_csvs  # noqa: F401
 from .parser import prepare_all_datasets  # noqa: F401

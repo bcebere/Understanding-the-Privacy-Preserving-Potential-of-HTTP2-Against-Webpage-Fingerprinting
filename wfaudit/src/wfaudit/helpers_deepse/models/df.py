@@ -6,13 +6,18 @@ from torch import nn
 
 
 class DF(nn.Module):
-    def __init__(self, include_classifier, args):
+    def __init__(
+        self,
+        include_classifier,
+        n_websites: int,
+        embedding_size: int = 512,
+        dropout: float = 0.1,
+    ):
         """Initialize the df model architecture.
 
         Args:
             seq_len: Length of the input sequence.
             include_classifier: Whether to include the classifier or not
-            args: Arguments
 
         Returns:
             model: Pytorch model which implements the DF attack neural network
@@ -20,7 +25,7 @@ class DF(nn.Module):
         super(DF, self).__init__()
 
         logging.debug(
-            f"Using DF model with {args.embedding_size} embedding "
+            f"Using DF model with {embedding_size} embedding "
             + f"size (classifier: {include_classifier})"
         )
 
@@ -111,20 +116,18 @@ class DF(nn.Module):
             nn.Linear(in_features=256, out_features=512),
             nn.BatchNorm1d(num_features=512),
             nn.ReLU(),
-            nn.Dropout(p=args.dropout),
-            nn.Linear(in_features=512, out_features=args.embedding_size),
+            nn.Dropout(p=dropout),
+            nn.Linear(in_features=512, out_features=embedding_size),
         )
 
         self.classifier = None
 
         if include_classifier:
             self.classifier = nn.Sequential(
-                nn.BatchNorm1d(args.embedding_size),
+                nn.BatchNorm1d(embedding_size),
                 nn.ReLU(),
                 nn.Dropout(p=0.5),
-                nn.Linear(
-                    in_features=args.embedding_size, out_features=args.n_websites
-                ),
+                nn.Linear(in_features=embedding_size, out_features=n_websites),
             )
 
     def forward(self, x):

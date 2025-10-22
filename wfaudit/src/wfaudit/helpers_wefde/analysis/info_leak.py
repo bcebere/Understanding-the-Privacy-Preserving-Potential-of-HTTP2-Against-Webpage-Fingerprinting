@@ -93,9 +93,9 @@ def print_leakage(
                 offset = next_off
 
         if leakages_syn_topfeats is not None:
-            summary["lk_syn"] = [leakages_syn_topfeats[0]]
+            summary["MI_TOTAL"] = [leakages_syn_topfeats[0]]
         if leakages_holdout_topfeats is not None:
-            summary["lk_ho"] = [leakages_holdout_topfeats[0]]
+            summary["MI_HOLDOUT"] = [leakages_holdout_topfeats[0]]
 
         summary = pd.DataFrame(summary)
     else:

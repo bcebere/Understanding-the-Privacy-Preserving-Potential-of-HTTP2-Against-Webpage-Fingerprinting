@@ -141,17 +141,11 @@ def train_model(
     epochs: int = 50,
     device=DEVICE,
     batch_size=200,
+    patience: int = 10,
+    min_delta: float = 0.0,
 ):
-    """This function trains the attack for timeing as well as directional traces.
-
-    Args:
-        data: Dictionary containing train, test1 and test2
-
-    Raises:
-        NotImplementedError: If the attack is not implemented.
-
-    Returns:
-        embeddings: Embeddings of the test data
+    """
+    Neural net training logic
     """
     # data loader
     x_train, x_val, y_train, y_val = train_test_split(
@@ -177,9 +171,9 @@ def train_model(
     )
 
     # optimizer
-    optimizer = torch.optim.Adamax(
+    optimizer = torch.optim.Adam(
         model.parameters(),
-        lr=0.002,
+        lr=1e-3,
         betas=(0.9, 0.999),
         eps=1e-08,
         weight_decay=0.0,
@@ -188,16 +182,9 @@ def train_model(
     # loss function
     loss_fn = torch.nn.CrossEntropyLoss()
 
-    current_history = {
-        "train_loss": [],
-        "val_loss": [],
-        "test_loss": [],
-        "train_acc": [],
-        "val_acc": [],
-        "test_acc": [],
-    }
-
     best_state, best_val = None, float("inf")
+    epochs_no_improve = 0
+
     for epoch in range(epochs):
         train_loss, train_acc = train_one_epoch(
             model=model,
@@ -216,16 +203,21 @@ def train_model(
             epochs=epochs,
             device=device,
         )
-        if val_loss < best_val:
+        if best_val - val_loss > min_delta:
             best_val = val_loss
             best_state = {
                 k: v.detach().cpu().clone() for k, v in model.state_dict().items()
             }
+            epochs_no_improve = 0
+        else:
+            epochs_no_improve += 1
 
-        current_history["train_loss"].append(train_loss)
-        current_history["val_loss"].append(val_loss)
-        current_history["train_acc"].append(train_acc)
-        current_history["val_acc"].append(val_acc)
+        if epochs_no_improve >= patience:
+            if hasattr(tqdm, "write"):
+                tqdm.write(
+                    f"Early stopping at epoch {epoch+1} (no val improvement for {patience} epochs)"
+                )
+            break
 
     if best_state is not None:
         model.load_state_dict(best_state)
