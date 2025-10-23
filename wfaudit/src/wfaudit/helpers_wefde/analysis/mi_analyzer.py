@@ -65,7 +65,6 @@ class MutualInformationAnalyzer(object):
         X = None  # data array used to fit KDE
         bw = []  # kernel bw for each feature
         for feature in features:
-
             # get feature vector
             if site is not None:  # pdf(f|c)
                 X_f = self.data.get_site(site, feature)
@@ -261,7 +260,6 @@ class MutualInformationAnalyzer(object):
         # continue to process features until either there are no features left to process
         # or the topN features have been selected
         while features and len(cleaned_features) < topn:
-
             # the next most important feature
             current_feature = features.pop(0)
             log.debug(f"MI analysis on feature #{current_feature}")
@@ -276,7 +274,6 @@ class MutualInformationAnalyzer(object):
             # break upon first occurrence of redundancy
             is_redundant = False
             for res in results:
-
                 # unzip results
                 is_redundant, feature_pair, nmi = res
 

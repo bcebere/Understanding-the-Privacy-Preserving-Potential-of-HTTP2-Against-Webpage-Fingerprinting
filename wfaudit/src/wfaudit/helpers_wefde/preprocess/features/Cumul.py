@@ -1,22 +1,21 @@
-# for CUMUL feature extractions
-# input: a list of packet sizes
-
-
 # stdlib
 import itertools
 
 # third party
-import numpy
+import numpy as np
+
+# wfaudit absolute
+from wfaudit.helpers_wefde.preprocess.features.common import split_by_value
 
 
-def CumulFeatures(packets, featureCount):
-    separateClassifier = True
+def get_cumul_features_per_connection(packets: list, feature_cnt: int):
+    if len(packets) == 0:
+        packets = [0]
     # Calculate Features
 
     features = []
 
     total = []
-    cum = []
     pos = []
     neg = []
     inSize = 0
@@ -26,7 +25,6 @@ def CumulFeatures(packets, featureCount):
 
     # Process trace
     for packetsize in itertools.islice(packets, None):
-
         # CUMUL uses positive to denote incoming, negative to be outgoing,
         # different from dataset
         packetsize = -packetsize
@@ -36,13 +34,11 @@ def CumulFeatures(packets, featureCount):
             inSize += packetsize
             inCount += 1
             # cumulated packetsizes
-            if len(cum) == 0:
-                cum.append(packetsize)
+            if len(total) == 0:
                 total.append(packetsize)
                 pos.append(packetsize)
                 neg.append(0)
             else:
-                cum.append(cum[-1] + packetsize)
                 total.append(total[-1] + abs(packetsize))
                 pos.append(pos[-1] + packetsize)
                 neg.append(neg[-1] + 0)
@@ -51,13 +47,11 @@ def CumulFeatures(packets, featureCount):
         if packetsize <= 0:
             outSize += abs(packetsize)
             outCount += 1
-            if len(cum) == 0:
-                cum.append(packetsize)
+            if len(total) == 0:
                 total.append(abs(packetsize))
                 pos.append(0)
                 neg.append(abs(packetsize))
             else:
-                cum.append(cum[-1] + packetsize)
                 total.append(total[-1] + abs(packetsize))
                 pos.append(pos[-1] + 0)
                 neg.append(neg[-1] + abs(packetsize))
@@ -66,24 +60,59 @@ def CumulFeatures(packets, featureCount):
     features.append(outSize)
     features.append(inSize)
 
-    if separateClassifier:
-        # cumulative in and out
-        posFeatures = numpy.interp(
-            numpy.linspace(total[0], total[-1], int(featureCount / 2)), total, pos
-        )
-        negFeatures = numpy.interp(
-            numpy.linspace(total[0], total[-1], int(featureCount / 2)), total, neg
-        )
-        for el in itertools.islice(posFeatures, None):
-            features.append(el)
-        for el in itertools.islice(negFeatures, None):
-            features.append(el)
-    else:
-        # cumulative in one
-        cumFeatures = numpy.interp(
-            numpy.linspace(total[0], total[-1], featureCount + 1), total, cum
-        )
-        for el in itertools.islice(cumFeatures, 1, None):
-            features.append(el)
+    # cumulative in and out
+    posFeatures = np.interp(
+        np.linspace(total[0], total[-1], int(feature_cnt / 2)), total, pos
+    )
+    negFeatures = np.interp(
+        np.linspace(total[0], total[-1], int(feature_cnt / 2)), total, neg
+    )
+    for el in itertools.islice(posFeatures, None):
+        features.append(float(el))
+    for el in itertools.islice(negFeatures, None):
+        features.append(float(el))
 
     return features
+
+
+def get_cumul_features(times, packets, feature_cnt=20, conn_limit: int = 1):
+    packets = np.asarray(packets)
+
+    if conn_limit == 1:
+        # global
+        features = get_cumul_features_per_connection(
+            packets.tolist(), feature_cnt=feature_cnt
+        )
+
+        # print("  >> CUMUL Global", features)
+        return features
+    else:
+        features = []
+        # per connection
+        conn_idxs = split_by_value(times, 0)
+
+        if len(conn_idxs) < conn_limit:
+            conn_idxs += [[]] * (conn_limit - len(conn_idxs))
+
+        for idx, conn_idx in enumerate(conn_idxs[: conn_limit - 1]):
+            cumul_raw_stats = get_cumul_features_per_connection(
+                packets[conn_idx].tolist(), feature_cnt=feature_cnt
+            )
+            features += cumul_raw_stats
+
+        # Aggregate the rest of the connections together
+        extra_conns = np.concatenate(conn_idxs[conn_limit - 1 :])
+        if len(extra_conns) > 0:
+            cumul_raw_stats_extra = get_cumul_features_per_connection(
+                packets[extra_conns].tolist(), feature_cnt=feature_cnt
+            )
+        else:
+            cumul_raw_stats_extra = get_cumul_features_per_connection(
+                [], feature_cnt=feature_cnt
+            )
+        features += cumul_raw_stats_extra
+
+        assert len(features) == (conn_limit) * (2 + feature_cnt), features
+
+        # print("  >> CUMUL Multi", features)
+        return features

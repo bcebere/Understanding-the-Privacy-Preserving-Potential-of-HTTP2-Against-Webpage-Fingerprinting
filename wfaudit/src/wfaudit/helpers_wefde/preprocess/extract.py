@@ -4,24 +4,21 @@ from __future__ import division
 
 # stdlib
 from collections import OrderedDict
-import itertools
 import json
-from multiprocessing import Pool
 import os
 from pathlib import Path
 import re
 
 # third party
+from joblib import Parallel, delayed
 import pandas as pd
-from tqdm import tqdm
 
 # wfaudit absolute
 import wfaudit.helpers_wefde.preprocess.features.Burst as Burst
 import wfaudit.helpers_wefde.preprocess.features.Cumul as Cumul
 import wfaudit.helpers_wefde.preprocess.features.PktNum as PktNum
-import wfaudit.helpers_wefde.preprocess.features.PktSec as PktSec
 import wfaudit.helpers_wefde.preprocess.features.Time as Time
-from wfaudit.helpers_wefde.preprocess.util import FEATURE_EXT, featureCount
+from wfaudit.helpers_wefde.preprocess.util import FEATURE_EXT
 
 
 def enumerate_files(dir, splitter="-", extension=""):
@@ -41,7 +38,7 @@ def enumerate_files(dir, splitter="-", extension=""):
     return file_list
 
 
-def extract(times, sizes, debug_path="./"):
+def extract(times, sizes, debug_path: str, conn_limit: int = 1):
     """
     extract features from a parsed website trace
     """
@@ -49,25 +46,20 @@ def extract(times, sizes, debug_path="./"):
     features = []
 
     # Transmission size features
-    features.extend(PktNum.PacketNumFeature(times, sizes))
-    feature_pos["PACKET_NUMBER"] = len(features)
+    features.extend(PktNum.get_packet_counts(times, sizes, conn_limit=conn_limit))
+    feature_pos["MI_PKT_COUNT"] = len(features)
 
     # inter packet time + transmission time feature
-    features.extend(Time.TimeFeature(times, sizes))
-    feature_pos["PKT_TIME"] = len(features)
+    features.extend(Time.get_time_features(times, sizes, conn_limit=conn_limit))
+    feature_pos["MI_PKT_TIME"] = len(features)
 
     # Bursts (knn)
-    features.extend(Burst.BurstFeature(times, sizes))
-    feature_pos["BURST"] = len(features)
-
-    # packets per second (k-anonymity)
-    # plus alternative list
-    features.extend(PktSec.PktSecFeature(times, sizes))
-    feature_pos["PKT_PER_SECOND"] = len(features)
+    features.extend(Burst.get_burst_features(times, sizes, conn_limit=conn_limit))
+    feature_pos["MI_BURST"] = len(features)
 
     # CUMUL features
-    features.extend(Cumul.CumulFeatures(sizes, featureCount))
-    feature_pos["CUMUL"] = len(features)
+    features.extend(Cumul.get_cumul_features(times, sizes, conn_limit=conn_limit))
+    feature_pos["MI_CUMUL"] = len(features)
 
     # output FeaturePos
     with open(os.path.join(debug_path, "FeaturePositions.json"), "w") as fd:
@@ -76,26 +68,43 @@ def extract(times, sizes, debug_path="./"):
     return features
 
 
-def task_handler(args):
+def task_handler(filepath: str, out_path: str, conn_limit: int):
     """
     handle feature extraction for each trace instance assigned to batch
     """
-    filepath, out_path = args
-
     # load trace file
     x = pd.read_csv(filepath, sep=" ", header=None)
+
+    mask_nonzero = (x != 0).any(axis=1)  # True where there's at least one non-zero
+    last_nonzero_idx = mask_nonzero[::-1].idxmax()  # index of last non-zero row
+    x = x.loc[:last_nonzero_idx]
+
+    if len(x) == 0:
+        print("Ignore empty dataset")
+        return
+
+    # print("Before after ", orig_len, len(x))
+
     times = x.iloc[:, 0].astype(float).values.tolist()
-    sizes = x.iloc[:, 1].astype(int).values.tolist()
+
+    HTTP2_DEF_WINDOW_SIZE = 65535
+    sizes = x.iloc[:, 1].astype(float).values
+    sizes /= HTTP2_DEF_WINDOW_SIZE
+    sizes = sizes.tolist()
 
     # extract features (saving feature positions only for the first trace)
     if len(times) < 4:
         return
 
+    # print("Processing ", filepath)
     features = extract(
         times,
         sizes,
         debug_path=out_path,
+        conn_limit=conn_limit,
     )
+
+    # print(f"Features {filepath} --> {len(features)} = {features}")
 
     # save features to file
     dest = os.path.join(out_path, os.path.basename(filepath) + FEATURE_EXT)
@@ -110,19 +119,15 @@ def task_handler(args):
                 fout.write(repr(x) + " ")
 
 
-def prepare_wefde_features(trace_path, out_path):
+def prepare_wefde_features(trace_path, out_path, conn_limit: int = 1):
     """
     start batches to handle feature extraction
     """
     file_list = enumerate_files(trace_path)
-
-    # start BATCH_NUM processes for computation
-    pool = Pool()
-    for _ in tqdm(
-        pool.imap(task_handler, zip(file_list, itertools.repeat(out_path))),
-        total=len(file_list),
-    ):
-        pass
+    Parallel(n_jobs=20)(
+        delayed(task_handler)(f, out_path, conn_limit) for f in file_list
+    )
 
     features = json.load(open(Path(out_path) / "FeaturePositions.json"))
+    # print("Features -> ", features)
     return features

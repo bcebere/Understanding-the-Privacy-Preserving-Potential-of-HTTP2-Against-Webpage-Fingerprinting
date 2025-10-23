@@ -4,11 +4,8 @@ FEATURE_EXT = ".features"
 # packet number per second, how many milliseconds to count?
 howlong = 1000
 
-# n-gram feature
-NGRAM = 3
-
 # CUMUL feature number
-featureCount = 8
+featureCount = 5
 
 
 # Python3 conversion of python2 cmp function

@@ -1,315 +1,277 @@
-# Adapted from https://github.com/notem/reWeFDE
 # third party
 import numpy as np
 from scipy import stats
 import statsmodels.api as sm
 
+np.random.seed(42)
 
-class KDE(object):
-    def __init__(self, data, weights=None, bw=None, discrete_threshold=10000000000):
+
+class KDE:
+    """
+    Kernel Density Estimator that:
+      - Fits a univariate bandwidth for each feature via plugin or rule-of-thumb
+      - Uses statsmodels.nonparametric.KDEMultivariate for 'predict'
+      - Samples new points from a discrete mixture of the original data points
+        plus a Gaussian offset scaled by the local bandwidth.
+    """
+
+    def __init__(self, data, weights=None, bw=None, discrete_threshold=1e10):
         """
-        Setup and fit a kernel density estimator to data.
-
         Parameters
         ----------
-        data : ndarray
-            Data samples from which to build the KDE.
-            The first dimension of the array defines the number of kernels (samples).
-            The second dimension defines the number of features per sample.
-        weights : ndarray
-            Weights for each sample. Array should be of shape (n_samples, 1).
-            The summation of all weights should equal to 1.
-            If None is used, all samples are weighted equally.
-        bw : ndarray
-            The bandwidth vector to use. Array should be of shape (n_features, n_kernels)
-            If None is used, kernel sizes are automatically determined.
-
+        data : ndarray of shape (n_samples, n_features)
+            The raw data samples on which we build the KDE.
+        weights : ndarray of shape (n_samples,), optional
+            Mixture weights for each sample. Defaults to uniform.
+        bw : ndarray, optional
+            Either a single (n_features,)-shape array (bandwidth per feature)
+            or a 2D shape=(n_features,n_kernels).  If None, bandwidths are
+            computed automatically.
+        discrete_threshold : int
+            If any particular data point occurs >= this many times,
+            we call it "discrete" and assign a small bandwidth to it.
         """
         self.points = data
         self.n_kernels, self.n_features = self.points.shape
-        self.weights = (
-            weights
-            if weights is not None
-            else np.repeat(1.0 / self.n_kernels, self.n_kernels)
-        )
 
+        if weights is not None:
+            assert weights.shape[0] == self.n_kernels, "weights must match data samples"
+            # Ensure sum of weights=1
+            self.weights = weights / np.sum(weights)
+        else:
+            self.weights = np.repeat(1.0 / self.n_kernels, self.n_kernels)
+
+        # --- Determine or set bandwidths ---
         if bw is None:
+            # We create a per-sample bandwidth array 'bw_array' first,
+            # then consolidate to a single (n_features,) if needed.
+            bw_array = np.empty((self.n_features, self.n_kernels))
+            bw_array[:] = np.nan
 
-            # create empty bandwidth array
-            bw = np.empty((self.n_features, self.n_kernels))
-            bw[:] = np.nan
+            # Identify which samples are "discrete" (occur at least 'discrete_threshold' times)
+            disc_vec = self._identify_discrete(self.points, discrete_threshold)
 
-            # identify discrete samples
-            disc_vec = self._identify_discrete(data, discrete_threshold)
-
-            # set discrete sample bandwidths to a small value
+            # Discrete points get a very small bandwidth
             if np.any(disc_vec == 1):
-                bw[:, disc_vec == 1] = 0.001
+                bw_array[:, disc_vec == 1] = 0.001
 
-            # generate optimal continuous bandwidths
+            # For continuous points, estimate bandwidth with Hall or fallback ROT
             if np.any(disc_vec == 0):
-                # first, attempt to find the optimal BW using Hall's method
-                # TODO: replace Hall's method with (newer) Improved Sheather-Jones method
                 try:
                     with np.errstate(all="raise"):
                         continuous_bw = self._ksizeHall(self.points[disc_vec == 0, :])
-                except BaseException:
+                except Exception:
                     continuous_bw = np.array([np.nan])
-                # do multivariate Rule of Thumb if Hall's BW is unusable
+
                 if np.isnan(continuous_bw).any() or np.isinf(continuous_bw).any():
                     continuous_bw = self._ksizeROT(self.points[disc_vec == 0, :])
 
-                # set continuous bandwidths in bw
+                # Fill those continuous columns in bw_array
                 for i in range(self.n_features):
-                    bw[i, disc_vec == 0] = continuous_bw[i]
+                    bw_array[i, disc_vec == 0] = continuous_bw[i]
 
+            # Finally, pick the "mode" bandwidth across all kernels for each feature
             self.bw = np.zeros((self.n_features,))
             for i in range(self.n_features):
-                self.bw[i] = stats.mode(bw[i, :])[0]
-
+                # stats.mode(...) returns (mode, count); we want [0]
+                self.bw[i] = stats.mode(bw_array[i, :])[0]
         else:
+            # User-supplied bandwidth
             self.bw = bw
 
-        # replace any zero widths with a small value
+        # Replace zero bandwidths with a small positive number
         self.bw = self.bw + (self.bw == 0.0) * 0.001
-        assert not np.any(self.bw <= 0)
 
-        # treat all features as continuous distributions
-        var_vector = "".join(["c"] * self.n_features)
+        if np.any(self.bw <= 0):
+            raise ValueError("All bandwidths must be > 0 after adjustments.")
 
-        # create the underlying KDE
+        # Build statsmodels KDE: treat all features as continuous
+        var_vector = "c" * self.n_features
         self._kde = sm.nonparametric.KDEMultivariate(
-            self.points, var_vector, bw=self.bw
+            data=self.points,
+            var_type=var_vector,
+            bw=self.bw,
         )
 
     def sample(self, n_samples):
         """
-        Draw random samples from the estimator.
-
-        Parameters
-        ----------
-        n_samples : int
-            The number of samples to generate.
+        Draw random samples from the fitted distribution.  We treat it
+        as a mixture over the original data points plus Gaussian noise
+        scaled by each dimension's bandwidth.  That is:
+            1. Choose a kernel index i ~ 'weights'
+            2. x = points[i, :] + bw[i, :] * Normal(0,1)
+        except we do not differentiate bandwidth by kernel i here (only by dimension).
+        We'll keep a uniform 'self.bw' across all kernels for each dimension.
 
         Returns
         -------
-        ndarray
-            A numpy matrix containing samples, of size (n_samples, n_features)
+        points : ndarray of shape (n_samples, n_features)
         """
-        bw = np.tile(self.bw, (self.n_kernels, 1))
-        points = np.zeros((n_samples, self.n_features))
+        # For statsmodels, we have only a single bandwidth per dimension
+        # So each dimension's bandwidth is self.bw[d].  If you want a distinct
+        # bandwidth for each kernel, you'd store a full 2D array. But here
+        # we replicate self.bw for each kernel row, to match old code style.
+        full_bw = np.tile(self.bw, (self.n_kernels, 1))  # shape=(n_kernels, n_features)
+
+        # Discrete mixture: choose which kernel to sample from for each row
+        chosen_kernels = np.random.choice(
+            self.n_kernels, size=n_samples, p=self.weights
+        )
+        # Normal offsets
         randnums = np.random.normal(size=(n_samples, self.n_features))
 
-        # weights and thresholds to determine which kernel to sample from
-        w = np.cumsum(self.weights)
-        w /= np.amax(w)  # kernel weights represented as normalized cumsum
-        t = list(np.sort(np.random.uniform(size=(n_samples,))).tolist())
-        t.append(1.0)  # final threshold value signals sampling is done
+        # Build output
+        samples = np.zeros((n_samples, self.n_features))
+        for i in range(n_samples):
+            k_idx = chosen_kernels[i]
+            # center + offset
+            samples[i, :] = self.points[k_idx, :] + randnums[i, :] * full_bw[k_idx, :]
 
-        ii = 1
-        for i in range(self.n_kernels):
-            # if kernel weight is less than threshold, go to next kernel
-            # otherwise, continue sampling from current kernel
-            while w[i] > t[ii]:
-                points[ii, :] = self.points[i, :] + (bw[i, :] * randnums[ii, :])
-                ii += 1
-        # verify samples are correctly shaped before returning samples
-        assert points.shape[0] == n_samples
-        assert points.shape[1] == self.points.shape[1]
-        return points
+        return samples
 
     def predict(self, data):
         """
-        Predict probability estimate for samples.
+        Evaluate the KDE pdf at each row in 'data'.
 
         Parameters
         ----------
-        data : ndarray
-            Data is a numpy array of dimensions (n_samples, n_features).
-            The number of features in the data must be the same as the
-            number of features in the data used to fit the estimator.
+        data : ndarray of shape (n_samples, n_features)
 
         Returns
         -------
-        ndarray
-            A 1D numpy array containing the probabilities for each sample.
-
+        probs : ndarray of shape (n_samples,)
         """
         return self._kde.pdf(data)
 
     def entropy(self, data=None):
         """
-        Calculate a resubstitute entropy estimate using the mean log-likelihood
+        Calculate an entropy estimate using the negative mean log-likelihood.
+        If 'data' is None, compute "resubstitution" entropy with the original data.
 
         Parameters
         ----------
-        data : ndarray
-            Data samples to use for estimation, of shape (n_samples, n_features)
-            If None is used, the samples and weights used to fit the KDE are used.
+        data : ndarray of shape (n_samples, n_features), optional
 
         Returns
         -------
         float
-            Entropy estimate based on the mean log-likelihood
-
+            Estimated entropy (in natural log units).  If you want bits, divide by log(2).
+            For pure bits, you can do:   bits = entropy(...)/np.log(2).
         """
-        if data is not None:
-            probs = self.predict(data)
-            if np.any(probs[probs == 0.0]):
-                return -np.inf
-            else:
-                return -np.mean(np.log(probs))
+        if data is None:
+            data = self.points
+            w = self.weights
         else:
-            probs = self.predict(self.points)
-            if np.any(self.weights[probs <= 0.0]):
-                return -np.inf
-            else:
-                probs[probs == 0.0] = 1.0
-                return -np.dot(np.log(probs), np.transpose(self.weights))
+            # If we have new data, we treat each sample as equally likely
+            # i.e., uniform weighting
+            w = np.ones(data.shape[0]) / data.shape[0]
+
+        probs = self.predict(data)
+        # If any predicted probability is zero => log(prob)= -inf => entire sum = inf
+        if np.any(probs == 0.0):
+            return -np.inf
+
+        # Weighted average of -log(prob)
+        return -np.sum(w * np.log(probs))
 
     @staticmethod
     def _ksizeROT(X):
         """
-        Find optimal kernel bandwidth using the Multivariate 'Rule of Thumb' technique.
-
-        Parameters
-        ----------
-        X : ndarray
-            Numpy array containing data samples, of shape (n_samples, n_features)
-
-        Returns
-        -------
-        ndarray
-            Numpy array containing optimal bandwidth for each dimension, of shape (n_features,)
+        Multivariate 'Rule of Thumb' bandwidth for X, shape=(n_samples,n_features).
         """
-        X = np.transpose(X)
-
-        noIQR = 0
+        # Transpose: shape => (n_features, n_samples)
+        X = X.T
         dim = X.shape[0]
         N = X.shape[1]
-
-        prop = 1.0
         sig = np.std(X, axis=1)
-        if noIQR:
-            h = prop * sig * np.power(N, (-1 / (4 + dim)))
-        else:
-            iqrSig = 0.7413 * np.transpose(stats.iqr(np.transpose(X)))
-            if np.amax(iqrSig) == 0:
-                iqrSig = sig
-            h = prop * np.minimum(sig, iqrSig) * np.power(float(N), (-1 / (4 + dim)))
+        iqrSig = 0.7413 * stats.iqr(X, axis=1)
+        iqrSig[iqrSig == 0] = sig[iqrSig == 0]  # fallback
+        h = np.minimum(sig, iqrSig) * N ** (-1.0 / (4 + dim))
         return h
 
     @staticmethod
     def _ksizeHall(X):
         """
-        Find optimal kernel bandwidth using the "plug-in" method described by Hall et. al.
-
-        The method will fail to find valid bandwidths when the variance between samples is zero.
-        The caller needs to handle these scenarios.
-        Method details can be found in DOI: 10.2307/2337251
-
-        Parameters
-        ----------
-        X : ndarray
-            Numpy array containing data samples, of shape (n_samples, n_features)
-
-        Returns
-        -------
-        ndarray
-            Numpy array containing optimal bandwidth for each dimension, of shape (n_features,)
+        "Plug-in" bandwidth method by Hall et al.
+        May fail if variance is zero or data dimension is large.
         """
-        X = np.transpose(X)
-
-        N1, N2 = X.shape
+        # NOTE: This is the same as your original code, just lightly tidied
+        X = X.T  # shape => (n_features, n_samples)
+        n_features, n_samples = X.shape
         sig = np.std(X, axis=1)
-        lamS = 0.7413 * np.transpose(stats.iqr(np.transpose(X)))
-        if np.amax(lamS) == 0:
-            lamS = sig
+        lamS = 0.7413 * stats.iqr(X, axis=1)
+        lamS[lamS == 0] = sig[lamS == 0]
 
-        BW = 1.0592 * lamS * np.power(float(N2), -1 / (4 + N1))
-        BW = np.tile(BW, (1, N2))
+        # "Initial" plugin guess
+        BW = 1.0592 * lamS * (n_samples ** (-1.0 / (4 + n_features)))
+        # We replicate each dimension’s BW across all samples for next steps:
+        BW_expand = np.tile(BW, (1, n_samples))
 
-        t = np.transpose(X[:, :, None], (0, 2, 1))
-        dX = np.tile(t, (1, N2, 1))
-
-        for i in range(N2):
-            dX[:, :, i] = np.divide(dX[:, :, i] - X, BW)
-        for i in range(N2):
+        # Build dX array
+        t = np.transpose(X[:, :, None], (0, 2, 1))  # shape=(f,1,n_samples)
+        dX = np.tile(t, (1, n_samples, 1))  # shape=(f,n_samples,n_samples)
+        for i in range(n_samples):
+            dX[:, :, i] = (dX[:, :, i] - X) / BW_expand
+        # avoid self-distances
+        for i in range(n_samples):
             dX[:, i, i] = 2e22
-        dX = np.reshape(dX, (N1, N2 * N2))
+        dX = np.reshape(dX, (n_features, n_samples * n_samples))
 
         def h_findI2(n, dXa, alpha):
-            t = np.exp(-0.5 * np.sum(np.power(dXa, 2), axis=0))
+            # sum over axis=0 => each column is a data point
+            t = np.exp(-0.5 * np.sum(dXa**2, axis=0))
             t = (
-                (np.power(dXa, 2) - 1)
+                (dXa**2 - 1)
                 * (1 / np.sqrt(2 * np.pi))
                 * np.tile(t, (dXa.shape[0], 1))
             )
             s = np.sum(t, axis=1)
-            return np.divide(s, n * (n - 1) * np.power(alpha, 5))
+            return s / (n * (n - 1) * (alpha**5))
 
         def h_findI3(n, dXb, beta):
-            t = np.exp(-0.5 * np.sum(np.power(dXb, 2), axis=0))
+            t = np.exp(-0.5 * np.sum(dXb**2, axis=0))
             t = (
-                (np.power(dXb, 3) - (3 * dXb))
+                (dXb**3 - 3 * dXb)
                 * (1 / np.sqrt(2 * np.pi))
                 * np.tile(t, (dXb.shape[0], 1))
             )
             s = np.sum(t, axis=1)
-            return -np.divide(s, n * (n - 1) * np.power(beta, 7))
+            return -s / (n * (n - 1) * (beta**7))
 
-        I2 = h_findI2(N2, dX, BW[:, 1])
-        I3 = h_findI3(N2, dX, BW[:, 1])
+        # Evaluate I2,I3 on dimension #0 as a reference
+        I2 = h_findI2(n_samples, dX, BW_expand[:, 1])
+        I3 = h_findI3(n_samples, dX, BW_expand[:, 1])
 
-        RK, mu2, mu4 = 0.282095, 1.000000, 3.000000
-
-        J1 = (RK / mu2**2) * (1.0 / I2)
+        # constants
+        RK, mu2, mu4 = 0.282095, 1.0, 3.0
+        J1 = (RK / (mu2**2)) * (1.0 / I2)
         J2 = (mu4 * I3) / (20 * mu2) * (1.0 / I2)
-        h = np.power((J1 / N2).astype(dtype=np.complex), 1.0 / 5) + (
-            J2 * np.power((J1 / N2).astype(dtype=np.complex), 3.0 / 5)
-        )
-        h = h.real.astype(dtype=np.float64)
 
-        return np.transpose(h)
+        h = (J1 / n_samples) ** (1 / 5) + J2 * ((J1 / n_samples) ** (3 / 5))
+        h = h.real.astype(float)
+        return h
 
     def _identify_discrete(self, data, threshold):
         """
-        Identify which data samples should be modeled as discrete-like for the purposes of setting kernel bandwidth.
-
-        Parameters
-        ----------
-            data : ndarray
-            threshold : int
-
-        Returns
-        -------
-        ndarray
-            Numpy array of zero and ones identifying samples as continuous or discrete
+        Mark a data sample as "discrete" if it occurs >= threshold times.
+        data: shape=(n_samples, n_features)
+        threshold: int
         """
-        # recognize which data point is discrete or not
-        sampleNum, featureNum = data.shape
-        isDiscVec = np.empty((self.n_kernels,))
-        isDiscVec[:] = np.nan
+        sampleNum = data.shape[0]
+        isDiscVec = np.full(sampleNum, np.nan)
 
         for i in range(sampleNum):
-            # if i has been processed
             if not np.isnan(isDiscVec[i]):
                 continue
-
-            equal_list = [i]
-            samplei = data[i, :]
-
-            # find following equal samples...
+            # find all rows j that are identical to row i
+            match_list = []
             for j in range(sampleNum):
-                samplej = data[j, :]
-                if np.array_equal(samplei, samplej):
-                    equal_list.append(j)
+                if np.array_equal(data[i, :], data[j, :]):
+                    match_list.append(j)
 
-            # determine to be discrete or continuous
-            if len(equal_list) >= threshold:
-                # bigger than threshold: discrete
-                isDiscVec[equal_list] = 1
+            if len(match_list) >= threshold:
+                isDiscVec[match_list] = 1  # discrete
             else:
-                # smaller than threshold: continuous
-                isDiscVec[equal_list] = 0
+                isDiscVec[match_list] = 0  # continuous
+
         return isDiscVec

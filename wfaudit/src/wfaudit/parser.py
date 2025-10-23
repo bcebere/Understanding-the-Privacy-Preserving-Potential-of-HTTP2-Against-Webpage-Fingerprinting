@@ -1,24 +1,37 @@
 # stdlib
+from collections import defaultdict
 import glob
 import hashlib
 from pathlib import Path
-import time
-from typing import Optional
+from random import shuffle
+from typing import List, Optional, Tuple
 
 # third party
+from joblib import Parallel, delayed
 import numpy as np
 import pandas as pd
+import pyarrow as pa
+import pyarrow.dataset as ds
+import pyarrow.parquet as pq
 from tqdm import tqdm
 
 # wfaudit absolute
+from wfaudit.helpers_deepse import prepare_deepse_dataset
+from wfaudit.helpers_wefde.preprocess.extract import prepare_wefde_features
 import wfaudit.logger as log
-from wfaudit.processing import process_pcap
+from wfaudit.processing import process_pcap, process_pcap_via_json
+
+np.set_printoptions(suppress=True)
 
 
 def process_raw_pcaps(
     traces=Path("traces"),
     workspace=Path("workspace"),
     unlink_after_processing=True,
+    buffer_tcp: bool = True,
+    n_jobs=8,
+    files=None,
+    use_json=False,
 ):
     """
     Args:
@@ -28,195 +41,288 @@ def process_raw_pcaps(
     """
     if not traces.exists():
         log.error("missing traces folder")
-        return
+        return []
     workspace.mkdir(parents=True, exist_ok=True)
     output = workspace / "output_csv_single"
     output.mkdir(parents=True, exist_ok=True)
 
-    files = glob.glob(str(traces / "*.pcap"))
+    if files is None:
+        files = glob.glob(str(traces / "*.pcap"))
 
-    for filename in tqdm(files):
+    print(f"Parsing {len(files)} PCAPS to {workspace}")
+    shuffle(files)
+
+    def _parse_single_pcap(filename):
         filename = Path(filename)
         stem = filename.stem
         output_csv_static = output / f"static_data_{stem}.csv"
         output_csv_temporal = output / f"temporal_data_{stem}.csv"
         if not filename.exists():
-            continue
+            print("Missing file !!!", filename)
+            return
 
         if output_csv_temporal.exists():
             if unlink_after_processing:
                 log.debug(f"dropping  {filename}")
-                filename.unlink()
-            continue
+                if unlink_after_processing:
+                    filename.unlink()
+            print("temporal file already done", filename)
+            return
+        log.debug(f"Parsing {filename}")
         try:
-            session = process_pcap(filename)
+            if use_json:
+                session = process_pcap_via_json(filename, buffer_tcp=buffer_tcp)
+            else:
+                session = process_pcap(filename, buffer_tcp=buffer_tcp)
         except BaseException as e:
             log.error(
                 f"failed to parse pcap. moving to graveyard {filename}, error = {e}"
             )
             filename.unlink()
-            time.sleep(0.1)
-            continue
+
+            return
 
         label = stem.split("_")[1]
         static_data, temporal_data = session.temporal_stats_per_flow()
         if len(static_data) == 0:
             log.error(f"empty dataset {filename}")
             filename.unlink()
-            continue
+            return
 
         static_data["label"] = label
         static_data.to_csv(output_csv_static, index=False)
         temporal_data.to_csv(output_csv_temporal, index=False)
 
+        print("Done parsing", filename)
         if unlink_after_processing:
             filename.unlink()
 
+    Parallel(n_jobs=n_jobs)(delayed(_parse_single_pcap)(filename) for filename in files)
 
-def merge_pcap_csvs(workspace=Path("workspace"), pd_lim: int = 3000) -> None:
+    return files
+
+
+def merge_pcap_csvs(
+    workspace=Path("workspace"),
+    pd_lim: int = 1000,
+    temporal_lim: int = 50_000,
+    cache: bool = False,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
-    Args:
-        workspace: The folder which contains the post-processed pcaps --- output_csv_single.
-        pd_lim: how often to batch the CSVs.
+    Stream merge the individual per PCAP CSVs into two partitioned Parquet files.
     """
-    in_workspace = workspace / Path("output_csv_single")
-    if not in_workspace.exists():
-        log.error("Missing output_csv_single folder")
-        return
+    in_workspace = workspace / "output_csv_single"
 
-    output = workspace / Path("output_csv_full")
-    output.mkdir(parents=True, exist_ok=True)
+    out_workspace = workspace / "output_csv_merged"
+    out_workspace.mkdir(parents=True, exist_ok=True)
 
-    full_static_csv: Optional[pd.DataFrame] = None
-    full_temporal_csv: Optional[pd.DataFrame] = None
-    cnt = 0
-    batch_idx = 0
+    static_files = glob.glob(str(in_workspace / "static*.csv"))
+    print("static files", len(static_files))
 
-    for fidx, filename in enumerate(glob.glob(str(in_workspace / "static*.csv"))):
-        static_filename = Path(filename)
-        base = static_filename.name.split("static_")[1]
-        temporal_base = "temporal_" + base
-        temporal_filename = in_workspace / temporal_base
+    static_parquet = out_workspace / "static_data.parquet"
+    temporal_parquet = out_workspace / "temporal_data.parquet"
+    if static_parquet.exists() and temporal_parquet.exists():
+        print("Parquet cache found skipping CSV merge.")
+        static_ds = ds.dataset(static_parquet, format="parquet")
+        temporal_ds = ds.dataset(temporal_parquet, format="parquet")
 
-        assert static_filename.exists()
-        assert temporal_filename.exists()
+        return static_ds, temporal_ds
+
+    pq_static: pq.ParquetWriter = None
+    pq_temporal: pq.ParquetWriter = None
+
+    buf_static, buf_temporal = [], []
+    for fidx, static_filename in enumerate(tqdm(static_files, desc="merge-csvs")):
         try:
-            local_static_csv = pd.read_csv(static_filename)
-            local_temporal_csv = pd.read_csv(temporal_filename)
-        except BaseException:
+            s_df = pd.read_csv(
+                static_filename, dtype={"label": "category"}, engine="pyarrow"
+            )
+            t_df = pd.read_csv(
+                in_workspace
+                / Path(static_filename).name.replace("static_", "temporal_"),
+                engine="pyarrow",
+                dtype={
+                    "relative_timestamp": "float32",
+                    "length": "int32",
+                    "direction": "int8",
+                },
+            )
+            if temporal_lim is not None:
+                t_df = t_df.head(temporal_lim)
+        except BaseException as e:
+            print("Failed to read csv", e, static_filename)
             continue
 
-        original_ids = local_static_csv["id"].values[0]
-        original_label = local_static_csv["label"].values[0]
-        total_duration = local_temporal_csv["relative_timestamp"].sum()
-        new_id = f"{original_ids}-{original_label}-{total_duration}-{fidx}"
-        hashed_id = hashlib.sha1(new_id.encode())
-        hashed_id = hashed_id.hexdigest()
+        # ------ post‑processing that the original version performed ------
+        original_id, original_label = s_df["id"].iloc[0], s_df["label"].iloc[0]
+        total_dur = t_df["relative_timestamp"].sum()
+        hashed_id = hashlib.sha1(
+            f"{original_id}-{original_label}-{total_dur}-{fidx}".encode()
+        ).hexdigest()
 
-        local_static_csv["file_order"] = fidx
-        local_temporal_csv["file_order"] = fidx
+        for df in (s_df, t_df):
+            df["file_order"] = fidx
+            df["full_id"] = hashed_id
+            df["id"] = df["id"].astype(str)
 
-        local_static_csv["full_id"] = hashed_id
-        local_temporal_csv["full_id"] = hashed_id
+        # ------------------- batch‑to‑disk -------------------            ➌
+        buf_static.append(pa.Table.from_pandas(s_df, preserve_index=False))
+        buf_temporal.append(pa.Table.from_pandas(t_df, preserve_index=False))
 
-        if full_static_csv is None:
-            full_static_csv = local_static_csv
-            full_temporal_csv = local_temporal_csv
-        else:
-            full_static_csv = pd.concat(
-                [full_static_csv, local_static_csv], ignore_index=True
-            )
-            full_temporal_csv = pd.concat(
-                [full_temporal_csv, local_temporal_csv], ignore_index=True
-            )
+        if (fidx + 1) % pd_lim == 0:
+            if pq_static is None:  # first batch → open writers
+                pq_static = pq.ParquetWriter(
+                    out_workspace / "static_data.parquet", buf_static[0].schema
+                )
+                pq_temporal = pq.ParquetWriter(
+                    out_workspace / "temporal_data.parquet", buf_temporal[0].schema
+                )
+            for tbl_static, tbl_temp in zip(buf_static, buf_temporal):
+                if len(tbl_static) == 0 or len(tbl_temp) == 0:
+                    continue
+                pq_static.write_table(tbl_static)
+                pq_temporal.write_table(tbl_temp)
+            buf_static.clear(), buf_temporal.clear()
 
-        if cnt % 100 == 0:
-            log.debug(f"merge  batch {cnt}, {full_static_csv.shape}")
-
-        if len(full_static_csv) > pd_lim:
-            assert full_static_csv is not None
-            assert full_temporal_csv is not None
-
-            full_static_csv.to_csv(
-                output / f"static_data_batch{batch_idx}.csv",
-                index=False,
-            )
-            full_temporal_csv.to_csv(
-                output / f"temporal_data_batch{batch_idx}.csv",
-                index=False,
-            )
-            batch_idx += 1
-            full_static_csv = None
-            full_temporal_csv = None
-
-        cnt += 1
-
-    if full_temporal_csv is not None:
-        full_static_csv.to_csv(
-            output / f"static_data_batch{batch_idx}.csv",
-            index=False,
+    # ---------- flush leftovers & close ----------
+    if pq_static is None:  # we never triggered the batch flush
+        pq_static = pq.ParquetWriter(
+            out_workspace / "static_data.parquet", buf_static[0].schema
         )
-        full_temporal_csv.to_csv(
-            output / f"temporal_data_batch{batch_idx}.csv",
-            index=False,
+        pq_temporal = pq.ParquetWriter(
+            out_workspace / "temporal_data.parquet", buf_temporal[0].schema
         )
 
-    full_data_static = None
-    full_data_temporal = None
+    for tbl_static, tbl_temp in zip(buf_static, buf_temporal):
+        if len(tbl_static) == 0 or len(tbl_temp) == 0:
+            continue
+        pq_static.write_table(tbl_static)
+        pq_temporal.write_table(tbl_temp)
+    pq_static.close(), pq_temporal.close()
 
-    for batch in range(0, 100):
-        static_batch = Path(output / f"static_data_batch{batch}.csv")
-        temporal_batch = Path(output / f"temporal_data_batch{batch}.csv")
-        if not static_batch.exists():
-            break
-
-        batch_data_static = pd.read_csv(static_batch)
-        batch_data_temporal = pd.read_csv(temporal_batch)
-
-        if full_data_static is None:
-            full_data_static = batch_data_static
-            full_data_temporal = batch_data_temporal
-        else:
-            full_data_static = pd.concat(
-                [full_data_static, batch_data_static], ignore_index=True
-            )
-            full_data_temporal = pd.concat(
-                [full_data_temporal, batch_data_temporal], ignore_index=True
-            )
-
-    full_data_static.to_csv(
-        output / "static_data.csv",
-        index=False,
+    # ---------- return *lazy* DataFrames backed by the parquet files ----------
+    static_ds = pa.dataset.dataset(
+        out_workspace / "static_data.parquet", format="parquet"
     )
-    full_data_temporal.to_csv(
-        output / "temporal_data.csv",
-        index=False,
+    temporal_ds = pa.dataset.dataset(
+        out_workspace / "temporal_data.parquet", format="parquet"
+    )
+    return static_ds, temporal_ds
+
+
+def _prepare_time_series_arrow(
+    static_ds: ds.Dataset,
+    ts_ds: ds.Dataset,
+    ts_limit: Optional[int] = 50_000,
+    ts_pad: int = 0,
+    ID_COL: str = "file_order",  # id, full_id
+    batch_rows: int = 10000,
+) -> Tuple[
+    pd.DataFrame, List[pd.DataFrame], Tuple[List[int], List[float], List[float]]
+]:
+    """
+    Streaming, low RAM version of `_prepare_time_series` that works on
+    `pyarrow.dataset.Dataset` inputs and **guarantees that each ID is gathered
+    in full even when it spans multiple record batches**.
+    """
+    # 1)  materialise the tiny static table                              #
+    static_df = (
+        static_ds.to_table(columns=[ID_COL, "label"])
+        .to_pandas(split_blocks=True, self_destruct=True)
+        .drop_duplicates(ID_COL)
+    )
+    static_ids = set(static_df[ID_COL].values)
+
+    # 2)  streaming scan with a per ID stash                             #
+    pending = defaultdict(list)  # id  -> list[pd.DataFrame] (fragments)
+    ts_data_clean, final_ids = [], []
+
+    lens, sizes, rel_times = [], [], []
+    print("processing time series (Arrow batches)")
+
+    for batch in tqdm(ts_ds.to_batches(batch_size=batch_rows)):
+        pdf = batch.to_pandas(split_blocks=True, self_destruct=True)
+
+        for idx, grp in pdf.groupby(ID_COL):
+            if idx not in static_ids:
+                continue
+
+            pending[idx].append(
+                grp.drop(columns=["id", "full_id", "duration"], errors="ignore")
+            )
+
+            # If ts_limit is reached, or we know the group is complete, flush now
+            if ts_limit is not None and sum(len(x) for x in pending[idx]) >= ts_limit:
+                _ts_helper_flush_id(
+                    idx,
+                    pending,
+                    ts_data_clean,
+                    final_ids,
+                    lens,
+                    sizes,
+                    rel_times,
+                    ts_limit,
+                    ts_pad,
+                )
+        # (otherwise we wait for more fragments)
+
+    # 3)  flush any IDs that ended in the last batch                     #
+    for idx in list(pending):  # iterate over *copy* we mutate inside
+        _ts_helper_flush_id(
+            idx,
+            pending,
+            ts_data_clean,
+            final_ids,
+            lens,
+            sizes,
+            rel_times,
+            ts_limit,
+            ts_pad,
+        )
+
+    # 4)  re-index the static DF and log stats                           #
+    static_df = static_df.set_index(ID_COL).reindex(final_ids)
+
+    log.debug(
+        f"TS info total={len(lens)}, "
+        f"mean len={np.mean(lens):.2f}, median len={np.median(lens):.0f}, "
+        f"min len={np.min(lens)}, max len={np.max(lens)}"
     )
 
-
-def _discrete_columns(
-    dataframe: pd.DataFrame, max_classes: int = 10, return_counts: bool = False
-) -> list:
-    """
-    Find columns containing discrete values in a pandas dataframe.
-    """
-    return [
-        (col, cnt) if return_counts else col
-        for col, vals in dataframe.items()
-        for cnt in [vals.nunique()]
-        if cnt <= max_classes
-    ]
+    return static_df, ts_data_clean, (lens, sizes, rel_times)
 
 
-def _constant_columns(dataframe: pd.DataFrame) -> list:
-    """
-    Find constant value columns in a pandas dataframe.
-    """
-    return _discrete_columns(dataframe, 1)
+def _ts_helper_flush_id(
+    idx, pending, ts_data_clean, final_ids, lens, sizes, rel_times, ts_limit, ts_pad
+):
+    parts = pending.pop(idx)  # remove from stash
+    local = pd.concat(parts, ignore_index=True)
+
+    lens.append(len(local))
+    sizes.extend(local["length"].values.tolist())
+    rel_times.extend(local["relative_timestamp"].values.tolist())
+
+    # optional trim/pad exactly like the legacy version
+    if ts_limit is not None:
+        if len(local) > ts_limit:
+            local = local.head(ts_limit)
+        elif len(local) < ts_limit:
+            pad_rows = ts_pad * np.ones((ts_limit - len(local), len(local.columns)))
+            local = pd.concat(
+                [local, pd.DataFrame(pad_rows, columns=local.columns)],
+                ignore_index=True,
+            )
+
+    ts_data_clean.append(local)
+    final_ids.append(idx)
 
 
-def _prepare_time_series(
-    static_data: pd.DataFrame, ts_data: pd.DataFrame, ID_COL="file_order"  # id, full_id
+def _prepare_time_series_pandas(
+    static_data: pd.DataFrame,
+    ts_data: pd.DataFrame,
+    ts_limit: Optional[int] = None,
+    ts_pad: int = 0,
+    ID_COL="file_order",  # id, full_id
 ):
     ts_data_clean = []
 
@@ -227,24 +333,28 @@ def _prepare_time_series(
     static_ids = set(static_data[ID_COL].values)
 
     lens = []
+    sizes = []
+    rel_times = []
+    print("processing time series")
     for idx, group in tqdm(groups):
         if idx not in static_ids:
             continue
 
-        # patch ID collisions
-        collisions = group[group["relative_timestamp"] == 0]
-        if len(collisions) > 1:
-            cnt_cons = 0
-            prev_val = 0
-            for idxval in group.index.values:
-                if prev_val != 0 and prev_val + 1 != idxval:
-                    break
-                prev_val = idxval
-                cnt_cons += 1
-            group = group.head(cnt_cons)
-
         lens.append(len(group))
         local_data = group.drop(columns=["id", "full_id", "file_order", "duration"])
+        sizes.extend(local_data["length"].values.tolist())
+        rel_times.extend(local_data["relative_timestamp"].values.tolist())
+        if ts_limit is not None:
+            if len(local_data) > ts_limit:
+                local_data = local_data.head(ts_limit)
+            else:
+                padded = ts_pad * np.ones(
+                    ((ts_limit - len(local_data)), len(local_data.columns))
+                )
+                local_data = pd.concat(
+                    [local_data, pd.DataFrame(padded, columns=local_data.columns)],
+                    ignore_index=True,
+                )
 
         ts_data_clean.append(local_data)
         ids.append(idx)
@@ -257,59 +367,42 @@ def _prepare_time_series(
               min len={np.min(lens)}, max len={np.max(lens)}
               """
     )
-    return static_data, ts_data_clean
+    return static_data, ts_data_clean, (lens, sizes, rel_times)
 
 
-def prepare_ts_datasets(
-    workspace=Path("workspace"), ID_COL="file_order"
+def prepare_wefde_raw(
+    static_data,
+    temporal_data,
+    workspace=Path("workspace"),
+    ID_COL="file_order",
+    domain_limit=1000,
+    class_cnt_limit=1024,
+    wefde_folder: str = "output_wefde",
 ):  # id, full_id
-    in_workspace = workspace / Path("output_csv_full")
-    if not workspace.exists():
-        log.error("Missing output_csv_full data")
-        return
-
-    output = workspace / Path("output_wefde")
+    output = workspace / wefde_folder
     output.mkdir(parents=True, exist_ok=True)
 
-    full_data_static = pd.read_csv(in_workspace / "static_data.csv")
-    full_data_temporal = pd.read_csv(in_workspace / "temporal_data.csv")
-
-    static_data_no_cache_no_blacklists = full_data_static
-    constant = _constant_columns(static_data_no_cache_no_blacklists)
-    static_data_no_cache_no_blacklists = static_data_no_cache_no_blacklists.drop(
-        columns=constant
-    )
-
-    static_ids = static_data_no_cache_no_blacklists[ID_COL].values
-
-    temporal_data_no_cache_no_blacklists = full_data_temporal[
-        full_data_temporal[ID_COL].isin(static_ids)
-    ]
-    static_data_no_cache_no_blacklists = static_data_no_cache_no_blacklists[
-        static_data_no_cache_no_blacklists[ID_COL].isin(
-            temporal_data_no_cache_no_blacklists[ID_COL].values
-        )
-    ]
-
-    (clean_static_data, clean_ts_data,) = _prepare_time_series(
-        static_data_no_cache_no_blacklists,
-        temporal_data_no_cache_no_blacklists,
+    print("process time series")
+    (clean_static_data, clean_ts_data, _) = _prepare_time_series_arrow(
+        static_data,
+        temporal_data,
         ID_COL=ID_COL,
     )
+    print("processed time series", clean_static_data.shape)
 
     real_idx = 0
     domain_repeats = {}
     domain_label = {}
-    domain_limit = 50
-    class_cnt_limit = 1024
 
+    print("process labels")
     experiment_labels = []
     for ridx, static_row in clean_static_data.iterrows():
         encoded_label = static_row["label"]
         experiment_labels.append(encoded_label)
 
+    print("process wefde features")
     experiment_labels = list(sorted(list(set(experiment_labels))))
-    for ridx, static_row in clean_static_data.iterrows():
+    for ridx, static_row in tqdm(clean_static_data.iterrows()):
         local_token = static_row["label"]
         encoded_label = experiment_labels.index(local_token)
 
@@ -337,7 +430,9 @@ def prepare_ts_datasets(
         )
         timestamps = clean_ts_data[real_idx]["relative_timestamp"].copy()
         timestamps[timestamps < 0] = 0  # WTF
-        local_ts = timestamps.cumsum().values
+        timestamps[timestamps > 1000] = 0  # Parsing bug
+
+        local_ts = timestamps.values
         assert len(local_ts) == len(local_sizes)
         assert (local_ts >= 0).all(), timestamps.values
 
@@ -347,22 +442,56 @@ def prepare_ts_datasets(
         real_idx += 1
 
 
-def create_datasets(
-    traces=Path("traces"),
+def prepare_wefde_dataset(
     workspace=Path("workspace"),
-    unlink_after_processing=True,
+    conn_limit=3,
+    wefde_folder: str = "output_wefde",
+    wefde_feats_folder: str = "output_features",
 ):
-    workspace.mkdir(parents=True, exist_ok=True)
+    time_series_traces = workspace / wefde_folder
+    if not time_series_traces.exists():
+        log.error(f"Missing {wefde_folder} data. Call prepare_wefde_raw first!")
+        return
 
-    # Parse raw pcaps
-    process_raw_pcaps(
-        traces=traces,
-        workspace=workspace,
-        unlink_after_processing=unlink_after_processing,
+    output = workspace / wefde_feats_folder
+    output.mkdir(parents=True, exist_ok=True)
+
+    return prepare_wefde_features(
+        trace_path=time_series_traces,
+        out_path=output,
+        conn_limit=conn_limit,
     )
 
-    # Merge CSV in a single dataset
-    merge_pcap_csvs(workspace=workspace)
 
-    # Create Time-Series datasets
-    prepare_ts_datasets(workspace=workspace)
+def prepare_all_datasets(
+    workspace=Path("workspace"),
+    n_websites: int = 100,
+    n_traces: int = 500,
+    feature_length: int = 5000,
+    deepse_testtypes=["real", "sanity"],
+    wefde_folder: str = "output_wefde",
+    wefde_feats_folder: str = "output_features",
+):
+    print("merge raw datasets")
+    static_data, ts_data = merge_pcap_csvs(workspace=workspace)
+
+    print("prepare WeFDE data")
+    prepare_wefde_raw(
+        static_data, ts_data, workspace=workspace, wefde_folder=wefde_folder
+    )
+    prepare_wefde_dataset(
+        workspace=workspace,
+        wefde_folder=wefde_folder,
+        wefde_feats_folder=wefde_feats_folder,
+    )
+
+    print("prepare DeepSE-WF features")
+    for testtype in deepse_testtypes:
+        prepare_deepse_dataset(
+            path_wefde=workspace / wefde_folder,
+            path_out=workspace / "output_deepse" / testtype / "dataset.npz",
+            n_websites=n_websites,
+            n_traces=n_traces,
+            feature_length=feature_length,
+            debug_mode=(testtype != "real"),
+        )

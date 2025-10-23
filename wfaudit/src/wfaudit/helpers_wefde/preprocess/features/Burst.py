@@ -1,26 +1,65 @@
+# stdlib
+import heapq
+
 # third party
 import numpy as np
 
+# wfaudit absolute
+from wfaudit.helpers_wefde.preprocess.features.common import split_by_value
 
-# knn feature (share similarity with interval)
-# the burst of inflow traffic
-def BurstFeature(times, sizes, max_length=20):
-    burst_features = []
-    bursts = []
-    for x in sizes:
-        if x > 0:
-            bursts.append(x)
-        else:
-            bursts.append(-x)
 
-    # burst could be none
-    if len(bursts) != 0:
-        burst_features = [
-            np.max(bursts),
-            np.mean(bursts),
-            np.std(bursts),
-        ]
-    else:
-        burst_features = [0, 0, 0, 0, 0]
+def get_burst_features_per_connection(bursts: list, topn: int):
+    if len(bursts) < topn:
+        bursts += [0] * (topn - len(bursts))
 
+    burst_features = heapq.nlargest(topn, bursts)
+    burst_features += [
+        float(np.mean(bursts)),
+        float(np.std(bursts)),
+        float(np.sum(bursts)),
+    ]
     return burst_features
+
+
+def get_burst_features(times, sizes, topn: int = 20, conn_limit: int = 1):
+    sizes = np.abs(np.asarray(sizes))
+    burst_features = []
+    if conn_limit == 1:  # global stats
+        burst_features = get_burst_features_per_connection(
+            np.unique(sizes).astype(float).tolist(), topn=topn
+        )
+
+        # print(" >>> Global BURST", burst_features)
+        return burst_features
+    else:
+        conn_idxs = split_by_value(times, 0)
+
+        if len(conn_idxs) < conn_limit:
+            conn_idxs += [[]] * (conn_limit - len(conn_idxs))
+
+        def _process_connection(conn_idx):
+            if len(conn_idx) == 0:
+                conn_bursts = []
+            else:
+                conn_bursts = sizes[conn_idx].tolist()
+            conn_burst_uniq_features = get_burst_features_per_connection(
+                np.unique(conn_bursts).astype(float).tolist(), topn=topn
+            )
+
+            return conn_burst_uniq_features
+
+        # Extract first conn_limit - 1 connections
+        for idx, conn_idx in enumerate(conn_idxs[: conn_limit - 1]):
+            conn_burst_uniq_features = _process_connection(conn_idx)
+            burst_features += conn_burst_uniq_features
+
+        # Aggregate the rest of the connections together
+        extra_conns = np.concatenate(conn_idxs[conn_limit - 1 :])
+        conn_burst_uniq_features = _process_connection(extra_conns)
+        burst_features += conn_burst_uniq_features
+
+        assert len(burst_features) == (conn_limit) * (topn + 3), burst_features
+
+        # print(" >>> Multi BURST", burst_features)
+
+        return burst_features

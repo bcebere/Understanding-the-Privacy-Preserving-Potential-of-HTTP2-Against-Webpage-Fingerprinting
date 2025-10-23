@@ -1,9 +1,13 @@
 # Adapted from https://github.com/notem/reWeFDE
+
+# future
+from __future__ import annotations
+
 # stdlib
-from collections.abc import Iterable
 import math
 
 # third party
+from joblib import Parallel, delayed
 import numpy as np
 
 # wfaudit absolute
@@ -11,273 +15,138 @@ from wfaudit.helpers_wefde.analysis.kde_wrapper import KDE
 import wfaudit.logger as log
 
 
-class WebsiteFingerprintModeler(object):
-    def __init__(self, data, pool=None, web_priors=None, discrete_threshold=10000):
-        """
-        Instantiate a fingerprint modeler.
+class WebsiteFingerprintModeler:
+    """
+    data : WebsiteData-like object with
+           - data.sites = list of site indices
+           - data.get_site(site, feature) = numpy array of values for that site/feature
+           - data.get_feature(feature) = numpy array of values for that feature across all sites
+    web_priors : Optional list of site priors, default uniform.
+    """
 
-        Parameters
-        ----------
-        data : WebsiteData
-            Website trace data object
-
-        """
-        self.sample_size = 1000
+    # ------------------------------------------------------------------
+    def __init__(self, data, web_priors=None, *, discrete_threshold: int = 10000):
         self.data = data
+        self.sites = data.sites
         self.website_priors = (
             web_priors
-            if web_priors
-            else [1 / float(len(self.data.sites)) for _ in self.data.sites]
+            if web_priors is not None
+            else [1 / len(self.sites)] * len(self.sites)
         )
         self.discrete_threshold = discrete_threshold
+        print("WebsiteFingerprint Modeler with discrete threshold ", discrete_threshold)
+        self._sample_cache: dict[tuple[int, int], tuple[np.ndarray, np.ndarray]] = {}
 
-    def _make_kde(self, features, site=None):
-        """
-        Produce AKDE for a single feature or single feature for a particular site.
+    # ------------------------------------------------------------------
+    def max_information_leakage(self) -> float:
+        return -sum(p * math.log2(p) for p in self.website_priors if p > 0)
 
-        Parameters
-        ----------
-        features : list
-            Feature(s) of which to model a multi/uni-variate AKDE.
-        site : int
-            Model features only for the given website number.
-            Model all sites if None.
+    # ------------------------------------------------------------------
+    def _make_kde_for_cluster_and_site(self, cluster, site):
+        cols = [self.data.get_site(site, f).reshape(-1, 1) for f in cluster]
+        X = np.hstack(cols)
+        return KDE(X, discrete_threshold=self.discrete_threshold)
 
-        Returns
-        -------
-        KDE
-            Fit KDE for the feature data
+    # ------------------------------------------------------------------
+    def _draw_samples(self, kdes, sample_size: int):
+        """Draw & cache samples for (dim, sample_size)."""
+        d = kdes[0].n_features
+        cache_key = (d, sample_size)
+        if cache_key in self._sample_cache:
+            return self._sample_cache[cache_key]
 
-        """
-        if not isinstance(features, Iterable):
-            features = [features]
+        pri = np.array(self.website_priors)
+        counts = np.floor(pri * sample_size).astype(int)
+        leftover = sample_size - counts.sum()
+        if leftover > 0:
+            counts[:leftover] += 1  # distribute residual
 
-        X = None
-        for feature in features:
-            # get feature vector
-            if site is not None:  # pdf(f|c)
-                X_f = self.data.get_site(site, feature)
-            else:  # pdf(f)
-                X_f = self.data.get_feature(feature)
-            X_f = np.reshape(X_f, (X_f.shape[0], 1))
+        X_all, idx_all = [], []
+        for i, (kde, n_i) in enumerate(zip(kdes, counts)):
+            if n_i:
+                samp_i = kde.sample(int(n_i))
+                X_all.append(samp_i)
+                idx_all.append(np.full(len(samp_i), i, dtype=int))
+        X_all = np.vstack(X_all)
+        idx_all = np.concatenate(idx_all)
+        self._sample_cache[cache_key] = (X_all, idx_all)
+        return X_all, idx_all
 
-            # extend X w/ feature vector if it has been initialized
-            # otherwise, initalize X using the current feature vector
-            if X is None:
-                X = X_f
+    # ------------------------------------------------------------------
+    def information_leakage(
+        self,
+        clusters,
+        *,
+        sample_size: int = 5000,
+        n_procs: int = 2,
+        X_eval=None,
+    ):
+        if not clusters:
+            return []
+
+        H_C = self.max_information_leakage()
+        priors_log2 = np.log2(self.website_priors)[:, None]  # (sites,1)
+
+        print(
+            f"Approximate Information leakage using {sample_size} samples from clusters {clusters}"
+        )
+
+        results = []
+        for cluster in clusters:
+            for dbgfeat in cluster:
+                log.info(
+                    f"[Cluster {cluster}] Feature {dbgfeat} unique values ---> {len(np.unique(self.data.get_feature(dbgfeat)))}"
+                )
+
+            kdes = [self._make_kde_for_cluster_and_site(cluster, s) for s in self.sites]
+            log.info(
+                f"[Cluster {cluster}] Constructed KDEs : {len(kdes)} {self.discrete_threshold}"
+            )
+
+            if X_eval is None:
+                X_samp, _ = self._draw_samples(kdes, sample_size)
             else:
-                X = np.hstack((X, X_f))
+                X_samp = X_eval[:, cluster]
 
-        # fit KDE on X
-        try:
-            return KDE(X, discrete_threshold=self.discrete_threshold)
-        except BaseException:
-            return None
-
-    def _sample(self, mkdes, web_priors, sample_size):
-        """
-        Generate samples from site KDEs.
-
-        Sampling is done on each website KDE.
-        The number of samples drawn from each website is determined by prior.
-        Selected samples are later used for monte-carlo evaluation.
-
-        Parameters
-        ----------
-        mkdes : list
-            list of site AKDEs from which to sample
-        web_priors : list
-            list of website priors
-        sample_size : int
-            number of samples to generate
-
-        Returns
-        -------
-        list
-            List of instance samples.
-            The dimension of the samples depends on the number of features used to generate the KDEs.
-
-        """
-        samples = []
-        for site, mkde in zip(self.data.sites, mkdes):
-
-            # n = k * pr(c[i]) -- number of samples per site
-            num = int(sample_size * web_priors[site])
-
-            if num > 0:
-                # sample from pdf(f|c[i])
-                x = mkde.sample(num)
-                samples.extend(x)
-
-        return samples
-
-    def _do_predictions(self, cluster):
-        """
-        Produce the site x prediction matrix for a cluster.
-
-        Parameters
-        ----------
-        cluster : list
-            Features to be modeled.
-
-        Returns
-        -------
-        ndarray
-            Numpy array of dimensions (n_sites, n_samples) containing
-            the probability predictions for samples of each site.
-
-        """
-        mkdes = []
-        for site in self.data.sites:
-            local_kde = self._make_kde(cluster, site)
-            if local_kde is None:
-                return None
-            mkdes.append(local_kde)
-
-        # performing sampling for monte-carlo evaluation of H(C|f)
-        samples = self._sample(mkdes, self.website_priors, self.sample_size)
-
-        # get probabilities of samples for each site
-        probs = np.array([mkde.predict(samples) for mkde in mkdes])
-
-        # sample predictions are often above 1.0 (related to the bw choice?)
-        # this snippet of code is adapted from the original WeFDE implementation
-        # seems to correctly adjust the predictions to values between 0.0 and 1.0
-        with np.errstate(divide="ignore"):
-            probs = np.log2(probs)
-            probs[probs == np.nan] = -300
-        probs = probs - np.amax(probs)
-        probs = 2**probs
-        assert not np.any(probs[probs > 1.0])
-
-        return probs
-
-    def max_information_leakage(self):
-        # Shannon Entropy func: -p(x)*log2(p(x))
-        def h(x):
-            return -x * math.log(x, 2)
-
-        return sum([h(prior) for prior in self.website_priors if prior > 0])
-
-    def information_leakage(self, clusters, sample_size=50000, joint_leakage=True):
-        """
-        Evaluate the information leakage for feature(s).
-
-        Computes marginal KDEs for features given a sites using AKDEs.
-        Conditional entropy is then estimated from the distributions via monte-carlo integration.
-        The conditional entropy is then used to compute the leakage for the feature(s)
-
-        Parameters
-        ----------
-        clusters : list
-            A list of lists. Features is a list of clusters.
-            Each cluster is a list containing the features in the cluster.
-            A singular feature or cluster may be given as the parameter.
-            In those instances, the data will be wrapped in additional lists to match the expected form.
-        sample_size : int
-            Count of total random feature samples to use for monte-carlo estimation.
-        joint_leakage : bool
-            Determines if the leakage of clusters should be measured jointly or individually.
-            If True, the probability of samples for each cluster will be multiplied together before estimating entropy.
-            Otherwise, the leakage for each cluster is measured.
-
-        Returns
-        -------
-        list
-            Estimated information leakage for the features/clusters.
-            If ``joint_leakage`` is True, the list contains the leakage for the combined analysis.
-            Otherwise, the list contains the leakages for each cluster,
-            appearing in the same order as seen in ``clusters``.
-
-        """
-        # convert one feature to singular list for comparability
-        if not isinstance(clusters, Iterable):
-            clusters = [clusters]
-        if not isinstance(clusters[0], Iterable):
-            clusters = [clusters]
-
-        self.sample_size = sample_size
-        log.info(f"Measuring leakage for {clusters} with {sample_size}")
-
-        # Shannon Entropy func: -p(x)*log2(p(x))
-        def h(x):
-            return -x * math.log(x, 2)
-
-        # H(C) -- compute website entropy, this represents the maximum number of bits which can be leaked
-        H_C = sum([h(prior) for prior in self.website_priors if prior > 0])
-        log.info(f"Maximum uncertaininty = {H_C}")
-
-        # map clusters to probability predictions for random samples
-        # allows for KDE construction, sampling, and prediction to be done in parallel (if enabled)
-        results = map(self._do_predictions, clusters)
-
-        # load the results as they are produced and log progress
-        cluster_probs = []
-        for probs in results:
-            if probs is None:
+            if X_samp.size == 0:
+                results.append(0.0)
                 continue
 
-            cluster_probs.append(probs)
-            # print progress updates
-            count = len(cluster_probs)
-            if count - 1 % (len(clusters) * 0.05) == 0:
-                log.info(f"Progress FP: {count}/{len(clusters)}")
+            # log p(x|site) in parallel
+            # def _logp(kde):
+            #    with np.errstate(divide="ignore"):
+            #        return np.log2(kde.predict(X_samp))
+            def _logp(kde):
+                p = kde.predict(X_samp)  # (N,)
+                p = np.maximum(p, np.finfo(float).tiny)
+                return np.log2(p)
 
-        if joint_leakage:
-            # multiply cluster probs to get joint probs for each sample
-            # clusters are assumed to be independent from one another
-            # in this way, the joint probability of all the variables is their products
-            cluster_probs = np.array(cluster_probs)
-            prob_sets = [
-                np.prod(cluster_probs, axis=0)
-            ]  # shape (1, n_sites, n_samples)
-        else:
-            # measure leakages for each cluster independently
-            prob_sets = cluster_probs  # shape (n_clusters, n_sites, n_samples)
+            logp = np.array(
+                Parallel(n_jobs=n_procs)(delayed(_logp)(k) for k in kdes)
+            )  # (sites,N)
+            lp = logp + priors_log2
+            max_lp = lp.max(axis=0, keepdims=True)
 
-        # compute information leakage for each cluster (or combined cluster if joint)
-        leakages = []
-        if len(np.asarray(prob_sets).shape) < 2:
-            prob_sets = [prob_sets]
+            post = np.exp2(lp - max_lp)  # still may contain NaN/inf
+            sum_cols = post.sum(axis=0, keepdims=True)
+            missing = sum_cols == 0  # True if every pdf(x)=0
+            if missing.any():
+                post[:, missing] = 1.0 / len(self.sites)  # revert to the priors
+                sum_cols[missing] = 1.0
+            post /= sum_cols
 
-        for i, prob_set in enumerate(prob_sets):
+            # post = 2 ** (lp - max_lp)
+            # post /= post.sum(axis=0, keepdims=True)
 
-            # weight the probability predictions by the website priors
-            # in the closed-world scenario, all are equally weighted
-            probs_weighted = []
-            for site, probs in enumerate(prob_set):
-                probs_weighted.append(probs * self.website_priors[site])
-            probs_weighted = np.array(probs_weighted)
+            logp = np.log2(np.clip(post, 1e-300, 1.0))
 
-            # transpose array so that first index represents samples, second index represent site
-            probs_weighted = np.transpose(probs_weighted)
+            H_post = -np.sum(post * logp, axis=0)
+            H_C_given_f = H_post.mean()
 
-            # normalize probabilities such that the per-site probs for each sample sums to one
-            # (as should be expected for conditional probabilities)
-            probs_norm = []
-            for probs in probs_weighted:
-                probs = np.asarray(probs)
-                if len(probs.shape) < 1:
-                    probs = [probs]
-                norm = probs / sum(probs) if sum(probs) > 0 else probs
-                probs_norm.append(norm)
+            if np.isnan(H_C_given_f):
+                print("X_C_given_f has NaNs", H_post, H_C_given_f)
+                raise
 
-            # compute entropy for each sample
-            entropies = []
-            for probs in probs_norm:
-                entropies.append(sum([h(prob) for prob in probs if prob > 0]))
-
-            # H(C|f) -- estimate real entropy as average of all samples
-            H_CF = sum(entropies) / len(entropies)
-
-            # I(C;f) = H(C) - H(C|f) -- compute information leakage
-            leakage = H_C - H_CF
-            leakages.append(leakage)
-
-            # debug output
-            log.info(f"{clusters[i]} {leakage} = {H_C} - {H_CF}")
-
-        return leakages
-
-    def __call__(self, features, sample_size: int = 50000):
-        return self.information_leakage(features, sample_size=sample_size)
+            # 6. I(C; f) = H(C) - H(C|f).
+            results.append(H_C - H_C_given_f)
+        return results

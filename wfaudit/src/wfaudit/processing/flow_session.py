@@ -7,15 +7,9 @@ import pandas as pd
 
 # wfaudit absolute
 import wfaudit.logger as log
-from wfaudit.processing.features.app_layer import AppLayerFeatures
 from wfaudit.processing.features.certificates import certificate
 from wfaudit.processing.features.context.packet_direction import PacketDirection
 from wfaudit.processing.features.context.packet_flow_key import get_packet_flow_key
-from wfaudit.processing.features.flow_bytes import FlowBytes
-from wfaudit.processing.features.packet_length import PacketLength
-from wfaudit.processing.features.packet_time import PacketTime
-from wfaudit.processing.features.response_time import ResponseTime
-from wfaudit.processing.features.time_series import TimeSeries
 from wfaudit.processing.flow import Flow
 
 
@@ -30,6 +24,7 @@ class FlowSession:
         with_dns: bool = True,
         workspace: Path = Path("workspace"),
         buffer_tcp: bool = False,
+        as_json=False,
     ) -> None:
         self.flows: Dict = {}
 
@@ -143,123 +138,3 @@ class FlowSession:
         return pd.DataFrame(static).T.reset_index(drop=True), pd.concat(
             temporal, ignore_index=True
         )
-
-    def static_stats_per_context(self) -> pd.DataFrame:
-        print("static_stats_per_context", len(self.interesting_packets))
-        if len(self.interesting_packets) == 0:
-            return pd.DataFrame([])
-
-        flow_bytes = FlowBytes(self.interesting_packets)
-        packet_length_raw_sent = PacketLength(
-            self.interesting_packets, strategy="raw_sent"
-        )
-        packet_length_raw_recv = PacketLength(
-            self.interesting_packets, strategy="raw_recv"
-        )
-        packet_length_raw_all = PacketLength(
-            self.interesting_packets, strategy="raw_all"
-        )
-        packet_length_aggr_sent = PacketLength(
-            self.interesting_packets, strategy="aggr_sent"
-        )
-        packet_length_aggr_recv = PacketLength(
-            self.interesting_packets, strategy="aggr_recv"
-        )
-        packet_length_aggr_all = PacketLength(
-            self.interesting_packets, strategy="aggr_all"
-        )
-        packet_time = PacketTime(self.interesting_packets)
-        response = ResponseTime(self.interesting_packets)
-        transport_features = AppLayerFeatures(self.interesting_packets)
-
-        results = {
-            # Basic information from packet times
-            "timestamp": [packet_time.get_time_stamp()],
-            "duration": [packet_time.get_duration()],
-            # Information from the amount of bytes
-            "flow_bytes_sent": [flow_bytes.get_bytes_sent()],
-            "flow_sent_rate": [flow_bytes.get_sent_rate()],
-            "flow_bytes_received": [flow_bytes.get_bytes_received()],
-            "flow_received_rate": [flow_bytes.get_received_rate()],
-            # Statistical info obtained from (Raw, Sent) Packet lengths
-            "packet_length_std_raw_sent": [packet_length_raw_sent.get_std()],
-            "packet_length_mean_raw_sent": [packet_length_raw_sent.get_mean()],
-            "packet_length_median_raw_sent": [packet_length_raw_sent.get_median()],
-            "packet_length_skew_from_median_raw_sent": [
-                packet_length_raw_sent.get_skew()
-            ],
-            "packet_length_coeff_variation_raw_sent": [
-                packet_length_raw_sent.get_cov()
-            ],
-            # Statistical info obtained from (Raw, Recv) Packet lengths
-            "packet_length_std_raw_recv": [packet_length_raw_recv.get_std()],
-            "packet_length_mean_raw_recv": [packet_length_raw_recv.get_mean()],
-            "packet_length_median_raw_recv": [packet_length_raw_recv.get_median()],
-            "packet_length_skew_from_median_raw_recv": [
-                packet_length_raw_recv.get_skew()
-            ],
-            "packet_length_coeff_variation_raw_recv": [
-                packet_length_raw_recv.get_cov()
-            ],
-            # Statistical info obtained from (Raw, All) Packet lengths
-            "packet_length_std_raw_all": [packet_length_raw_all.get_std()],
-            "packet_length_mean_raw_all": [packet_length_raw_all.get_mean()],
-            "packet_length_median_raw_all": [packet_length_raw_all.get_median()],
-            "packet_length_skew_from_median_raw_all": [
-                packet_length_raw_all.get_skew()
-            ],
-            "packet_length_coeff_variation_raw_all": [packet_length_raw_all.get_cov()],
-            # Statistical info obtained from (Aggr, Sent) Packet lengths
-            "packet_length_std_aggr_sent": [packet_length_aggr_sent.get_std()],
-            "packet_length_mean_aggr_sent": [packet_length_aggr_sent.get_mean()],
-            "packet_length_median_aggr_sent": [packet_length_aggr_sent.get_median()],
-            "packet_length_skew_from_median_aggr_sent": [
-                packet_length_aggr_sent.get_skew()
-            ],
-            "packet_length_coeff_variation_aggr_sent": [
-                packet_length_aggr_sent.get_cov()
-            ],
-            # Statistical info obtained from (Aggr, Recv) Packet lengths
-            "packet_length_std_aggr_recv": [packet_length_aggr_recv.get_std()],
-            "packet_length_mean_aggr_recv": [packet_length_aggr_recv.get_mean()],
-            "packet_length_median_aggr_recv": [packet_length_aggr_recv.get_median()],
-            "packet_length_skew_from_median_aggr_recv": [
-                packet_length_aggr_recv.get_skew()
-            ],
-            "packet_length_coeff_variation_aggr_recv": [
-                packet_length_aggr_recv.get_cov()
-            ],
-            # Statistical info obtained from (Aggr, All) Packet lengths
-            "packet_length_std_aggr_all": [packet_length_aggr_all.get_std()],
-            "packet_length_mean_aggr_all": [packet_length_aggr_all.get_mean()],
-            "packet_length_median_aggr_all": [packet_length_aggr_all.get_median()],
-            "packet_length_skew_from_median_aggr_all": [
-                packet_length_aggr_all.get_skew()
-            ],
-            "packet_length_coeff_variation_aggr_all": [
-                packet_length_aggr_all.get_cov()
-            ],
-            # Statistical info  obtained from Packet times
-            "packet_time_std": [packet_time.get_std()],
-            "packet_time_mean": [packet_time.get_mean()],
-            "packet_time_median": [packet_time.get_median()],
-            "packet_time_skew_from_median": [packet_time.get_skew()],
-            "packet_time_coeff_variation": [packet_time.get_cov()],
-            # Response Time
-            "response_time_std": [response.get_std()],
-            "response_time_mean": [response.get_mean()],
-            "response_time_median": [response.get_median()],
-            "response_time_skew_from_median": [response.get_skew()],
-            "response_time_coeff_variation": [response.get_cov()],
-            "request_snis": [transport_features.all_snis()],
-        }
-        return pd.DataFrame(results).reset_index(drop=True)
-
-    def temporal_stats_per_context(self) -> Tuple[pd.DataFrame, pd.DataFrame]:
-        if len(self.interesting_packets) == 0:
-            return pd.DataFrame([]), pd.DataFrame([])
-
-        static_results = self.static_stats_per_context()
-        temporal_results = TimeSeries(self.interesting_packets).data()
-
-        return pd.DataFrame(static_results).reset_index(drop=True), temporal_results

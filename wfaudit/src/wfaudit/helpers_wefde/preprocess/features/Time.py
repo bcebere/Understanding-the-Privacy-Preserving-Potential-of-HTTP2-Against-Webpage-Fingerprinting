@@ -1,48 +1,55 @@
 # third party
-import numpy
+import numpy as np
 
 # wfaudit absolute
-from wfaudit.helpers_wefde.preprocess.features.common import X
+from wfaudit.helpers_wefde.preprocess.features.common import split_by_value
 
 
-# max, mean, std, quartile
-def interTimeStats(times):
-    res = []
-    for i in range(1, len(times)):
-        prev = times[i - 1]
-        cur = times[i]
-        res.append(cur - prev)
+# time includes relative timestamps. 0 means a new connection.
+def get_time_features_per_connection(times):
+    if len(times) == 0:
+        return [0, 0, 0]
 
-    if len(res) == 0:
-        return [X, X, X, X]
+    return [
+        float(np.max(times)),
+        float(np.mean(times)),
+        float(np.sum(times)),
+    ]
+
+
+def get_time_features(times, sizes, conn_limit: int = 1):
+    if conn_limit == 1:
+        # global
+        features = get_time_features_per_connection(times)
+        # print(" >>> Time global", features)
+        return features
     else:
-        return [
-            numpy.max(res),
-            numpy.mean(res),
-            numpy.std(res),
-        ]
+        features = []  # get_time_features_per_connection(times)
 
+        # per connection
+        conn_idxs = split_by_value(times, 0)
 
-# k-anonymity
-# inter packet time statistics for total, incoming, and outgoing
-# max, mean, std, third quartile
-def TimeFeature(times, sizes):
-    features = []
-    # inter packet time feature
-    # total
-    features.extend(interTimeStats(times))
-    # outgoing
-    # times_out = []
-    # for i in range(0, len(sizes)):
-    #    if sizes[i] >= 0:
-    #        times_out.append(times[i])
-    # features.extend(interTimeStats(times_out))
+        if len(conn_idxs) < conn_limit:
+            conn_idxs += [[]] * (conn_limit - len(conn_idxs))
 
-    # incoming
-    # times_in = []
-    # for i in range(0, len(sizes)):
-    #    if sizes[i] <= 0:
-    #        times_in.append(times[i])
-    # features.extend(interTimeStats(times_in))
+        times = np.asarray(times)
+        # Extract conn_limit - 1 connections
+        for idx, conn_idx in enumerate(conn_idxs[: conn_limit - 1]):
+            conn_times = times[conn_idx].tolist()
+            conn_times_features = get_time_features_per_connection(conn_times)
+            features += conn_times_features
 
-    return features
+        # Aggregate the rest of the connections
+        extra_conns = np.concatenate(conn_idxs[conn_limit - 1 :])
+        if len(extra_conns) > 0:
+            conn_times_features = get_time_features_per_connection(
+                times[extra_conns].tolist()
+            )
+        else:
+            conn_times_features = get_time_features_per_connection([])
+        features += conn_times_features
+
+        assert len(features) == (conn_limit) * 3
+
+        # print(" >>> TIME multi", features)
+        return features

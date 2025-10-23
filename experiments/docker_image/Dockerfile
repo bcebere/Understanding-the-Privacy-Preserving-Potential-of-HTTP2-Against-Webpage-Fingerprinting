@@ -9,6 +9,3 @@ RUN  apt update && \
      rm -rf /var/lib/apt/lists/*
 
 RUN pip install -r /var/requirements.txt
-RUN pip install playwright
-RUN python -m playwright install-deps
-RUN python -m playwright install
