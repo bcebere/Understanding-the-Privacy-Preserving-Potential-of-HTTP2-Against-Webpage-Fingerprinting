@@ -29,8 +29,8 @@ openssl req -new -x509 -key "$KEY_FILE" -out "$CERT_FILE" -days 365 \
 ```
 
 ## Demo for simulating the HTTP2 datasets
-[./demo](demo) illustrates how to collect traces using a toy dataset (3 pages), and how simulate various defenses (server or client side).
-For full datasets, replace the `data` folder with the contents (`bin`, `client_trace`, `server_trace`) of one of the datasets from [../datasets/](../datasets/).
+[The demo](./demo) illustrates how to collect traces using a toy dataset (3 pages), and how simulate various defenses (server or client side).
+For full datasets, replace the `data` folder with the contents (`bin`, `client_trace`, `server_trace`) of one of the datasets from [website datasets](../datasets/).
 
 - Start the Docker containers
 ```bash
