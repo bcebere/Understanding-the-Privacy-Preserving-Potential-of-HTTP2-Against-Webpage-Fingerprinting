@@ -4,6 +4,7 @@ httpx
 matplotlib
 numpy
 pathos
+pydantic
 pyOpenSSL
 scikit-learn
 scipy
