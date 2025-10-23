@@ -115,9 +115,6 @@ class Client(asyncio.Protocol):
         self.connection_id = connection_id
         self.server_hints = []
 
-        if request_server_defense:
-            defense_name = "mod_clping"
-
         defense = get_defense(defense_name)
         initial_window_size = defense.initial_window_size()
         self.window_size = initial_window_size
@@ -574,15 +571,11 @@ class Client(asyncio.Protocol):
         self.exit_event.set()
 
     def send_ping(self):
-        # print("SEND PING")
         ping_data = b"\x00" * 8  # 8 bytes of arbitrary data
         self.conn.ping(ping_data)
         self.transport.write(self.conn.data_to_send())
 
     def respond_ping(self, event):
-        # self.conn.acknowledge_ping(event.ping_data)
-        # self.conn.ping(event.ping_data)
-        # self.transport.write(self.conn.data_to_send())
         pass
 
     async def send_ping_in_loop(self):

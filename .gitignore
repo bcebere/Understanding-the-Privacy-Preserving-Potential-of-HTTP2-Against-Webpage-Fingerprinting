@@ -129,3 +129,4 @@ cython_debug/
 
 traces.bkp
 *.pem
+workspace

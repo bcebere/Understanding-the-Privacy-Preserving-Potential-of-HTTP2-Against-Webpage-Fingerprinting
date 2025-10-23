@@ -162,7 +162,7 @@ def prepare_requests(requests):
                 }
             )
         )
-
+    print(out.keys())
     if (
         USE_SRV_REQ_DEFENSE is not None
         and USE_SRV_REQ_DEFENSE not in out

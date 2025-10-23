@@ -128,7 +128,6 @@ def merge_pcap_csvs(
 
         return static_ds, temporal_ds
 
-    # ---------- Parquet writers (created the first time we see schema) ----------
     pq_static: pq.ParquetWriter = None
     pq_temporal: pq.ParquetWriter = None
 
@@ -139,7 +138,8 @@ def merge_pcap_csvs(
                 static_filename, dtype={"label": "category"}, engine="pyarrow"
             )
             t_df = pd.read_csv(
-                in_workspace / static_filename.replace("static_", "temporal_"),
+                in_workspace
+                / Path(static_filename).name.replace("static_", "temporal_"),
                 engine="pyarrow",
                 dtype={
                     "relative_timestamp": "float32",

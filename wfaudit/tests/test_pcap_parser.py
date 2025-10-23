@@ -194,24 +194,3 @@ def test_e2e(tmp_path):
     for testtype in deepse_testtypes:
         output = tmp_path / "output_deepse" / testtype / "dataset.npz"
         assert output.exists()
-
-
-def test_preparedbg():
-    tmp_path = Path("datasets")
-
-    wefde_feats_folder = "wefde_feats"
-    prepare_wefde_dataset(
-        workspace=tmp_path,
-        wefde_folder="wefde",
-        wefde_feats_folder=wefde_feats_folder,
-    )
-
-    print("Creating deepse features")
-    output = tmp_path / "deepse" / "dataset.npz"
-    prepare_deepse_dataset(
-        path_wefde=tmp_path / "wefde",
-        path_out=output,
-        n_websites=3,
-        n_traces=500,
-    )
-    assert output.exists()
