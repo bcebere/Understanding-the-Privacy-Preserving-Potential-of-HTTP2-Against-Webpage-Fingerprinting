@@ -1,9 +1,9 @@
-# Understanding the Privacy-Preserving Potential of HTTP2 Against Webpage Fingerprinting
-In this repository, we provide the code to reproduce the results in the "Understanding the Privacy-Preserving Potential of HTTP2 Against Subpage Fingerprinting" paper.
+# Understanding the Privacy-Preserving Potential of HTTP2 Against Webpage Fingerprinting (WF)
+In this repository, we provide the code to reproduce the results in the "Understanding the Privacy-Preserving Potential of HTTP2 Against Webpage Fingerprinting" paper.
 
 ## 🚀 Website Fingerprinting Audit Tool
 
-We provide the library for measuring the information leakage and fingerprinting accuracy in [wfaudit](wfaudit).
+The [wfaudit](./wfaudit) library provides a framework for evaluating the security of a WF defense, through fingerprinting accuracy, information leakage, and feature importance measurements.
 
 The library can be installed from source using
 ```bash
