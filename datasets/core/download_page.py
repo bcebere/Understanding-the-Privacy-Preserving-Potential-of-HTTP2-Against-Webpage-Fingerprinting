@@ -149,8 +149,3 @@ async def process_response(response, client_db, server_db, request_start_times):
 def capture(url_to_capture, reuse_context=False):
     # Run the save_responses function
     asyncio.run(save_responses(url_to_capture, reuse_context=reuse_context))
-
-
-# Replace 'https://example.com' with the URL you want to capture
-# url_to_capture = "https://en.wikipedia.org/wiki/Electric_Callboy"
-# capture(url_to_capture)
