@@ -1,0 +1,1 @@
+../scripts/run_client_dummy.sh

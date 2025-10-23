@@ -1,0 +1,1 @@
+../scripts/run_server_def_tamaraw.sh

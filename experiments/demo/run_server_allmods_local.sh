@@ -1,0 +1,1 @@
+../scripts/run_server_allmods_local.sh

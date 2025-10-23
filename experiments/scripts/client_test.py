@@ -47,9 +47,6 @@ SRV_DB_PATH = DATA_PATH / "server_trace"
 CLIENT_DB_PATH = DATA_PATH / "client_trace"
 BIN_DB_PATH = DATA_PATH / "bin"
 
-USE_HTTP2_WND = int(args.http2_wnd)
-USE_HTTP2_BATCH = int(args.http2_batch)
-USE_HTTP2_PING = int(args.http2_ping)
 USE_HTTP2_ALL = int(args.http2_all)
 USE_DEFENSE = str(args.defense)
 USE_SRV_REQ_DEFENSE = args.request_server_defense

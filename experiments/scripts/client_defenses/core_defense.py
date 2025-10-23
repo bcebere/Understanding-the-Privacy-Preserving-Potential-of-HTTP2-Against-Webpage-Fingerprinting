@@ -366,7 +366,7 @@ class DEFENSE(BaseModel):
         output = []
 
         expected_data_size = request.expected_size
-        if expected_data_size is None or expected_data_size < 10000:
+        if expected_data_size is None or expected_data_size < 1000:
             return [request]
 
         if not isinstance(expected_data_size, int):

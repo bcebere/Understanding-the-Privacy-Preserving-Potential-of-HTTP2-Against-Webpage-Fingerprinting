@@ -9,14 +9,14 @@ import time
 from typing import List, Optional
 
 # third party
-# DEFENSES
-from defenses.front import FRONT_DEFENSE
-from defenses.httpos import HTTPOS_DEFENSE
-from defenses.llama import LLAMA_DEFENSE
-from defenses.mod_all import CLMODS_DEFENSE
-from defenses.nop import NOP_DEFENSE
-from defenses.tamaraw import TAMARAW_DEFENSE
-from defenses.tamaraw_qcsd import TAMARAW_QCSD_DEFENSE
+# CLIENT DEFENSES
+from client_defenses.front import FRONT_DEFENSE
+from client_defenses.httpos import HTTPOS_DEFENSE
+from client_defenses.llama import LLAMA_DEFENSE
+from client_defenses.mod_all import CLMODS_DEFENSE
+from client_defenses.nop import NOP_DEFENSE
+from client_defenses.tamaraw import TAMARAW_DEFENSE
+from client_defenses.tamaraw_qcsd import TAMARAW_QCSD_DEFENSE
 from h2.config import H2Configuration
 from h2.connection import H2Connection
 from h2.errors import ErrorCodes

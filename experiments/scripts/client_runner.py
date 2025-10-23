@@ -14,7 +14,6 @@ from core_client import Request, run_test_case
 from scapy.config import conf
 from scapy.sendrecv import AsyncSniffer
 from scapy.utils import wrpcap
-import sslkeylog
 from tqdm import tqdm
 
 parser = ArgumentParser()
@@ -65,7 +64,7 @@ conf.bufsize = 50 * 1024 * 1024  # 50 MB buffer size
 testcase = Path(__file__).parent.name
 cat = Path(__file__).parent.parent.name
 
-WORKSPACE = Path(f"/data/bcebere/http2/experiments/{cat}/{testcase}")
+WORKSPACE = Path("workspace")
 WORKSPACE.mkdir(parents=True, exist_ok=True)
 
 TRACE_PATH = Path(WORKSPACE / "traces")
@@ -74,7 +73,6 @@ TRACE_PATH.mkdir(parents=True, exist_ok=True)
 OUTPUT_CSV = Path(WORKSPACE / "tcp_repr/output_csv_single")
 startup_wait_sec = 0.2
 
-sslkeylog.set_keylog("ssllogkey.log")
 IFACE = args.ifname  # "lo"
 SERVER_PORT = int(args.dst_port)  # 8443
 SERVER_IP = args.dst_ip  # "127.0.0.1"
