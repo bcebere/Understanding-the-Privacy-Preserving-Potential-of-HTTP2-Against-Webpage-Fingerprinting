@@ -3,13 +3,12 @@ In this repository, we provide the code to reproduce the results in the "Underst
 
 ## 🚀 Website Fingerprinting Audit Tool
 
-The [wfaudit](./wfaudit) library provides a framework for evaluating the security of a WF defense, through fingerprinting accuracy, information leakage, and feature importance measurements.
+The [wfaudit](./wfaudit/README.md) library provides a framework for evaluating the security of a WF defense, through fingerprinting accuracy, information leakage, and feature importance measurements.
 
 The library can be installed from source using
 ```bash
 cd wfaudit
 pip install .
-# TODO: publish to PyPI
 ```
 
 Example usage:
