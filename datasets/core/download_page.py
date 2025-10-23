@@ -35,7 +35,7 @@ async def save_responses(url, reuse_context=False, headless=True):
         # Launch the browser
         if reuse_context:
             context = await p.chromium.launch_persistent_context(
-                user_data_dir="/home/bcebere/.config/chromium/",  # Path to your existing user data directory
+                user_data_dir="~/.config/chromium/",  # Path to your existing user data directory
                 ignore_https_errors=True,
                 headless=headless,
             )
