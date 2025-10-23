@@ -1,48 +1,83 @@
-## WFAUDIT
+# 🚀 Website Fingerprinting Audit Tool
 
-A tool that measures the information leakage of an website, starting from a dataset of PCAPs.
+The [wfaudit](./wfaudit) library provides a framework for evaluating the security of a WF defense, through fingerprinting accuracy, information leakage, and feature importance measurements.
 
-Example usage:
+
+## 🔑 Installation
+The library can be installed from source using
+```bash
+cd wfaudit
+pip install .
+# TODO: publish to PyPI
+```
+
+## 💥 Example usage:
 
 ```python
 # stdlib
-import json
 from pathlib import Path
 
 # wfaudit absolute
-from wfaudit import create_datasets, evaluate_leakage, evaluate_ml, prepare_features
-from wfaudit.helpers_ml import print_score
+from wfaudit import audit, prepare_all_datasets, process_raw_pcaps
 
-traces = ... # folder with collected PCAPS from the interaction client-server. Each pcap name should have the format '<subpage_label>_<repeat_count>.pcap'
-# See wfaudit/tests/test_benchmarks.py for a data collection example.
+traces = ... # path to the collected PCAPS
+# See experiments/ for a full example on how to simulate the PCAPs
 
 workspace = Path("workspace")
-
-# Process the PCAPs in the `traces` folder
-create_datasets(
-    traces=Path("traces"),
-    workspace=tmp_path,
+pcaps = process_raw_pcaps(
+    traces=traces,
+    workspace=workspace,
     unlink_after_processing=False,
 )
 
-# Extract the information leakage features
-output_features = workspace / "output_features"
-features_range = prepare_features(
-    time_series_traces=tmp_path / "output_wefde",
-    output=output_features,
+# Create the evaluation datasets
+prepare_all_datasets(
+    workspace=workspace,
+    n_websites=...,  # Number of labels in the dataset
+    n_traces=...,  # Number of samples per label
 )
 
-# Compute information leakage
-output_leakage = workspace / "output_leakage"
-leakage = evaluate_leakage(
-    features, workspace=output_leakage, wefde_features_dir=output_features
+# Evaluate the security of the dataset
+ml_output_folder = workspace / "eval_ml"
+wefde_output_folder = workspace / "eval_wefde"
+deepse_output = workspace / "eval_deepse/results.csv"
+xai_output_folder = workspace / "eval_xai"
+
+wefde_feats_folder = workspace / "output_features"
+deepse_dataset = workspace / "output_deepse" / "real" / "dataset.npz"
+
+assert wefde_feats_folder.exists()  # created by prepare_all_datasets
+assert deepse_dataset.exists()  # created by prepare_all_datasets
+
+scores = audit(
+    # ML
+    ml_output_folder=ml_output_folder,
+    wefde_feats_folder=wefde_feats_folder,
+    deepse_dataset=deepse_dataset,
+    ml_arch_2D=["xgboost"],
+    ml_arch_3D=[],
+    # leakage
+    wefde_output_folder=wefde_output_folder,
+    deepse_output=deepse_output,
+    # xai
+    xai_output_folder=xai_output_folder,
 )
-print("Information Leakage ", leakage)
 
-# Compute F1 score for fingerprinting
-ml_score = evaluate_ml(
-    workspace=output_ml, wefde_features_dir=output_features
-)  # returns a list of F1 scores, for each label
-print("ML F1-score", print_score(ml_score))
-
+print("ML scores ---> ", scores["ML"])
+print("Leakage scores ---> ", scores["leakage"])
+print("XAI scores ---> ", scores["xai"])
 ```
+
+## :hammer: Tests
+For more examples on how to use the library, please refer to the [unit tests](./tests).
+
+Install the testing dependencies for `wfaudit` using
+```bash
+pip install .[testing]
+```
+The tests can be executed using
+```bash
+pytest -vsx
+```
+
+``
