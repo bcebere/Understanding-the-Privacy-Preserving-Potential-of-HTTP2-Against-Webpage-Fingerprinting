@@ -23,6 +23,7 @@ from wfaudit.helpers_ml.holmes import HolmesClassifier
 from wfaudit.helpers_ml.kfpv2 import KFingerprintingForestClassifier
 from wfaudit.helpers_ml.lr import LinearClassifier
 from wfaudit.helpers_ml.rf import RFClassifier
+from wfaudit.helpers_ml.robustfp import RobustFingerprintingClassifier
 from wfaudit.helpers_ml.serialization import load_from_file, save_to_file
 from wfaudit.helpers_ml.varcnn import VarCNNClassifier
 from wfaudit.helpers_ml.xgb import XGBoostClassifier
@@ -210,13 +211,18 @@ def evaluate_classifier(
     if n_folds < 2:
         raise ValueError("n_folds must be >= 2")
 
+    X = np.asarray(X)
+
+    # Encode labels FIRST, then collect classes from the encoded space.
+    # Collecting before encoding is a bug: classes holds raw label values while
+    # predict_proba returns encoded indices.
+    Y = LabelEncoder().fit_transform(Y)
+    Y = np.asarray(Y)
+
     if classes is None:
         classes = np.ravel(Y)
     classes = set(classes)
 
-    X = np.asarray(X)
-    Y = LabelEncoder().fit_transform(Y)
-    Y = np.asarray(Y)
     # log.debug(f"evaluate_estimator shape x:{X.shape} y:{Y.shape}")
 
     results = {}
@@ -229,10 +235,19 @@ def evaluate_classifier(
     skf = StratifiedKFold(n_splits=n_folds, shuffle=True, random_state=seed)
 
     for train_index, test_index in skf.split(X, Y):
-        X_train = X[train_index]
         Y_train = Y[train_index]
-        X_test = X[test_index]
         Y_test = Y[test_index]
+
+        # Per-fold normalization for 3D sequence data (VarCNN, DF).
+        # Stats computed on train fold only to prevent leakage into test.
+        if X.ndim == 3:  # (N, channels, length)
+            mu = X[train_index].mean(axis=(0, 2), keepdims=True)
+            sigma = X[train_index].std(axis=(0, 2), keepdims=True) + 1e-8
+            X_train = (X[train_index] - mu) / sigma
+            X_test = (X[test_index] - mu) / sigma
+        else:
+            X_train = X[train_index]
+            X_test = X[test_index]
 
         model = copy.deepcopy(estimator)
         model.fit(X_train, Y_train)
@@ -275,6 +290,8 @@ def _get_arch_mode(arch: str, **kwargs):
         return VarCNNClassifier(**kwargs)
     elif arch == "holmes":
         return HolmesClassifier(**kwargs)
+    elif arch == "robustfp":
+        return RobustFingerprintingClassifier(**kwargs)
     elif arch == "df":
         return DFClassifier(**kwargs)
     else:
@@ -323,7 +340,7 @@ def _evaluate_static_models_cv(
         )
         if use_cache:
             save_to_file(bkp_file, score)
-    log.error(
+    log.info(
         f" >>> test = {testname}, datalen = {len(input_data)} score = {score['str']['f1_score_macro']}"
     )
     return score

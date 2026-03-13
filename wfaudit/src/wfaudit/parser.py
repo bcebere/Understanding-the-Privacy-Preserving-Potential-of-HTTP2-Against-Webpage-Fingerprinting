@@ -78,15 +78,12 @@ def process_raw_pcaps(
             log.error(
                 f"failed to parse pcap. moving to graveyard {filename}, error = {e}"
             )
-            filename.unlink()
-
             return
 
         label = stem.split("_")[1]
         static_data, temporal_data = session.temporal_stats_per_flow()
         if len(static_data) == 0:
             log.error(f"empty dataset {filename}")
-            filename.unlink()
             return
 
         static_data["label"] = label

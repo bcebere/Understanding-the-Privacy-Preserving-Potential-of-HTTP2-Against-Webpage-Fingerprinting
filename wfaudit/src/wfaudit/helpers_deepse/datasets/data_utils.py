@@ -36,7 +36,7 @@ def load_data(
     assert len(x.shape) == 3
     x = x[:, :, :feature_length]
 
-    y = y.astype("float32")
+    y = y.astype("int64")
 
     # reduce dataset if necessary
     if (
@@ -70,11 +70,11 @@ def get_split(x, y, train_idx, test_idx):
               data where a new axis is added for the traces
     """
     # get correct split of data
-    x_train = np.array([v for i, v in enumerate(x) if i in train_idx]).astype("float32")
-    x_test = np.array([v for i, v in enumerate(x) if i in test_idx]).astype("float32")
+    x_train = x[train_idx].astype("float32")
+    x_test = x[test_idx].astype("float32")
 
-    y_train = np.array([v for i, v in enumerate(y) if i in train_idx]).astype("float32")
-    y_test = np.array([v for i, v in enumerate(y) if i in test_idx]).astype("float32")
+    y_train = y[train_idx].astype("int64")
+    y_test = y[test_idx].astype("int64")
 
     # split test into tes1 and test2
     x_test1, x_test2, y_test1, y_test2 = train_test_split(
@@ -130,5 +130,6 @@ def get_dataloader(
         dataset,
         batch_size=batch_size,
         shuffle=is_training,
-        num_workers=num_workers,
+        num_workers=0,
+        pin_memory=True,
     )

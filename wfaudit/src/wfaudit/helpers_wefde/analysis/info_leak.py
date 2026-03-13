@@ -65,7 +65,7 @@ def features_to_category(
         offset = 0
         for category in features_range:
             next_off = features_range[category]
-            if feat < next_off and offset < feat:
+            if feat < next_off and offset <= feat:
                 if category not in output:
                     output[category] = []
                 output[category].append(feat)

@@ -163,13 +163,15 @@ def get_embeddings(model, data_loader, device=DEVICE):
     model.to(device)
     model.eval()
     embeddings = []
+    original_classifier = model.classifier
+    model.classifier = torch.nn.Identity()
     with torch.no_grad():
-        model.classifier = torch.nn.Identity()
         for traces, _ in data_loader:
             traces = traces.to(device)
 
             embedding = model(traces)
             embeddings.append(embedding.cpu().numpy())
+    model.classifier = original_classifier
 
     return np.concatenate(embeddings)
 
@@ -183,6 +185,8 @@ def train_models(
     device=DEVICE,
     batch_size: int = 200,
     num_workers: int = 4,
+    patience: int = 10,
+    min_delta: float = 0.0,
 ):
     """This function trains the attack for timeing as well as directional traces.
 
@@ -254,6 +258,8 @@ def train_models(
         "val_acc": [],
         "test_acc": [],
     }
+    best_state, best_val = None, float("inf")
+    epochs_no_improve = 0
     for epoch in range(epochs):
         train_loss, train_acc = train_one_epoch(
             model=model,
@@ -277,6 +283,24 @@ def train_models(
         current_history["val_loss"].append(val_loss)
         current_history["train_acc"].append(train_acc)
         current_history["val_acc"].append(val_acc)
+
+        if best_val - val_loss > min_delta:
+            best_val = val_loss
+            best_state = {
+                k: v.detach().cpu().clone() for k, v in model.state_dict().items()
+            }
+            epochs_no_improve = 0
+        else:
+            epochs_no_improve += 1
+
+        if epochs_no_improve >= patience:
+            tqdm.write(
+                f"Early stopping at epoch {epoch+1} (no val improvement for {patience} epochs)"
+            )
+            break
+
+    if best_state is not None:
+        model.load_state_dict(best_state)
 
     train_end = timer()
     logging.info(f"\tmodel ({timedelta(seconds=train_end-train_start)})")

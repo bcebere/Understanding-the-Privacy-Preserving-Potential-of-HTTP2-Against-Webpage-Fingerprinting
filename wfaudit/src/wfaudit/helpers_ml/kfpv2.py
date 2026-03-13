@@ -13,12 +13,13 @@ from typing import Optional
 # third party
 import numpy as np
 import sklearn
+from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neighbors import NearestNeighbors
 from sklearn.utils.multiclass import unique_labels
 
 
-class KFingerprintingForestClassifier:
+class KFingerprintingForestClassifier(BaseEstimator, ClassifierMixin):
     """k-fingerprinting website classifier.
 
     Utilises a RandomForestClassifier to gather leaf indices then
