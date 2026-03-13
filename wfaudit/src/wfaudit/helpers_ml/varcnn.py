@@ -76,7 +76,7 @@ class basic_1d(nn.Module):
 
         if self.shortcut is not None:
             shortcut = self.shortcut(x)
-            y += shortcut
+            y = y + shortcut
 
         return y
 

@@ -47,7 +47,7 @@ def test_eval_ml_2D(tmp_path, arch):
         assert metric in scores["str"]
 
 
-@pytest.mark.parametrize("arch", ["varcnn", "df"])
+@pytest.mark.parametrize("arch", ["varcnn", "df", "robustfp", "holmes"])
 def test_eval_ml_3D(tmp_path, arch):
     ml_folder = tmp_path / "eval_ml"
     deepse_dataset = Path("datasets") / "deepse" / "dataset.npz"
