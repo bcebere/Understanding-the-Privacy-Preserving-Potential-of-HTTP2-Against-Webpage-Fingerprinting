@@ -1,0 +1,20 @@
+{
+    "/wiki/Eutypella": {
+        "body_path": "data/bin/4424e522943a9729725b78105c992a0dc6bc94ce",
+        "url": "https://en.wikipedia.org/wiki/Eutypella",
+        "url_local": "/wiki/Eutypella",
+        "status": 200,
+        "content_type": "text/html; charset=UTF-8",
+        "headers": {},
+        "timeout_s": 0.3869650363922119
+    },
+    "/w/load.php?lang=en&modules=ext.cite.styles%7Cext.uls.interlanguage%7Cext.visualEditor.desktopArticleTarget.noscript%7Cext.wikimediamessages.styles%7Cskins.vector.icons%2Cstyles%7Cskins.vector.search.codex.styles%7Cwikibase.client.init&only=styles&skin=vector-2022": {
+        "body_path": "data/bin/b08e420274f4785159c36bf7cfc65e66986fa9eb",
+        "url": "https://en.wikipedia.org/w/load.php?lang=en&modules=ext.cite.styles%7Cext.uls.interlanguage%7Cext.visualEditor.desktopArticleTarget.noscript%7Cext.wikimediamessages.styles%7Cskins.vector.icons%2Cstyles%7Cskins.vector.search.codex.styles%7Cwikibase.client.init&only=styles&skin=vector-2022",
+        "url_local": "/w/load.php?lang=en&modules=ext.cite.styles%7Cext.uls.interlanguage%7Cext.visualEditor.desktopArticleTarget.noscript%7Cext.wikimediamessages.styles%7Cskins.vector.icons%2Cstyles%7Cskins.vector.search.codex.styles%7Cwikibase.client.init&only=styles&skin=vector-2022",
+        "status": 200,
+        "content_type": "text/css; charset=utf-8",
+        "headers": {},
+        "timeout_s": 0.017659664154052734
+    }
+}

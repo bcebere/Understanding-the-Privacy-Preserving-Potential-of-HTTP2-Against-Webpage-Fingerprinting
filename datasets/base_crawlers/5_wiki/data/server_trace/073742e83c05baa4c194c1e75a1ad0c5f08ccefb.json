@@ -1,0 +1,92 @@
+{
+    "/wiki/Gilbert%20of%20Hastings": {
+        "body_path": "data/bin/073742e83c05baa4c194c1e75a1ad0c5f08ccefb",
+        "url": "https://en.wikipedia.org/wiki/Gilbert%20of%20Hastings",
+        "url_local": "/wiki/Gilbert%20of%20Hastings",
+        "status": 301,
+        "content_type": "text/html; charset=UTF-8",
+        "headers": {},
+        "timeout_s": 0.25243234634399414
+    },
+    "/wiki/Gilbert_of_Hastings": {
+        "body_path": "data/bin/f1237a5c0ce746cd9392a9a7b1d240be8128a0c5",
+        "url": "https://en.wikipedia.org/wiki/Gilbert_of_Hastings",
+        "url_local": "/wiki/Gilbert_of_Hastings",
+        "status": 200,
+        "content_type": "text/html; charset=UTF-8",
+        "headers": {},
+        "timeout_s": 0.30626654624938965
+    },
+    "/w/load.php?lang=en&modules=ext.cite.styles%7Cext.uls.interlanguage%7Cext.visualEditor.desktopArticleTarget.noscript%7Cext.wikimediamessages.styles%7Cskins.vector.icons%2Cstyles%7Cskins.vector.search.codex.styles%7Cwikibase.client.init&only=styles&skin=vector-2022": {
+        "body_path": "data/bin/b08e420274f4785159c36bf7cfc65e66986fa9eb",
+        "url": "https://en.wikipedia.org/w/load.php?lang=en&modules=ext.cite.styles%7Cext.uls.interlanguage%7Cext.visualEditor.desktopArticleTarget.noscript%7Cext.wikimediamessages.styles%7Cskins.vector.icons%2Cstyles%7Cskins.vector.search.codex.styles%7Cwikibase.client.init&only=styles&skin=vector-2022",
+        "url_local": "/w/load.php?lang=en&modules=ext.cite.styles%7Cext.uls.interlanguage%7Cext.visualEditor.desktopArticleTarget.noscript%7Cext.wikimediamessages.styles%7Cskins.vector.icons%2Cstyles%7Cskins.vector.search.codex.styles%7Cwikibase.client.init&only=styles&skin=vector-2022",
+        "status": 200,
+        "content_type": "text/css; charset=utf-8",
+        "headers": {},
+        "timeout_s": 0.0187835693359375
+    },
+    "/w/load.php?lang=en&modules=site.styles&only=styles&skin=vector-2022": {
+        "body_path": "data/bin/38f9d9d981ee7e0c696ae5792eb1176eb43adf8b",
+        "url": "https://en.wikipedia.org/w/load.php?lang=en&modules=site.styles&only=styles&skin=vector-2022",
+        "url_local": "/w/load.php?lang=en&modules=site.styles&only=styles&skin=vector-2022",
+        "status": 200,
+        "content_type": "text/css; charset=utf-8",
+        "headers": {},
+        "timeout_s": 0.021385669708251953
+    },
+    "/static/images/mobile/copyright/wikipedia-wordmark-en.svg": {
+        "body_path": "data/bin/429b5ef43cb4e7e5008d10f2bf3672ff6a34e59d",
+        "url": "https://en.wikipedia.org/static/images/mobile/copyright/wikipedia-wordmark-en.svg",
+        "url_local": "/static/images/mobile/copyright/wikipedia-wordmark-en.svg",
+        "status": 200,
+        "content_type": "image/svg+xml",
+        "headers": {},
+        "timeout_s": 0.021658897399902344
+    },
+    "/static/images/icons/wikipedia.png": {
+        "body_path": "data/bin/98effd2a1889d09813e63b737fb311afab15929c",
+        "url": "https://en.wikipedia.org/static/images/icons/wikipedia.png",
+        "url_local": "/static/images/icons/wikipedia.png",
+        "status": 200,
+        "content_type": "image/png",
+        "headers": {},
+        "timeout_s": 0.11394500732421875
+    },
+    "/static/images/mobile/copyright/wikipedia-tagline-en.svg": {
+        "body_path": "data/bin/b2d98419222e15a32b6a3dced835ae7d488ae942",
+        "url": "https://en.wikipedia.org/static/images/mobile/copyright/wikipedia-tagline-en.svg",
+        "url_local": "/static/images/mobile/copyright/wikipedia-tagline-en.svg",
+        "status": 200,
+        "content_type": "image/svg+xml",
+        "headers": {},
+        "timeout_s": 0.11441731452941895
+    },
+    "/w/load.php?modules=skins.vector.icons&image=menu&format=original&lang=en&skin=vector-2022&version=zfrnc": {
+        "body_path": "data/bin/9c86b76b609787f1a80460cb5b9a6f6be799dee0",
+        "url": "https://en.wikipedia.org/w/load.php?modules=skins.vector.icons&image=menu&format=original&lang=en&skin=vector-2022&version=zfrnc",
+        "url_local": "/w/load.php?modules=skins.vector.icons&image=menu&format=original&lang=en&skin=vector-2022&version=zfrnc",
+        "status": 200,
+        "content_type": "image/svg+xml",
+        "headers": {},
+        "timeout_s": 0.003444194793701172
+    },
+    "/w/load.php?modules=skins.vector.icons&image=ellipsis&format=original&lang=en&skin=vector-2022&version=zfrnc": {
+        "body_path": "data/bin/d218c7429892d7b8a2e0670d317c84c15778017d",
+        "url": "https://en.wikipedia.org/w/load.php?modules=skins.vector.icons&image=ellipsis&format=original&lang=en&skin=vector-2022&version=zfrnc",
+        "url_local": "/w/load.php?modules=skins.vector.icons&image=ellipsis&format=original&lang=en&skin=vector-2022&version=zfrnc",
+        "status": 200,
+        "content_type": "image/svg+xml",
+        "headers": {},
+        "timeout_s": 0.0038576126098632812
+    },
+    "/w/load.php?modules=skins.vector.icons&image=language&variant=progressive&format=original&lang=en&skin=vector-2022&version=zfrnc": {
+        "body_path": "data/bin/cfb03800bbd4e0c8206b1a0c2f44f96431cc3cfa",
+        "url": "https://en.wikipedia.org/w/load.php?modules=skins.vector.icons&image=language&variant=progressive&format=original&lang=en&skin=vector-2022&version=zfrnc",
+        "url_local": "/w/load.php?modules=skins.vector.icons&image=language&variant=progressive&format=original&lang=en&skin=vector-2022&version=zfrnc",
+        "status": 200,
+        "content_type": "image/svg+xml",
+        "headers": {},
+        "timeout_s": 0.0040988922119140625
+    }
+}

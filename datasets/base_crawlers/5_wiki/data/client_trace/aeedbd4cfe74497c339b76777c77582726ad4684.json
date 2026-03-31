@@ -1,0 +1,68 @@
+[
+  {
+    "url": "https://en.wikipedia.org/wiki/Siris",
+    "url_local": "/wiki/Siris",
+    "headers": {
+      "upgrade-insecure-requests": "1",
+      "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.16 Safari/537.36",
+      "sec-ch-ua": "\"Chromium\";v=\"140\", \"Not=A?Brand\";v=\"24\", \"HeadlessChrome\";v=\"140\"",
+      "sec-ch-ua-mobile": "?0",
+      "sec-ch-ua-platform": "\"Linux\""
+    }
+  },
+  {
+    "url": "https://en.wikipedia.org/w/load.php?lang=en&modules=site.styles&only=styles&skin=vector-2022",
+    "url_local": "/w/load.php?lang=en&modules=site.styles&only=styles&skin=vector-2022",
+    "headers": {
+      "sec-ch-ua-platform": "\"Linux\"",
+      "referer": "https://en.wikipedia.org/wiki/Siris",
+      "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.16 Safari/537.36",
+      "sec-ch-ua": "\"Chromium\";v=\"140\", \"Not=A?Brand\";v=\"24\", \"HeadlessChrome\";v=\"140\"",
+      "sec-ch-ua-mobile": "?0"
+    }
+  },
+  {
+    "url": "https://en.wikipedia.org/w/load.php?lang=en&modules=ext.uls.interlanguage%7Cext.visualEditor.desktopArticleTarget.noscript%7Cext.wikimediamessages.styles%7Cskins.vector.icons%2Cstyles%7Cskins.vector.search.codex.styles%7Cwikibase.client.init&only=styles&skin=vector-2022",
+    "url_local": "/w/load.php?lang=en&modules=ext.uls.interlanguage%7Cext.visualEditor.desktopArticleTarget.noscript%7Cext.wikimediamessages.styles%7Cskins.vector.icons%2Cstyles%7Cskins.vector.search.codex.styles%7Cwikibase.client.init&only=styles&skin=vector-2022",
+    "headers": {
+      "sec-ch-ua-platform": "\"Linux\"",
+      "referer": "https://en.wikipedia.org/wiki/Siris",
+      "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.16 Safari/537.36",
+      "sec-ch-ua": "\"Chromium\";v=\"140\", \"Not=A?Brand\";v=\"24\", \"HeadlessChrome\";v=\"140\"",
+      "sec-ch-ua-mobile": "?0"
+    }
+  },
+  {
+    "url": "https://en.wikipedia.org/static/images/mobile/copyright/wikipedia-wordmark-en.svg",
+    "url_local": "/static/images/mobile/copyright/wikipedia-wordmark-en.svg",
+    "headers": {
+      "sec-ch-ua-platform": "\"Linux\"",
+      "referer": "https://en.wikipedia.org/wiki/Siris",
+      "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.16 Safari/537.36",
+      "sec-ch-ua": "\"Chromium\";v=\"140\", \"Not=A?Brand\";v=\"24\", \"HeadlessChrome\";v=\"140\"",
+      "sec-ch-ua-mobile": "?0"
+    }
+  },
+  {
+    "url": "https://en.wikipedia.org/static/images/icons/wikipedia.png",
+    "url_local": "/static/images/icons/wikipedia.png",
+    "headers": {
+      "sec-ch-ua-platform": "\"Linux\"",
+      "referer": "https://en.wikipedia.org/wiki/Siris",
+      "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.16 Safari/537.36",
+      "sec-ch-ua": "\"Chromium\";v=\"140\", \"Not=A?Brand\";v=\"24\", \"HeadlessChrome\";v=\"140\"",
+      "sec-ch-ua-mobile": "?0"
+    }
+  },
+  {
+    "url": "https://en.wikipedia.org/static/images/mobile/copyright/wikipedia-tagline-en.svg",
+    "url_local": "/static/images/mobile/copyright/wikipedia-tagline-en.svg",
+    "headers": {
+      "sec-ch-ua-platform": "\"Linux\"",
+      "referer": "https://en.wikipedia.org/wiki/Siris",
+      "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.16 Safari/537.36",
+      "sec-ch-ua": "\"Chromium\";v=\"140\", \"Not=A?Brand\";v=\"24\", \"HeadlessChrome\";v=\"140\"",
+      "sec-ch-ua-mobile": "?0"
+    }
+  }
+]

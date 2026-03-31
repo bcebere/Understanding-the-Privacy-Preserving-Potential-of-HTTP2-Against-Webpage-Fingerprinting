@@ -1,0 +1,56 @@
+{
+    "/wiki/Siris": {
+        "body_path": "data/bin/aeedbd4cfe74497c339b76777c77582726ad4684",
+        "url": "https://en.wikipedia.org/wiki/Siris",
+        "url_local": "/wiki/Siris",
+        "status": 200,
+        "content_type": "text/html; charset=UTF-8",
+        "headers": {},
+        "timeout_s": 0.09394216537475586
+    },
+    "/w/load.php?lang=en&modules=site.styles&only=styles&skin=vector-2022": {
+        "body_path": "data/bin/38f9d9d981ee7e0c696ae5792eb1176eb43adf8b",
+        "url": "https://en.wikipedia.org/w/load.php?lang=en&modules=site.styles&only=styles&skin=vector-2022",
+        "url_local": "/w/load.php?lang=en&modules=site.styles&only=styles&skin=vector-2022",
+        "status": 200,
+        "content_type": "text/css; charset=utf-8",
+        "headers": {},
+        "timeout_s": 0.019235610961914062
+    },
+    "/w/load.php?lang=en&modules=ext.uls.interlanguage%7Cext.visualEditor.desktopArticleTarget.noscript%7Cext.wikimediamessages.styles%7Cskins.vector.icons%2Cstyles%7Cskins.vector.search.codex.styles%7Cwikibase.client.init&only=styles&skin=vector-2022": {
+        "body_path": "data/bin/cee699d2fe36320c2a0a2dfca459071d01e4f337",
+        "url": "https://en.wikipedia.org/w/load.php?lang=en&modules=ext.uls.interlanguage%7Cext.visualEditor.desktopArticleTarget.noscript%7Cext.wikimediamessages.styles%7Cskins.vector.icons%2Cstyles%7Cskins.vector.search.codex.styles%7Cwikibase.client.init&only=styles&skin=vector-2022",
+        "url_local": "/w/load.php?lang=en&modules=ext.uls.interlanguage%7Cext.visualEditor.desktopArticleTarget.noscript%7Cext.wikimediamessages.styles%7Cskins.vector.icons%2Cstyles%7Cskins.vector.search.codex.styles%7Cwikibase.client.init&only=styles&skin=vector-2022",
+        "status": 200,
+        "content_type": "text/css; charset=utf-8",
+        "headers": {},
+        "timeout_s": 0.01689004898071289
+    },
+    "/static/images/mobile/copyright/wikipedia-wordmark-en.svg": {
+        "body_path": "data/bin/429b5ef43cb4e7e5008d10f2bf3672ff6a34e59d",
+        "url": "https://en.wikipedia.org/static/images/mobile/copyright/wikipedia-wordmark-en.svg",
+        "url_local": "/static/images/mobile/copyright/wikipedia-wordmark-en.svg",
+        "status": 200,
+        "content_type": "image/svg+xml",
+        "headers": {},
+        "timeout_s": 0.02106928825378418
+    },
+    "/static/images/icons/wikipedia.png": {
+        "body_path": "data/bin/98effd2a1889d09813e63b737fb311afab15929c",
+        "url": "https://en.wikipedia.org/static/images/icons/wikipedia.png",
+        "url_local": "/static/images/icons/wikipedia.png",
+        "status": 200,
+        "content_type": "image/png",
+        "headers": {},
+        "timeout_s": 0.16695809364318848
+    },
+    "/static/images/mobile/copyright/wikipedia-tagline-en.svg": {
+        "body_path": "data/bin/b2d98419222e15a32b6a3dced835ae7d488ae942",
+        "url": "https://en.wikipedia.org/static/images/mobile/copyright/wikipedia-tagline-en.svg",
+        "url_local": "/static/images/mobile/copyright/wikipedia-tagline-en.svg",
+        "status": 200,
+        "content_type": "image/svg+xml",
+        "headers": {},
+        "timeout_s": 0.16734862327575684
+    }
+}
