@@ -1,9 +1,10 @@
 # stdlib
 import time
 
+import pandas as pd
+
 # third party
 from download_page import capture
-import pandas as pd
 
 urls = []
 for batch in range(1, 5):

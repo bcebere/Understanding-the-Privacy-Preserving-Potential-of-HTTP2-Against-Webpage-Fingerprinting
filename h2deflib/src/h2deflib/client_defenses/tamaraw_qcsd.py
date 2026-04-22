@@ -1,9 +1,8 @@
-# wfaudit relative
 # h2deflib relative
 from .core_defense import DEFENSE
 
 TAMARAW_QCSD_DEFENSE = DEFENSE(
-    name="tamaraw_qcsd",
+    name="tamaraw",
     initial_window_size_strategy=4096,  # "constant",
     recv_delay_threshold=4096,
     recv_interval_strategy=0.01,

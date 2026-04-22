@@ -7,18 +7,14 @@ from __future__ import annotations
 
 # stdlib
 import asyncio
-import datetime
 import io
-from pathlib import Path
-import random
 import ssl
+from pathlib import Path
 from typing import Dict, List, Tuple
 
+import pytest
+
 # third party
-from cryptography import x509
-from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
-from cryptography.x509.oid import NameOID
 from h2.config import H2Configuration
 from h2.connection import H2Connection
 from h2.events import (
@@ -29,7 +25,6 @@ from h2.events import (
     SettingsAcknowledged,
     StreamEnded,
 )
-import pytest
 
 # h2deflib absolute
 from h2deflib import (
@@ -133,45 +128,29 @@ class TestH2ServerConfig:
         assert c.fixed_frame_delay is None
         assert c.fixed_frame_threshold is None
 
+    def test_h2ps_preset(self):
+        c = H2ServerConfig.h2ps()
+        # Features that are ON in the h2ps eval script.
+        assert c.enable_multiplexing_batching
+        assert c.enable_random_103_hints
+        assert c.enable_global_103_hints
+        assert c.hints_count_lo == 1
+        assert c.hints_count_hi == 3
+        assert c.enable_random_out_window
+        assert c.enable_random_frame_delay
+        assert c.enable_hpack_cache_bust
+        # Features that are deliberately OFF in the h2ps eval script.
+        assert not c.enable_random_server_push
+        assert not c.enable_random_pings
+        # Features that weren't touched by the script (remain at defaults).
+        assert not c.enable_random_padding
+        assert not c.enable_fixed_padding
+        assert not c.enable_server_push
+
 
 # ====================================================================== #
 # Integration tests: real server + raw h2 client                           #
 # ====================================================================== #
-
-
-def _make_self_signed_cert(tmp_path: Path) -> Tuple[Path, Path]:
-    """Generate a throwaway TLS cert for the tests."""
-    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "localhost")])
-    cert = (
-        x509.CertificateBuilder()
-        .subject_name(name)
-        .issuer_name(name)
-        .public_key(key.public_key())
-        .serial_number(x509.random_serial_number())
-        .not_valid_before(datetime.datetime.now(datetime.timezone.utc))
-        .not_valid_after(
-            datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=1)
-        )
-        .add_extension(
-            x509.SubjectAlternativeName([x509.DNSName("localhost")]),
-            critical=False,
-        )
-        .sign(key, hashes.SHA256())
-    )
-    cert_file = tmp_path / "cert.pem"
-    key_file = tmp_path / "key.pem"
-    cert_file.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
-    key_file.write_bytes(
-        key.private_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PrivateFormat.PKCS8,
-            encryption_algorithm=serialization.NoEncryption(),
-        )
-    )
-    return cert_file, key_file
-
-
 class _FetchClient(asyncio.Protocol):
     """
     Minimal HTTP/2 GET client built directly on the ``h2`` state machine.
@@ -282,19 +261,6 @@ async def _start_server(
     server = await loop.create_server(factory, "127.0.0.1", 0, ssl=ssl_ctx)
     port = server.sockets[0].getsockname()[1]
     return server, port
-
-
-@pytest.fixture(scope="session")
-def tls_cert(tmp_path_factory):
-    """Generate one self-signed cert per test session."""
-    tmp = tmp_path_factory.mktemp("tls")
-    return _make_self_signed_cert(tmp)
-
-
-@pytest.fixture(autouse=True)
-def seeded_random():
-    """Make the tests deterministic despite the server's use of ``random``."""
-    random.seed(1234)
 
 
 @pytest.mark.asyncio

@@ -1,7 +1,7 @@
 # stdlib
+import json
 from copy import deepcopy
 from glob import glob
-import json
 
 files = glob("./*.json")
 

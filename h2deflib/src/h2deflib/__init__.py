@@ -21,7 +21,6 @@ Typical use:
 """
 
 # h2deflib relative
-# wfaudit relative
 from .client import (
     ConnectionDetails,
     H2Client,

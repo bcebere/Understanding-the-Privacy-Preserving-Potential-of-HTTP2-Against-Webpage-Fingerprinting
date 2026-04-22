@@ -1,9 +1,8 @@
-# wfaudit relative
 # h2deflib relative
 from .core_defense import DEFENSE
 
 CLMODS_DEFENSE = DEFENSE(
-    name="all_mods",
+    name="h2pc",
     initial_window_size_strategy="random",  # "clwdn",
     request_batch=False,
     request_shuffle=True,

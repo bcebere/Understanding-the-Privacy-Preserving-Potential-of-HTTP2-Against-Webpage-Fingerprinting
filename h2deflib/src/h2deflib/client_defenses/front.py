@@ -1,4 +1,3 @@
-# wfaudit relative
 # h2deflib relative
 from .core_defense import DEFENSE
 
