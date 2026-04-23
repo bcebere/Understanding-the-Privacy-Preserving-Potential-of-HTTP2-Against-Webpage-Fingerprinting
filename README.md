@@ -68,6 +68,10 @@ print("Leakage scores ---> ", scores["leakage"])
 print("XAI scores ---> ", scores["xai"])
 ```
 
+## ⚡ Proof-of-Concept HTTP/2 client/servers
+
+TODO : [h2deflib](h2deflib) docs.
+
 ## :hammer: Tests
 
 Install the testing dependencies wfaudit using

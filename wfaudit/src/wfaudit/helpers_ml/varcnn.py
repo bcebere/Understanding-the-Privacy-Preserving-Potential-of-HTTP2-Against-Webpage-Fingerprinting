@@ -49,8 +49,8 @@ class basic_1d(nn.Module):
                 bias=False,
                 dilation=dilations[1],
             ),
-            nn.ReLU(),
             nn.BatchNorm1d(num_features=out_filters, eps=1e-5),
+            nn.ReLU(),
         )
 
         self.shortcut = None
@@ -76,7 +76,7 @@ class basic_1d(nn.Module):
 
         if self.shortcut is not None:
             shortcut = self.shortcut(x)
-            y += shortcut
+            y = y + shortcut
 
         return y
 

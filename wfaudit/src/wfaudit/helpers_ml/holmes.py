@@ -46,19 +46,20 @@ class Encoder1d(nn.Module):
 
     def __init__(self, in_channels, out_channels, conv_num_layers=4):
         super(Encoder1d, self).__init__()
+
+        # Build channel progression: double from 128 up to out_channels,
+        # then force the last stage to exactly out_channels.
+        channels = [min(128 * 2**i, out_channels) for i in range(conv_num_layers)]
+        channels[-1] = out_channels
+
         layers = []
         current_in = in_channels
-        hidden = 128
-        for i in range(conv_num_layers):
-            layers.append(ConvBlock1d(current_in, hidden, 3))
+        for i, ch in enumerate(channels):
+            layers.append(ConvBlock1d(current_in, ch, 3))
             if i < conv_num_layers - 1:
                 layers.append(nn.MaxPool1d(3))
                 layers.append(nn.Dropout(0.3))
-            current_in = hidden
-            hidden = hidden * 2
-            # Override the final hidden dimension just before the last layer:
-            if i == conv_num_layers - 2:
-                hidden = out_channels
+            current_in = ch
 
         self.layers = nn.Sequential(*layers)
 
@@ -71,28 +72,29 @@ class Holmes(nn.Module):
         super().__init__()
         emb_size = 128
         self.encoder1d = Encoder1d(
-            in_channels=in_channels,  # <- 2 for your data
+            in_channels=in_channels,
             out_channels=emb_size,
             conv_num_layers=4,
         )
         self.global_pool = nn.AdaptiveAvgPool1d(1)
-        self.final_linear = nn.Linear(emb_size, num_classes)
+        self.classifier = nn.Sequential(
+            nn.Dropout(0.3),
+            nn.Linear(emb_size, num_classes),
+        )
         self._initialize_weights()
 
     def forward(self, x):
-        """
-        x shape: [batch_size, 3, 360]
-        """
-        x = self.encoder1d(x)  # [batch, 128, some_length]
-        x = self.global_pool(x)  # [batch, 128, 1]
-        x = x.view(x.size(0), -1)  # [batch, 128]
-        x = self.final_linear(x)  # [batch, 2]
+        x = self.encoder1d(x)  # [batch, emb_size, length]
+        x = self.global_pool(x)  # [batch, emb_size, 1]
+        x = x.view(x.size(0), -1)  # [batch, emb_size]
+        x = self.classifier(x)  # [batch, num_classes]
         return x
 
     def _initialize_weights(self):
         for m in self.modules():
             if isinstance(m, nn.Conv1d):
-                n = (m.kernel_size[0]) * m.out_channels
+                # Kaiming He init: fan-in = kernel_size * in_channels
+                n = m.kernel_size[0] * m.in_channels
                 m.weight.data.normal_(0, math.sqrt(2.0 / n))
                 if m.bias is not None:
                     m.bias.data.zero_()
@@ -135,6 +137,8 @@ class HolmesClassifier:
     def predict_proba(self, X: np.ndarray, batch_size=100) -> np.ndarray:
         if self.model is None:
             raise RuntimeError("Fit the model first")
+        # Move model to device — train_model returns it on CPU (best_state is cpu-cloned)
+        self.model.to(self.device)
         self.model.eval()
         X = torch.from_numpy(np.asarray(X)).float()
         num_samples = X.shape[0]
@@ -152,7 +156,7 @@ class HolmesClassifier:
         return torch.cat(probs_out, dim=0).numpy()
 
     def predict(self, X: np.ndarray) -> np.ndarray:
-        return np.argmax(self.predict_proba(X), axis=-1)  # Ensure correct axis
+        return np.argmax(self.predict_proba(X), axis=-1)
 
     @staticmethod
     def name() -> str:

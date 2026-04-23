@@ -202,7 +202,7 @@ def main(args):
         num_workers=args.num_workers,
         knn_measure=args.knn_measure,
         ber_k=args.ber_k,
-        mi_k=args.ber_k,
+        mi_k=args.mi_k,
     )
 
     logging.info(f"Results:\n\n{results}\n")

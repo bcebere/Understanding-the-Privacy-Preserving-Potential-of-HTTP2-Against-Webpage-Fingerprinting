@@ -1,0 +1,11 @@
+# Server with added noise
+#
+python ./server_simple.py --dst_port $1 \
+    --http2_batch 1 \
+    --http2_rnd_server_push 0 \
+    --http2_rnd_hints103 1 \
+    --http2_rnd_pings 0 \
+    --http2_rnd_out_window 1 \
+    --http2_rnd_delay 1 \
+    --http2_global_hints103 0 \
+    --http2_hpack 1

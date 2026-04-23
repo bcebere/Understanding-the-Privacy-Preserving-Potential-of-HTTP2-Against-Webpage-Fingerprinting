@@ -84,8 +84,7 @@ def process_pcap_via_json(
         display_filter="tls",
         keep_packets=False,  # stream, don’t store
         include_raw=False,  # skip hex dumps
-        # use_ek=True,              # fastest JSON output
-        use_json=True,  # <--
+        use_json=True,
     )
 
     session = process_capture(

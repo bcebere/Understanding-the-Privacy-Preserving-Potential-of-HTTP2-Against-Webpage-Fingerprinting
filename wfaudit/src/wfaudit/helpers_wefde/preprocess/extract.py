@@ -88,9 +88,7 @@ def task_handler(filepath: str, out_path: str, conn_limit: int):
     times = x.iloc[:, 0].astype(float).values.tolist()
 
     HTTP2_DEF_WINDOW_SIZE = 65535
-    sizes = x.iloc[:, 1].astype(float).values
-    sizes /= HTTP2_DEF_WINDOW_SIZE
-    sizes = sizes.tolist()
+    sizes = (x.iloc[:, 1].astype(float).values / HTTP2_DEF_WINDOW_SIZE).tolist()
 
     # extract features (saving feature positions only for the first trace)
     if len(times) < 4:
