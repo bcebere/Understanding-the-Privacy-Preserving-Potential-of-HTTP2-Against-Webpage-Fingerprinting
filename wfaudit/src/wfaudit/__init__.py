@@ -17,4 +17,4 @@ from .parser import prepare_wefde_dataset  # noqa: F401; noqa: F401
 from .parser import prepare_wefde_raw  # noqa: F401; noqa: F401
 from .parser import process_raw_pcaps  # noqa: F401; noqa: F401
 
-logger.add(sink=sys.stderr, level="DEBUG")
+logger.add(sink=sys.stderr, level="ERROR")
