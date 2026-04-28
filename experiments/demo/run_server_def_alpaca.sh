@@ -1,1 +1,0 @@
-../scripts/run_server_def_alpaca.sh

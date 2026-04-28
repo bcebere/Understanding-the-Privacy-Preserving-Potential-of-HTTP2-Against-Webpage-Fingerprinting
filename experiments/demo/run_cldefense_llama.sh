@@ -1,1 +1,0 @@
-../scripts/run_cldefense_llama.sh

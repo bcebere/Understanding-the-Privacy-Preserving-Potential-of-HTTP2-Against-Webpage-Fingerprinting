@@ -1,1 +1,0 @@
-../scripts/server_runner_with_defs.py

@@ -1,1 +1,0 @@
-../scripts/run_client_srvdefs.sh
