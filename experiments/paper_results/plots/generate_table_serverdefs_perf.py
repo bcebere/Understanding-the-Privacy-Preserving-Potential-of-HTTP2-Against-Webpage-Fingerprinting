@@ -11,7 +11,7 @@ enabled_defenses = [
     f"srvdef_{defense}_{server}"
     for defense in ["alpaca", "tamaraw"]
     for server in ["html", "cdn1", "all"]
-]
+] + ["srvdef_h2ps"]
 
 pretty_datasets = {
     "5_wiki": "Wikipedia",
@@ -71,17 +71,22 @@ ml_def_results = (
     .reset_index()
     .rename_axis(None, axis=1)
 )
+print(ml_f1_results)
 
 # F1 score
 print("F1-score")
 print(
     ml_def_results[
-        ["Dataset", "srvdef_alpaca_html", "srvdef_alpaca_cdn1", "srvdef_alpaca_all"]
-    ]
-)
-print(
-    ml_def_results[
-        ["Dataset", "srvdef_tamaraw_html", "srvdef_tamaraw_cdn1", "srvdef_tamaraw_all"]
+        [
+            "Dataset",
+            "srvdef_alpaca_html",
+            "srvdef_alpaca_cdn1",
+            "srvdef_alpaca_all",
+            "srvdef_tamaraw_html",
+            "srvdef_tamaraw_cdn1",
+            "srvdef_tamaraw_all",
+            "srvdef_h2ps",
+        ]
     ]
 )
 
@@ -137,6 +142,7 @@ print(
             "srvdef_tamaraw_html",
             "srvdef_tamaraw_cdn1",
             "srvdef_tamaraw_all",
+            "srvdef_h2ps",
         ]
     ]
 )
@@ -197,6 +203,7 @@ print(
             "srvdef_tamaraw_html",
             "srvdef_tamaraw_cdn1",
             "srvdef_tamaraw_all",
+            "srvdef_h2ps",
         ]
     ]
 )
