@@ -1,6 +1,6 @@
-# Datasets
+# Browser Crawlers
 
-This section provides scripts for creating the resources  that can be replayed in the [experiments section](../experiments/demo).
+This section provides scripts for creating the resources  that can be replayed in the [experiments section](../experiments/example_replay).
 
 First, install `playwright`
 ```bash
@@ -16,4 +16,4 @@ cd 5_wiki
 python crawl.py
 ```
 
-This will generate a `data` which can be plugged into [experiments](../experiments/demo/) for replaying the website using various defenses.
+This will generate a `data` which can be plugged into [experiments](../experiments/example_replay/) for replaying the website using various defenses.
