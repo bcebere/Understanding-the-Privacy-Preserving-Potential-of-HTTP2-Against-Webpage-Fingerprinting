@@ -29,7 +29,7 @@ openssl req -new -x509 -key "$KEY_FILE" -out "$CERT_FILE" -days 365 \
 ```
 
 ## Demo for simulating the HTTP2 datasets
-[The demo](./demo) illustrates how to collect traces using a toy dataset (3 pages), and how simulate various defenses (server or client side).
+[example_replay](./example_replay) illustrates how to replay browser traces, using various defenses (server or client side).
 For full datasets, replace the `data` folder with the contents (`bin`, `client_trace`, `server_trace`) of one of the datasets from [website datasets](../datasets/).
 
 - Start the Docker containers
@@ -41,14 +41,14 @@ bash docker_image/run_container.sh http2_server
 bash docker_image/run_container.sh http2_client
 ```
 
-- Connect to the server Docker container and navigate to the demo folder
+- Connect to the server Docker container and navigate to the example folder
 ```bash
 docker exec -it http2_server /bin/bash
 
 ifconfig # Get the SERVER_IP, which will be used by the client from the other container
 
 # Navigate to the demo folder
-cd /experiments/demo
+cd /experiments/example_replay
 
 # Start a basic server on port 9999
 bash ./run_server_dummy.sh 9999
@@ -100,7 +100,7 @@ bash ./run_cldefense_tamaraw.sh $SERVER_IP 9999 eth0
 
 - H2PC defense
 ```bash
-bash ./run_client_modsnoise.sh $SERVER_IP 9999 eth0
+bash ./run_client_h2pc.sh $SERVER_IP 9999 eth0
 ```
 
 
@@ -116,6 +116,11 @@ bash ./run_server_def_alpaca.sh 9999
 - TAMARAW defense
 ```bash
 bash ./run_server_def_tamaraw.sh 9999
+```
+
+- H2PS defense
+```bash
+bash ./run_server_def_h2ps.sh 9999
 ```
 
 On the client side, request defense for the 'en.wikipedia.org' server using
@@ -151,7 +156,6 @@ prepare_all_datasets(
 Next, we can use these dataset to evaluate the security of the scenario (ML classification, information leakage and feature importance):
 ```python
 # Evaluate the security of the dataset.
-# NOTE: this is just a toy dataset. For the neural network estimators, we need at least 500 samples per class, for decent performance.
 
 # stdlib
 from pathlib import Path
@@ -186,5 +190,4 @@ scores = audit(
 
 print("ML scores ---> ", scores["ML"])
 print("Leakage scores ---> ", scores["leakage"])
-print("XAI scores ---> ", scores["xai"])
 ```

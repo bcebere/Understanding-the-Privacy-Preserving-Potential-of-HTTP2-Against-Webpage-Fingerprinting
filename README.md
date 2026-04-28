@@ -41,7 +41,6 @@ prepare_all_datasets(
 ml_output_folder = workspace / "eval_ml"
 wefde_output_folder = workspace / "eval_wefde"
 deepse_output = workspace / "eval_deepse/results.csv"
-xai_output_folder = workspace / "eval_xai"
 
 wefde_feats_folder = workspace / "output_features"
 deepse_dataset = workspace / "output_deepse" / "real" / "dataset.npz"
@@ -59,22 +58,26 @@ scores = audit(
     # leakage
     wefde_output_folder=wefde_output_folder,
     deepse_output=deepse_output,
-    # xai
-    xai_output_folder=xai_output_folder,
 )
 
 print("ML scores ---> ", scores["ML"])
 print("Leakage scores ---> ", scores["leakage"])
-print("XAI scores ---> ", scores["xai"])
 ```
 
 ## ⚡ Proof-of-Concept HTTP/2 client/servers
 
-TODO : [h2deflib](h2deflib) docs.
+The [h2deflib](h2deflib) folder contains the HTTP/2 client and servers used to replay the browser traces with various defenses enabled.
+
+The library can be installed from source using
+```bash
+cd h2deflib
+pip install .
+```
+
 
 ## :hammer: Tests
 
-Install the testing dependencies wfaudit using
+Install the testing dependencies `wfaudit` or `h2deflib` using
 ```bash
 pip install .[testing]
 ```
@@ -85,5 +88,7 @@ pytest -vsx
 ## 🔑 Datasets
 Refer to [datasets section](./datasets/README.md) for the necessary steps preparing the resources for the experiments.
 
+The full collected browser traces and the replayed HTTP/2 traces are available in the [datasets repository](https://i62nextcloud.tm.kit.edu/public.php/dav/files/6ga8tgFyiXo4ZAf/?accept=zip).
+
 ## 💥 Experiments
-Refer to [experiments section](./experiments/README.md) for the guidelines in replaying the collected datasets using various defenses, as well as evaluating the security of the defenses.
+Refer to [experiments section](./experiments/README.md) for examples in replaying the collected datasets using various defenses, as well as evaluating the security of the defenses.
