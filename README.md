@@ -64,7 +64,14 @@ print("ML scores ---> ", scores["ML"])
 print("Leakage scores ---> ", scores["leakage"])
 ```
 
-Refer to the [experiments benchmark example](experiments/example_benchmarks/) for more details.
+The Machine-Learning estimators can be configured through the parameters:
+ - `ml_arch_2D`. Available values: `kfp` (k-Fingerprinting), `rf` (Random Forest), `xgboost` (XGBoost).
+ - `ml_arch_3D`. Available values: `holmes` (Holmes), `varcnn` (VarCNN), `df` (Deep-Fingerprinting), `robustfp` (Robust Fingerprinting).
+
+The Information-Leakage estimators can be configured using the parameter:
+ - `leakage_estimators`. Available values: `wefde` (WeFDE), `deepse` (DeepSE-WF).
+
+Refer to the [experiments benchmark example](experiments/example_benchmarks/) for more usage examples.
 
 ## ⚡ Proof-of-Concept HTTP/2 client/servers
 
@@ -76,10 +83,10 @@ cd h2deflib
 pip install .
 ```
 
-The library includes unit tests in [tests][h2deflib/tests] and a [client defense demo](h2deflib/tests/demo/).
+The library includes unit tests in [tests](h2deflib/tests) and a [client defense demo](h2deflib/tests/demo/).
 
 
-Refer to the [experiments replay example](experiments/example_replay/) for more examples on configuring the client and the server defenses using the `h2deflib` library.
+Refer to the [experiments replay examples](experiments/example_replay/) for more usage examples for configuring the client and the server defenses using the `h2deflib` library.
 
 ## :hammer: Tests
 
