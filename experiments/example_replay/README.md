@@ -90,8 +90,8 @@ On the client side, request defense for the 'en.wikipedia.org' server using
 bash ./client_srvdefs.sh --dst_ip $SERVER_IP --dst_port 9999 --capture 0 --request_server_defense en.wikipedia.org
 ```
 ### Docker images (optional)
-For isolating multiple experiments, we used docker containers for each the server and the client. The scripts for building and running the container are available [here](./docker_image).
-The build create an image `http2_datasets`, which we use for both server and client sides.
+For isolating multiple experiments, we used Docker containers for each the server and the client. The scripts for building and running the container are available [here](./docker_image).
+The build creates an image `http2_datasets`, which we use for both server and client sides.
 
 - Start the Docker containers
 ```bash
@@ -112,7 +112,7 @@ ifconfig # Get the SERVER_IP, which will be used by the client from the other co
 cd /experiments/example_replay
 
 # Start a basic server on port 9999
-bash ./nop_server_nop.sh --dst_port 9999
+bash ./server_nop.sh --dst_port 9999
 ```
 
 - Connect to the client Docker container and test the connection
