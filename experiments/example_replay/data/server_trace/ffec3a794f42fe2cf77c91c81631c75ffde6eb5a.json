@@ -1,0 +1,362 @@
+{
+    "/wiki/Ras%20malai": {
+        "body_path": "data/bin/ffec3a794f42fe2cf77c91c81631c75ffde6eb5a",
+        "url": "https://en.wikipedia.org/wiki/Ras%20malai",
+        "url_local": "/wiki/Ras%20malai",
+        "status": 301,
+        "content_type": "text/html; charset=UTF-8",
+        "headers": {},
+        "timeout_s": 0.41356515884399414
+    },
+    "/wiki/Ras_malai": {
+        "body_path": "data/bin/ecf9c2451a762450c09ecd6c8d14800d8489f84a",
+        "url": "https://en.wikipedia.org/wiki/Ras_malai",
+        "url_local": "/wiki/Ras_malai",
+        "status": 200,
+        "content_type": "text/html; charset=UTF-8",
+        "headers": {},
+        "timeout_s": 0.2028656005859375
+    },
+    "/w/load.php?lang=en&modules=ext.cite.styles%7Cext.uls.interlanguage%7Cext.visualEditor.desktopArticleTarget.noscript%7Cext.wikimediaBadges%7Cext.wikimediamessages.styles%7Cjquery.makeCollapsible.styles%7Cskins.vector.icons%2Cstyles%7Cskins.vector.search.codex.styles%7Cwikibase.client.init&only=styles&skin=vector-2022": {
+        "body_path": "data/bin/ff841f3019bbf0a1231254e04dab40e72c2979ec",
+        "url": "https://en.wikipedia.org/w/load.php?lang=en&modules=ext.cite.styles%7Cext.uls.interlanguage%7Cext.visualEditor.desktopArticleTarget.noscript%7Cext.wikimediaBadges%7Cext.wikimediamessages.styles%7Cjquery.makeCollapsible.styles%7Cskins.vector.icons%2Cstyles%7Cskins.vector.search.codex.styles%7Cwikibase.client.init&only=styles&skin=vector-2022",
+        "url_local": "/w/load.php?lang=en&modules=ext.cite.styles%7Cext.uls.interlanguage%7Cext.visualEditor.desktopArticleTarget.noscript%7Cext.wikimediaBadges%7Cext.wikimediamessages.styles%7Cjquery.makeCollapsible.styles%7Cskins.vector.icons%2Cstyles%7Cskins.vector.search.codex.styles%7Cwikibase.client.init&only=styles&skin=vector-2022",
+        "status": 200,
+        "content_type": "text/css; charset=utf-8",
+        "headers": {},
+        "timeout_s": 0.029165983200073242
+    },
+    "/static/images/mobile/copyright/wikipedia-wordmark-en.svg": {
+        "body_path": "data/bin/429b5ef43cb4e7e5008d10f2bf3672ff6a34e59d",
+        "url": "https://en.wikipedia.org/static/images/mobile/copyright/wikipedia-wordmark-en.svg",
+        "url_local": "/static/images/mobile/copyright/wikipedia-wordmark-en.svg",
+        "status": 200,
+        "content_type": "image/svg+xml",
+        "headers": {},
+        "timeout_s": 0.03610420227050781
+    },
+    "/w/load.php?lang=en&modules=site.styles&only=styles&skin=vector-2022": {
+        "body_path": "data/bin/38f9d9d981ee7e0c696ae5792eb1176eb43adf8b",
+        "url": "https://en.wikipedia.org/w/load.php?lang=en&modules=site.styles&only=styles&skin=vector-2022",
+        "url_local": "/w/load.php?lang=en&modules=site.styles&only=styles&skin=vector-2022",
+        "status": 200,
+        "content_type": "text/css; charset=utf-8",
+        "headers": {},
+        "timeout_s": 0.037252187728881836
+    },
+    "/static/images/icons/wikipedia.png": {
+        "body_path": "data/bin/98effd2a1889d09813e63b737fb311afab15929c",
+        "url": "https://en.wikipedia.org/static/images/icons/wikipedia.png",
+        "url_local": "/static/images/icons/wikipedia.png",
+        "status": 200,
+        "content_type": "image/png",
+        "headers": {},
+        "timeout_s": 0.18519258499145508
+    },
+    "/static/images/mobile/copyright/wikipedia-tagline-en.svg": {
+        "body_path": "data/bin/b2d98419222e15a32b6a3dced835ae7d488ae942",
+        "url": "https://en.wikipedia.org/static/images/mobile/copyright/wikipedia-tagline-en.svg",
+        "url_local": "/static/images/mobile/copyright/wikipedia-tagline-en.svg",
+        "status": 200,
+        "content_type": "image/svg+xml",
+        "headers": {},
+        "timeout_s": 0.18544745445251465
+    },
+    "/static/images/footer/wikimedia-button.svg": {
+        "body_path": "data/bin/6c6e1345dffa80cc5299c7d3cfa1426c82524371",
+        "url": "https://en.wikipedia.org/static/images/footer/wikimedia-button.svg",
+        "url_local": "/static/images/footer/wikimedia-button.svg",
+        "status": 200,
+        "content_type": "image/svg+xml",
+        "headers": {},
+        "timeout_s": 0.17493081092834473
+    },
+    "/w/load.php?modules=skins.vector.icons&image=menu&format=original&lang=en&skin=vector-2022&version=frysa": {
+        "body_path": "data/bin/d48d87016a85b20b3c9c166ae35a3b86b968162f",
+        "url": "https://en.wikipedia.org/w/load.php?modules=skins.vector.icons&image=menu&format=original&lang=en&skin=vector-2022&version=frysa",
+        "url_local": "/w/load.php?modules=skins.vector.icons&image=menu&format=original&lang=en&skin=vector-2022&version=frysa",
+        "status": 200,
+        "content_type": "image/svg+xml",
+        "headers": {},
+        "timeout_s": 0.0037834644317626953
+    },
+    "/w/load.php?modules=skins.vector.icons&image=ellipsis&format=original&lang=en&skin=vector-2022&version=frysa": {
+        "body_path": "data/bin/724faec7c709b4265869c2a06c72c24177cbc14b",
+        "url": "https://en.wikipedia.org/w/load.php?modules=skins.vector.icons&image=ellipsis&format=original&lang=en&skin=vector-2022&version=frysa",
+        "url_local": "/w/load.php?modules=skins.vector.icons&image=ellipsis&format=original&lang=en&skin=vector-2022&version=frysa",
+        "status": 200,
+        "content_type": "image/svg+xml",
+        "headers": {},
+        "timeout_s": 0.004838705062866211
+    },
+    "/w/load.php?modules=skins.vector.icons&image=language&variant=progressive&format=original&lang=en&skin=vector-2022&version=frysa": {
+        "body_path": "data/bin/1a72e123180c7b7190985e6b2411876fc7c9025f",
+        "url": "https://en.wikipedia.org/w/load.php?modules=skins.vector.icons&image=language&variant=progressive&format=original&lang=en&skin=vector-2022&version=frysa",
+        "url_local": "/w/load.php?modules=skins.vector.icons&image=language&variant=progressive&format=original&lang=en&skin=vector-2022&version=frysa",
+        "status": 200,
+        "content_type": "image/svg+xml",
+        "headers": {},
+        "timeout_s": 0.005960702896118164
+    },
+    "/w/resources/src/mediawiki.skinning/images/magnify-clip-ltr.svg?8330e": {
+        "body_path": "data/bin/aa5896350550b50af392fd4aba3f0fd0d08f8a18",
+        "url": "https://en.wikipedia.org/w/resources/src/mediawiki.skinning/images/magnify-clip-ltr.svg?8330e",
+        "url_local": "/w/resources/src/mediawiki.skinning/images/magnify-clip-ltr.svg?8330e",
+        "status": 200,
+        "content_type": "image/svg+xml",
+        "headers": {},
+        "timeout_s": 0.007106304168701172
+    },
+    "/w/skins/Vector/resources/skins.vector.styles/images/link-external-small-ltr-progressive.svg?fb64d": {
+        "body_path": "data/bin/8609c297db3e58919561e514f28811254ec6d03d",
+        "url": "https://en.wikipedia.org/w/skins/Vector/resources/skins.vector.styles/images/link-external-small-ltr-progressive.svg?fb64d",
+        "url_local": "/w/skins/Vector/resources/skins.vector.styles/images/link-external-small-ltr-progressive.svg?fb64d",
+        "status": 200,
+        "content_type": "image/svg+xml",
+        "headers": {},
+        "timeout_s": 0.008197307586669922
+    },
+    "/w/skins/Vector/resources/skins.vector.styles/images/arrow-down-progressive.svg?5cd6d": {
+        "body_path": "data/bin/0c170523185726531312ad721bbf97fe25646d41",
+        "url": "https://en.wikipedia.org/w/skins/Vector/resources/skins.vector.styles/images/arrow-down-progressive.svg?5cd6d",
+        "url_local": "/w/skins/Vector/resources/skins.vector.styles/images/arrow-down-progressive.svg?5cd6d",
+        "status": 200,
+        "content_type": "image/svg+xml",
+        "headers": {},
+        "timeout_s": 0.009458065032958984
+    },
+    "/wikipedia/commons/thumb/f/f9/Flag_of_Bangladesh.svg/23px-Flag_of_Bangladesh.svg.png": {
+        "body_path": "data/bin/38c208548154a5d002e945d239cb94a3d02fd6c9",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f9/Flag_of_Bangladesh.svg/23px-Flag_of_Bangladesh.svg.png",
+        "url_local": "/wikipedia/commons/thumb/f/f9/Flag_of_Bangladesh.svg/23px-Flag_of_Bangladesh.svg.png",
+        "status": 200,
+        "content_type": "image/png",
+        "headers": {},
+        "timeout_s": 0.18353581428527832
+    },
+    "/wikipedia/commons/thumb/d/df/Wikibooks-logo-en-noslogan.svg/16px-Wikibooks-logo-en-noslogan.svg.png": {
+        "body_path": "data/bin/50da1f1a1666200d6d5ae120c6b9be3072847b64",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/df/Wikibooks-logo-en-noslogan.svg/16px-Wikibooks-logo-en-noslogan.svg.png",
+        "url_local": "/wikipedia/commons/thumb/d/df/Wikibooks-logo-en-noslogan.svg/16px-Wikibooks-logo-en-noslogan.svg.png",
+        "status": 200,
+        "content_type": "image/webp",
+        "headers": {},
+        "timeout_s": 0.19464635848999023
+    },
+    "/wikipedia/en/thumb/4/4a/Commons-logo.svg/12px-Commons-logo.svg.png": {
+        "body_path": "data/bin/94927d8c290010f01ee34336a54cf139bc169e08",
+        "url": "https://upload.wikimedia.org/wikipedia/en/thumb/4/4a/Commons-logo.svg/12px-Commons-logo.svg.png",
+        "url_local": "/wikipedia/en/thumb/4/4a/Commons-logo.svg/12px-Commons-logo.svg.png",
+        "status": 200,
+        "content_type": "image/webp",
+        "headers": {},
+        "timeout_s": 0.1950371265411377
+    },
+    "/wikipedia/commons/thumb/d/d1/Advertisement_of_Rosomalai.jpg/220px-Advertisement_of_Rosomalai.jpg": {
+        "body_path": "data/bin/6f6d5ebb69f389eda15a2fc244a02e85ced18dfb",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d1/Advertisement_of_Rosomalai.jpg/220px-Advertisement_of_Rosomalai.jpg",
+        "url_local": "/wikipedia/commons/thumb/d/d1/Advertisement_of_Rosomalai.jpg/220px-Advertisement_of_Rosomalai.jpg",
+        "status": 200,
+        "content_type": "image/jpeg",
+        "headers": {},
+        "timeout_s": 0.19541716575622559
+    },
+    "/wikipedia/commons/thumb/0/03/Misc_Indian_cuisine.jpg/100px-Misc_Indian_cuisine.jpg": {
+        "body_path": "data/bin/0152a0230d8d31d7871ad2210117ed6899288bb4",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/03/Misc_Indian_cuisine.jpg/100px-Misc_Indian_cuisine.jpg",
+        "url_local": "/wikipedia/commons/thumb/0/03/Misc_Indian_cuisine.jpg/100px-Misc_Indian_cuisine.jpg",
+        "status": 200,
+        "content_type": "image/jpeg",
+        "headers": {},
+        "timeout_s": 0.1852278709411621
+    },
+    "/wikipedia/en/thumb/4/41/Flag_of_India.svg/23px-Flag_of_India.svg.png": {
+        "body_path": "data/bin/599359c55d497641a577294255ed7d279e582c4f",
+        "url": "https://upload.wikimedia.org/wikipedia/en/thumb/4/41/Flag_of_India.svg/23px-Flag_of_India.svg.png",
+        "url_local": "/wikipedia/en/thumb/4/41/Flag_of_India.svg/23px-Flag_of_India.svg.png",
+        "status": 200,
+        "content_type": "image/webp",
+        "headers": {},
+        "timeout_s": 0.18576693534851074
+    },
+    "/wikipedia/en/thumb/9/96/Symbol_category_class.svg/16px-Symbol_category_class.svg.png": {
+        "body_path": "data/bin/67147b85e62102256b5c93734e114c776eabe890",
+        "url": "https://upload.wikimedia.org/wikipedia/en/thumb/9/96/Symbol_category_class.svg/16px-Symbol_category_class.svg.png",
+        "url_local": "/wikipedia/en/thumb/9/96/Symbol_category_class.svg/16px-Symbol_category_class.svg.png",
+        "status": 200,
+        "content_type": "image/webp",
+        "headers": {},
+        "timeout_s": 0.18630027770996094
+    },
+    "/wikipedia/commons/thumb/b/bd/Tandoorimumbai.jpg/100px-Tandoorimumbai.jpg": {
+        "body_path": "data/bin/13925bc56bc1388231c5843bb3b3589b098bbfcb",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/bd/Tandoorimumbai.jpg/100px-Tandoorimumbai.jpg",
+        "url_local": "/wikipedia/commons/thumb/b/bd/Tandoorimumbai.jpg/100px-Tandoorimumbai.jpg",
+        "status": 200,
+        "content_type": "image/jpeg",
+        "headers": {},
+        "timeout_s": 0.1864604949951172
+    },
+    "/wikipedia/commons/thumb/c/c5/Naan_shiva.jpg/100px-Naan_shiva.jpg": {
+        "body_path": "data/bin/928b0bacd91059601ae8d8f65df3ecd7ee109136",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Naan_shiva.jpg/100px-Naan_shiva.jpg",
+        "url_local": "/wikipedia/commons/thumb/c/c5/Naan_shiva.jpg/100px-Naan_shiva.jpg",
+        "status": 200,
+        "content_type": "image/jpeg",
+        "headers": {},
+        "timeout_s": 0.18709683418273926
+    },
+    "/wikipedia/commons/thumb/f/fa/Wikibooks-logo.svg/16px-Wikibooks-logo.svg.png": {
+        "body_path": "data/bin/970b8a0683ba99f04597aba95325e830dfca4006",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Wikibooks-logo.svg/16px-Wikibooks-logo.svg.png",
+        "url_local": "/wikipedia/commons/thumb/f/fa/Wikibooks-logo.svg/16px-Wikibooks-logo.svg.png",
+        "status": 200,
+        "content_type": "image/webp",
+        "headers": {},
+        "timeout_s": 0.18744516372680664
+    },
+    "/wikipedia/commons/thumb/d/d6/Foodlogo2.svg/16px-Foodlogo2.svg.png": {
+        "body_path": "data/bin/f08b36ac57a42d9bd8d39569ada18c734fba9131",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d6/Foodlogo2.svg/16px-Foodlogo2.svg.png",
+        "url_local": "/wikipedia/commons/thumb/d/d6/Foodlogo2.svg/16px-Foodlogo2.svg.png",
+        "status": 200,
+        "content_type": "image/webp",
+        "headers": {},
+        "timeout_s": 0.1878349781036377
+    },
+    "/wikipedia/commons/thumb/b/b6/Rajasthanthali.jpg/40px-Rajasthanthali.jpg": {
+        "body_path": "data/bin/e7430cd40f4d0ddf38b06b445194c10104852f4f",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b6/Rajasthanthali.jpg/40px-Rajasthanthali.jpg",
+        "url_local": "/wikipedia/commons/thumb/b/b6/Rajasthanthali.jpg/40px-Rajasthanthali.jpg",
+        "status": 200,
+        "content_type": "image/jpeg",
+        "headers": {},
+        "timeout_s": 0.18816065788269043
+    },
+    "/wikipedia/commons/thumb/7/73/Chicken_Tikka.jpg/40px-Chicken_Tikka.jpg": {
+        "body_path": "data/bin/74859a026e5e7a1f83d637da6d8c87d5883a6e61",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/73/Chicken_Tikka.jpg/40px-Chicken_Tikka.jpg",
+        "url_local": "/wikipedia/commons/thumb/7/73/Chicken_Tikka.jpg/40px-Chicken_Tikka.jpg",
+        "status": 200,
+        "content_type": "image/jpeg",
+        "headers": {},
+        "timeout_s": 0.18859243392944336
+    },
+    "/wikipedia/en/thumb/4/41/Flag_of_India.svg/16px-Flag_of_India.svg.png": {
+        "body_path": "data/bin/20801c21926ba4c7d6df7692cf165170225f6549",
+        "url": "https://upload.wikimedia.org/wikipedia/en/thumb/4/41/Flag_of_India.svg/16px-Flag_of_India.svg.png",
+        "url_local": "/wikipedia/en/thumb/4/41/Flag_of_India.svg/16px-Flag_of_India.svg.png",
+        "status": 200,
+        "content_type": "image/webp",
+        "headers": {},
+        "timeout_s": 0.18915629386901855
+    },
+    "/wikipedia/commons/thumb/1/1b/Pitha_for_Wedding-_Pakan%2C_Patishapta%2C_Bharandash.jpg/40px-Pitha_for_Wedding-_Pakan%2C_Patishapta%2C_Bharandash.jpg": {
+        "body_path": "data/bin/2415624a3243097cab7039522fc10a1333b2295f",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/Pitha_for_Wedding-_Pakan%2C_Patishapta%2C_Bharandash.jpg/40px-Pitha_for_Wedding-_Pakan%2C_Patishapta%2C_Bharandash.jpg",
+        "url_local": "/wikipedia/commons/thumb/1/1b/Pitha_for_Wedding-_Pakan%2C_Patishapta%2C_Bharandash.jpg/40px-Pitha_for_Wedding-_Pakan%2C_Patishapta%2C_Bharandash.jpg",
+        "status": 200,
+        "content_type": "image/jpeg",
+        "headers": {},
+        "timeout_s": 0.18944931030273438
+    },
+    "/wikipedia/commons/thumb/a/ae/Ras_Malai_2.JPG/220px-Ras_Malai_2.JPG": {
+        "body_path": "data/bin/f9e24a25c19744734bfa002ec51c60f3319f5a60",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ae/Ras_Malai_2.JPG/220px-Ras_Malai_2.JPG",
+        "url_local": "/wikipedia/commons/thumb/a/ae/Ras_Malai_2.JPG/220px-Ras_Malai_2.JPG",
+        "status": 200,
+        "content_type": "image/jpeg",
+        "headers": {},
+        "timeout_s": 0.20133399963378906
+    },
+    "/wikipedia/commons/thumb/9/92/Rasmalai_Dessert.jpg/220px-Rasmalai_Dessert.jpg": {
+        "body_path": "data/bin/6e996ab7b68bf9c9e619ede24ef5bdde90b03d94",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/92/Rasmalai_Dessert.jpg/220px-Rasmalai_Dessert.jpg",
+        "url_local": "/wikipedia/commons/thumb/9/92/Rasmalai_Dessert.jpg/220px-Rasmalai_Dessert.jpg",
+        "status": 200,
+        "content_type": "image/jpeg",
+        "headers": {},
+        "timeout_s": 0.20157313346862793
+    },
+    "/w/load.php?lang=en&modules=startup&only=scripts&raw=1&skin=vector-2022": {
+        "body_path": "data/bin/dce1ea4663243029dc1a41b6125139157d83304d",
+        "url": "https://en.wikipedia.org/w/load.php?lang=en&modules=startup&only=scripts&raw=1&skin=vector-2022",
+        "url_local": "/w/load.php?lang=en&modules=startup&only=scripts&raw=1&skin=vector-2022",
+        "status": 200,
+        "content_type": "text/javascript; charset=utf-8",
+        "headers": {},
+        "timeout_s": 0.20371007919311523
+    },
+    "/w/resources/assets/poweredby_mediawiki.svg": {
+        "body_path": "data/bin/cc01b89ae7a97b060ca8d62a9392f8dbb0e0750b",
+        "url": "https://en.wikipedia.org/w/resources/assets/poweredby_mediawiki.svg",
+        "url_local": "/w/resources/assets/poweredby_mediawiki.svg",
+        "status": 200,
+        "content_type": "image/svg+xml",
+        "headers": {},
+        "timeout_s": 0.027437210083007812
+    },
+    "/w/load.php?lang=en&modules=ext.gadget.ReferenceTooltips%2Cswitcher&skin=vector-2022&version=j1bg1": {
+        "body_path": "data/bin/51d7b7f293424512e57bb79963fa8143c7e6fc45",
+        "url": "https://en.wikipedia.org/w/load.php?lang=en&modules=ext.gadget.ReferenceTooltips%2Cswitcher&skin=vector-2022&version=j1bg1",
+        "url_local": "/w/load.php?lang=en&modules=ext.gadget.ReferenceTooltips%2Cswitcher&skin=vector-2022&version=j1bg1",
+        "status": 200,
+        "content_type": "text/javascript; charset=utf-8",
+        "headers": {},
+        "timeout_s": 0.029873132705688477
+    },
+    "/w/load.php?lang=en&modules=ext.visualEditor.core.utils.parsing%7Cext.visualEditor.desktopArticleTarget.init%7Cext.visualEditor.progressBarWidget%2CsupportCheck%2CtargetLoader%2CtempWikitextEditorWidget%2Ctrack%2Cve&skin=vector-2022&version=uutkw": {
+        "body_path": "data/bin/fea35c7184f1d4d1f659dd5ac803366975196ce6",
+        "url": "https://en.wikipedia.org/w/load.php?lang=en&modules=ext.visualEditor.core.utils.parsing%7Cext.visualEditor.desktopArticleTarget.init%7Cext.visualEditor.progressBarWidget%2CsupportCheck%2CtargetLoader%2CtempWikitextEditorWidget%2Ctrack%2Cve&skin=vector-2022&version=uutkw",
+        "url_local": "/w/load.php?lang=en&modules=ext.visualEditor.core.utils.parsing%7Cext.visualEditor.desktopArticleTarget.init%7Cext.visualEditor.progressBarWidget%2CsupportCheck%2CtargetLoader%2CtempWikitextEditorWidget%2Ctrack%2Cve&skin=vector-2022&version=uutkw",
+        "status": 200,
+        "content_type": "text/javascript; charset=utf-8",
+        "headers": {},
+        "timeout_s": 0.03460073471069336
+    },
+    "/w/load.php?lang=en&modules=ext.centralNotice.bannerHistoryLogger%2CchoiceData%2Cdisplay%2CgeoIP%2CimpressionDiet%2CkvStore%2ClargeBannerLimit%2ClegacySupport%2CstartUp%7Cext.centralauth.ForeignApi%2Ccentralautologin%7Cext.checkUser.clientHints%7Cext.cite.ux-enhancements%7Cext.cx.eventlogging.campaigns%7Cext.cx.model%7Cext.cx.uls.quick.actions%7Cext.echo.centralauth%7Cext.eventLogging%2CnavigationTiming%2Cpopups%2CwikimediaEvents%7Cext.growthExperiments.SuggestedEditSession%7Cext.scribunto.logs%7Cext.uls.common%2Cinterface%2Cpreferences%2Cwebfonts%7Cext.urlShortener.toolbar%7Cjquery%2Coojs%2Csite%7Cjquery.client%2CmakeCollapsible%2CtextSelection%7Cjquery.uls.data%7Cmediawiki.ForeignApi%2CString%2CTitle%2CUri%2Capi%2Cbase%2Ccldr%2Ccookie%2Cexperiments%2CjqueryMsg%2Clanguage%2Crouter%2Cstorage%2Ctoc%2Cuser%2Cutil%2CvisibleTimeout%7Cmediawiki.ForeignApi.core%7Cmediawiki.editfont.styles%7Cmediawiki.libs.pluralruleparser%7Cmediawiki.page.media%2Cready%7Cmediawiki.page.watch.ajax%7Cmmv.bootstrap%2Ccodex%2Chead%7Cmmv.bootstrap.autostart%7Cmw.cx.SiteMapper%7Coojs-ui.styles.icons-interactions%7Cskins.vector.clientPreferences%2Cjs%7Cskins.vector.icons.js%7Cwikibase.client.vector-2022%7Cwikibase.sidebar.tracking&skin=vector-2022&version=1jgov": {
+        "body_path": "data/bin/5412c443b4d4957d1d0dd46ed4352936c1a22c35",
+        "url": "https://en.wikipedia.org/w/load.php?lang=en&modules=ext.centralNotice.bannerHistoryLogger%2CchoiceData%2Cdisplay%2CgeoIP%2CimpressionDiet%2CkvStore%2ClargeBannerLimit%2ClegacySupport%2CstartUp%7Cext.centralauth.ForeignApi%2Ccentralautologin%7Cext.checkUser.clientHints%7Cext.cite.ux-enhancements%7Cext.cx.eventlogging.campaigns%7Cext.cx.model%7Cext.cx.uls.quick.actions%7Cext.echo.centralauth%7Cext.eventLogging%2CnavigationTiming%2Cpopups%2CwikimediaEvents%7Cext.growthExperiments.SuggestedEditSession%7Cext.scribunto.logs%7Cext.uls.common%2Cinterface%2Cpreferences%2Cwebfonts%7Cext.urlShortener.toolbar%7Cjquery%2Coojs%2Csite%7Cjquery.client%2CmakeCollapsible%2CtextSelection%7Cjquery.uls.data%7Cmediawiki.ForeignApi%2CString%2CTitle%2CUri%2Capi%2Cbase%2Ccldr%2Ccookie%2Cexperiments%2CjqueryMsg%2Clanguage%2Crouter%2Cstorage%2Ctoc%2Cuser%2Cutil%2CvisibleTimeout%7Cmediawiki.ForeignApi.core%7Cmediawiki.editfont.styles%7Cmediawiki.libs.pluralruleparser%7Cmediawiki.page.media%2Cready%7Cmediawiki.page.watch.ajax%7Cmmv.bootstrap%2Ccodex%2Chead%7Cmmv.bootstrap.autostart%7Cmw.cx.SiteMapper%7Coojs-ui.styles.icons-interactions%7Cskins.vector.clientPreferences%2Cjs%7Cskins.vector.icons.js%7Cwikibase.client.vector-2022%7Cwikibase.sidebar.tracking&skin=vector-2022&version=1jgov",
+        "url_local": "/w/load.php?lang=en&modules=ext.centralNotice.bannerHistoryLogger%2CchoiceData%2Cdisplay%2CgeoIP%2CimpressionDiet%2CkvStore%2ClargeBannerLimit%2ClegacySupport%2CstartUp%7Cext.centralauth.ForeignApi%2Ccentralautologin%7Cext.checkUser.clientHints%7Cext.cite.ux-enhancements%7Cext.cx.eventlogging.campaigns%7Cext.cx.model%7Cext.cx.uls.quick.actions%7Cext.echo.centralauth%7Cext.eventLogging%2CnavigationTiming%2Cpopups%2CwikimediaEvents%7Cext.growthExperiments.SuggestedEditSession%7Cext.scribunto.logs%7Cext.uls.common%2Cinterface%2Cpreferences%2Cwebfonts%7Cext.urlShortener.toolbar%7Cjquery%2Coojs%2Csite%7Cjquery.client%2CmakeCollapsible%2CtextSelection%7Cjquery.uls.data%7Cmediawiki.ForeignApi%2CString%2CTitle%2CUri%2Capi%2Cbase%2Ccldr%2Ccookie%2Cexperiments%2CjqueryMsg%2Clanguage%2Crouter%2Cstorage%2Ctoc%2Cuser%2Cutil%2CvisibleTimeout%7Cmediawiki.ForeignApi.core%7Cmediawiki.editfont.styles%7Cmediawiki.libs.pluralruleparser%7Cmediawiki.page.media%2Cready%7Cmediawiki.page.watch.ajax%7Cmmv.bootstrap%2Ccodex%2Chead%7Cmmv.bootstrap.autostart%7Cmw.cx.SiteMapper%7Coojs-ui.styles.icons-interactions%7Cskins.vector.clientPreferences%2Cjs%7Cskins.vector.icons.js%7Cwikibase.client.vector-2022%7Cwikibase.sidebar.tracking&skin=vector-2022&version=1jgov",
+        "status": 200,
+        "content_type": "text/javascript; charset=utf-8",
+        "headers": {},
+        "timeout_s": 0.037892818450927734
+    },
+    "/w/load.php?lang=en&modules=mw.config.values.wbCurrentSiteDetails%2CwbRepo%7Coojs-ui.styles.icons-editing-core&skin=vector-2022&version=1sqzm": {
+        "body_path": "data/bin/e54c1af0613e327a05cc1568f240f577d56aade9",
+        "url": "https://en.wikipedia.org/w/load.php?lang=en&modules=mw.config.values.wbCurrentSiteDetails%2CwbRepo%7Coojs-ui.styles.icons-editing-core&skin=vector-2022&version=1sqzm",
+        "url_local": "/w/load.php?lang=en&modules=mw.config.values.wbCurrentSiteDetails%2CwbRepo%7Coojs-ui.styles.icons-editing-core&skin=vector-2022&version=1sqzm",
+        "status": 200,
+        "content_type": "text/javascript; charset=utf-8",
+        "headers": {},
+        "timeout_s": 0.027481555938720703
+    },
+    "/w/load.php?lang=en&modules=ext.cite.referencePreviews%7Cext.math.popup%7Cext.popups.main&skin=vector-2022&version=6p3rs": {
+        "body_path": "data/bin/39b18460f3c2ca08267d5b706d791d6c94bb64cf",
+        "url": "https://en.wikipedia.org/w/load.php?lang=en&modules=ext.cite.referencePreviews%7Cext.math.popup%7Cext.popups.main&skin=vector-2022&version=6p3rs",
+        "url_local": "/w/load.php?lang=en&modules=ext.cite.referencePreviews%7Cext.math.popup%7Cext.popups.main&skin=vector-2022&version=6p3rs",
+        "status": 200,
+        "content_type": "text/javascript; charset=utf-8",
+        "headers": {},
+        "timeout_s": 0.026726484298706055
+    },
+    "/wiki/Special:CentralAutoLogin/checkLoggedIn?type=script&wikiid=enwiki": {
+        "body_path": "data/bin/34ac8304fd744756f62687d51b9c4ecd4c66f96d",
+        "url": "https://login.wikimedia.org/wiki/Special:CentralAutoLogin/checkLoggedIn?type=script&wikiid=enwiki",
+        "url_local": "/wiki/Special:CentralAutoLogin/checkLoggedIn?type=script&wikiid=enwiki",
+        "status": 200,
+        "content_type": "text/javascript; charset=utf-8",
+        "headers": {},
+        "timeout_s": 0.030325889587402344
+    },
+    "/w/load.php?lang=en&modules=skins.vector.search.codex.scripts%7Cvue&skin=vector-2022&version=hes4g": {
+        "body_path": "data/bin/26a24023bd6f22a854d83d9bd0df3aaba4bd70ec",
+        "url": "https://en.wikipedia.org/w/load.php?lang=en&modules=skins.vector.search.codex.scripts%7Cvue&skin=vector-2022&version=hes4g",
+        "url_local": "/w/load.php?lang=en&modules=skins.vector.search.codex.scripts%7Cvue&skin=vector-2022&version=hes4g",
+        "status": 200,
+        "content_type": "text/javascript; charset=utf-8",
+        "headers": {},
+        "timeout_s": 0.027179956436157227
+    }
+}
