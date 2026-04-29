@@ -1,25 +1,24 @@
 # stdlib
+from collections import defaultdict
 import glob
 import hashlib
-from collections import defaultdict
 from pathlib import Path
 from random import shuffle
 from typing import List, Optional, Tuple
 
+# third party
+from joblib import Parallel, delayed
 import numpy as np
 import pandas as pd
 import pyarrow as pa
 import pyarrow.dataset as ds
 import pyarrow.parquet as pq
-import wfaudit.logger as log
-
-# third party
-from joblib import Parallel, delayed
 from tqdm import tqdm
 
 # wfaudit absolute
 from wfaudit.helpers_deepse import prepare_deepse_dataset
 from wfaudit.helpers_wefde.preprocess.extract import prepare_wefde_features
+import wfaudit.logger as log
 from wfaudit.processing import process_pcap, process_pcap_via_json
 
 np.set_printoptions(suppress=True)
@@ -28,7 +27,7 @@ np.set_printoptions(suppress=True)
 def process_raw_pcaps(
     traces=Path("traces"),
     workspace=Path("workspace"),
-    unlink_after_processing=True,
+    unlink_after_processing=False,
     buffer_tcp: bool = True,
     n_jobs=8,
     files=None,
