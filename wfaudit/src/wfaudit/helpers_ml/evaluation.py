@@ -1,12 +1,13 @@
 # stdlib
 import copy
-from pathlib import Path
 import random
+from pathlib import Path
 from typing import Any, Dict, List, Tuple, Union
 
 # third party
 import numpy as np
 import pandas as pd
+import wfaudit.logger as log
 from sklearn.metrics import (
     f1_score,
     matthews_corrcoef,
@@ -27,7 +28,6 @@ from wfaudit.helpers_ml.robustfp import RobustFingerprintingClassifier
 from wfaudit.helpers_ml.serialization import load_from_file, save_to_file
 from wfaudit.helpers_ml.varcnn import VarCNNClassifier
 from wfaudit.helpers_ml.xgb import XGBoostClassifier
-import wfaudit.logger as log
 
 clf_extras = [
     "acc_top5",
@@ -187,7 +187,7 @@ def evaluate_classifier(
     estimator: Any,
     X: np.ndarray,
     Y: np.ndarray,
-    n_folds: int = 3,
+    n_folds: int = 5,
     seed: int = 0,
     classes: Any = None,
 ) -> Dict:
@@ -213,17 +213,12 @@ def evaluate_classifier(
 
     X = np.asarray(X)
 
-    # Encode labels FIRST, then collect classes from the encoded space.
-    # Collecting before encoding is a bug: classes holds raw label values while
-    # predict_proba returns encoded indices.
     Y = LabelEncoder().fit_transform(Y)
     Y = np.asarray(Y)
 
     if classes is None:
         classes = np.ravel(Y)
     classes = set(classes)
-
-    # log.debug(f"evaluate_estimator shape x:{X.shape} y:{Y.shape}")
 
     results = {}
 
@@ -355,7 +350,6 @@ def evaluate_multiclass(
     use_cache: bool = True,
     **kwargs,
 ):
-    print("Labels", pd.Series(labels).value_counts())
     score = _evaluate_static_models_cv(
         arch,
         f"{label}_multiclass",

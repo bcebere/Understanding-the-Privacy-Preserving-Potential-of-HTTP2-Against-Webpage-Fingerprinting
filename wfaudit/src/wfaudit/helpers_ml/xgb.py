@@ -48,7 +48,7 @@ class XGBoostClassifier:
 
     def __init__(
         self,
-        n_estimators: int = 50,
+        n_estimators: int = 100,
         reg_lambda: Optional[float] = None,
         reg_alpha: Optional[float] = None,
         colsample_bytree: Optional[float] = None,
@@ -61,7 +61,7 @@ class XGBoostClassifier:
         max_bin: int = 256,
         booster: int = 0,
         grow_policy: int = 0,
-        nthread: int = 2,
+        nthread: int = -1,
         random_state: int = 0,
         eta: float = 0.3,
         **kwargs: Any,

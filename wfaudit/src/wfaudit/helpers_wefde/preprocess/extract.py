@@ -2,15 +2,14 @@
 # future
 from __future__ import division
 
-# stdlib
-from collections import OrderedDict
 import json
 import os
-from pathlib import Path
 import re
 
-# third party
-from joblib import Parallel, delayed
+# stdlib
+from collections import OrderedDict
+from pathlib import Path
+
 import pandas as pd
 
 # wfaudit absolute
@@ -18,6 +17,9 @@ import wfaudit.helpers_wefde.preprocess.features.Burst as Burst
 import wfaudit.helpers_wefde.preprocess.features.Cumul as Cumul
 import wfaudit.helpers_wefde.preprocess.features.PktNum as PktNum
 import wfaudit.helpers_wefde.preprocess.features.Time as Time
+
+# third party
+from joblib import Parallel, delayed
 from wfaudit.helpers_wefde.preprocess.util import FEATURE_EXT
 
 
@@ -82,8 +84,6 @@ def task_handler(filepath: str, out_path: str, conn_limit: int):
     if len(x) == 0:
         print("Ignore empty dataset")
         return
-
-    # print("Before after ", orig_len, len(x))
 
     times = x.iloc[:, 0].astype(float).values.tolist()
 

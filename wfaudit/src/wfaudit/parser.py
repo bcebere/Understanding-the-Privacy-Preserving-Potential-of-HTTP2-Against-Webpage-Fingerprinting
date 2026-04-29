@@ -27,7 +27,7 @@ np.set_printoptions(suppress=True)
 def process_raw_pcaps(
     traces=Path("traces"),
     workspace=Path("workspace"),
-    unlink_after_processing=True,
+    unlink_after_processing=False,
     buffer_tcp: bool = True,
     n_jobs=8,
     files=None,
@@ -113,7 +113,7 @@ def merge_pcap_csvs(
     out_workspace = workspace / "output_csv_merged"
     out_workspace.mkdir(parents=True, exist_ok=True)
 
-    static_files = glob.glob(str(in_workspace / "static*.csv"))
+    static_files = glob.glob(str(in_workspace / "static_*.csv"))
     print("static files", len(static_files))
 
     static_parquet = out_workspace / "static_data.parquet"
@@ -132,7 +132,12 @@ def merge_pcap_csvs(
     for fidx, static_filename in enumerate(tqdm(static_files, desc="merge-csvs")):
         try:
             s_df = pd.read_csv(
-                static_filename, dtype={"label": "category"}, engine="pyarrow"
+                static_filename,
+                dtype={
+                    "label": "category",
+                    "domain": "str",
+                },
+                engine="pyarrow",
             )
             t_df = pd.read_csv(
                 in_workspace
@@ -150,7 +155,6 @@ def merge_pcap_csvs(
             print("Failed to read csv", e, static_filename)
             continue
 
-        # ------ post‑processing that the original version performed ------
         original_id, original_label = s_df["id"].iloc[0], s_df["label"].iloc[0]
         total_dur = t_df["relative_timestamp"].sum()
         hashed_id = hashlib.sha1(
@@ -162,12 +166,11 @@ def merge_pcap_csvs(
             df["full_id"] = hashed_id
             df["id"] = df["id"].astype(str)
 
-        # ------------------- batch‑to‑disk -------------------            ➌
         buf_static.append(pa.Table.from_pandas(s_df, preserve_index=False))
         buf_temporal.append(pa.Table.from_pandas(t_df, preserve_index=False))
 
         if (fidx + 1) % pd_lim == 0:
-            if pq_static is None:  # first batch → open writers
+            if pq_static is None:  # first batch open writers
                 pq_static = pq.ParquetWriter(
                     out_workspace / "static_data.parquet", buf_static[0].schema
                 )
@@ -181,7 +184,6 @@ def merge_pcap_csvs(
                 pq_temporal.write_table(tbl_temp)
             buf_static.clear(), buf_temporal.clear()
 
-    # ---------- flush leftovers & close ----------
     if pq_static is None:  # we never triggered the batch flush
         pq_static = pq.ParquetWriter(
             out_workspace / "static_data.parquet", buf_static[0].schema
@@ -197,7 +199,6 @@ def merge_pcap_csvs(
         pq_temporal.write_table(tbl_temp)
     pq_static.close(), pq_temporal.close()
 
-    # ---------- return *lazy* DataFrames backed by the parquet files ----------
     static_ds = pa.dataset.dataset(
         out_workspace / "static_data.parquet", format="parquet"
     )
@@ -375,6 +376,7 @@ def prepare_wefde_raw(
     domain_limit=1000,
     class_cnt_limit=1024,
     wefde_folder: str = "output_wefde",
+    ts_limit=1000,
 ):  # id, full_id
     output = workspace / wefde_folder
     output.mkdir(parents=True, exist_ok=True)
@@ -384,6 +386,7 @@ def prepare_wefde_raw(
         static_data,
         temporal_data,
         ID_COL=ID_COL,
+        ts_limit=ts_limit,
     )
     print("processed time series", clean_static_data.shape)
 
@@ -430,6 +433,7 @@ def prepare_wefde_raw(
         timestamps[timestamps > 1000] = 0  # Parsing bug
 
         local_ts = timestamps.values
+
         assert len(local_ts) == len(local_sizes)
         assert (local_ts >= 0).all(), timestamps.values
 
@@ -468,14 +472,21 @@ def prepare_all_datasets(
     deepse_testtypes=["real", "sanity"],
     wefde_folder: str = "output_wefde",
     wefde_feats_folder: str = "output_features",
+    prepare_raw_wefde_traces=True,
+    ts_limit=1000,
 ):
-    print("merge raw datasets")
-    static_data, ts_data = merge_pcap_csvs(workspace=workspace)
+    if prepare_raw_wefde_traces:
+        print("merge raw datasets")
+        static_data, ts_data = merge_pcap_csvs(workspace=workspace)
 
-    print("prepare WeFDE data")
-    prepare_wefde_raw(
-        static_data, ts_data, workspace=workspace, wefde_folder=wefde_folder
-    )
+        print("prepare WeFDE data")
+        prepare_wefde_raw(
+            static_data,
+            ts_data,
+            workspace=workspace,
+            wefde_folder=wefde_folder,
+            ts_limit=ts_limit,
+        )
     prepare_wefde_dataset(
         workspace=workspace,
         wefde_folder=wefde_folder,

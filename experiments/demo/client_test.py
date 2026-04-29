@@ -1,1 +1,0 @@
-../scripts/client_test.py

@@ -1,7 +1,7 @@
 # third party
 import numpy as np
-from sklearn.model_selection import train_test_split
 import torch
+from sklearn.model_selection import train_test_split
 from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
@@ -26,38 +26,30 @@ def train_model(
     model: nn.Module,
     X: np.ndarray,
     y: np.ndarray,
-    X_weather: "np.ndarray | None" = None,
-    epochs: int = 50,
+    epochs: int = 1000,
     device=DEVICE,
     batch_size: int = 200,
     patience: int = 10,
     min_delta: float = 0.0,
     random_state: int = 42,
 ) -> nn.Module:
-    split_inputs = [X, y] if X_weather is None else [X, X_weather, y]
+    split_inputs = [X, y]
     splits = train_test_split(
         *split_inputs, test_size=0.1, stratify=y, random_state=random_state
     )
 
-    # splits layout: [X_tr, X_te, y_tr, y_te] or [X_tr, X_te, W_tr, W_te, y_tr, y_ve]
-    if X_weather is None:
-        X_tr, X_val, y_tr, y_val = splits
-        W_tr = W_val = None
-    else:
-        X_tr, X_val, W_tr, W_val, y_tr, y_val = splits
+    X_tr, X_val, y_tr, y_val = splits
 
-    def to_tensors(X_, W_, y_):
+    def to_tensors(X_, y_):
         tensors = [torch.from_numpy(np.asarray(X_)).float()]
-        if W_ is not None:
-            tensors.append(torch.from_numpy(np.asarray(W_)).float())
         tensors.append(torch.from_numpy(np.asarray(y_)).long())
         return tensors
 
     train_loader = _make_loader(
-        to_tensors(X_tr, W_tr, y_tr), is_training=True, batch_size=batch_size
+        to_tensors(X_tr, y_tr), is_training=True, batch_size=batch_size
     )
     val_loader = _make_loader(
-        to_tensors(X_val, W_val, y_val), is_training=False, batch_size=batch_size
+        to_tensors(X_val, y_val), is_training=False, batch_size=batch_size
     )
 
     model = model.to(device)

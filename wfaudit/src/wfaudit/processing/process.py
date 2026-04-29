@@ -37,7 +37,7 @@ def process_pcap(
     input_file: Path,
     workspace: Path = Path("workspace"),
     with_certificates: bool = False,
-    with_dns: bool = False,
+    with_dns: bool = True,
     buffer_tcp: bool = True,
 ) -> FlowSession:
     input_file = Path(input_file)
@@ -71,7 +71,7 @@ def process_pcap_via_json(
     input_file: Path,
     workspace: Path = Path("workspace"),
     with_certificates: bool = False,
-    with_dns: bool = False,
+    with_dns: bool = True,
     buffer_tcp: bool = True,
 ) -> FlowSession:
     input_file = Path(input_file)

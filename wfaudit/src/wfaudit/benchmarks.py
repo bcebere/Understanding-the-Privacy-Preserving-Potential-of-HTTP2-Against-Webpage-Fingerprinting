@@ -6,6 +6,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import shap
+import wfaudit.logger as log
 from sklearn.model_selection import train_test_split
 
 # wfaudit absolute
@@ -14,7 +15,6 @@ from wfaudit.helpers_ml import evaluate_multiclass
 from wfaudit.helpers_ml.xgb import XGBoostClassifier
 from wfaudit.helpers_wefde.analysis.data_utils import load_wefde_features
 from wfaudit.helpers_wefde.analysis.info_leak import evaluate_info_leakage
-import wfaudit.logger as log
 
 
 def evaluate_ml_from_wefde(
@@ -279,6 +279,7 @@ def audit(
     ml_arch_3D=["varcnn", "df"],
     ml_kwargs={},
     # Leakage area
+    leakage_estimators=["wefde", "deepse"],
     wefde_output_folder=Path("output_wefde"),
     wefde_kwargs={},
     deepse_output=Path("output_deepse/results.csv"),
@@ -316,16 +317,18 @@ def audit(
     # Leakage estimators
     leak_scores = {}
 
-    leak_scores["wefde"] = evaluate_leakage_from_wefde(
-        wefde_output_folder=wefde_output_folder,
-        wefde_feats_folder=wefde_feats_folder,
-        **wefde_kwargs,
-    )
-    leak_scores["deepse"] = evaluate_leakage_from_deepse(
-        deepse_dataset=deepse_dataset,
-        deepse_output=deepse_output,
-        **deepse_kwargs,
-    )
+    if "wefde" in leakage_estimators:
+        leak_scores["wefde"] = evaluate_leakage_from_wefde(
+            wefde_output_folder=wefde_output_folder,
+            wefde_feats_folder=wefde_feats_folder,
+            **wefde_kwargs,
+        )
+    if "deepse" in leakage_estimators:
+        leak_scores["deepse"] = evaluate_leakage_from_deepse(
+            deepse_dataset=deepse_dataset,
+            deepse_output=deepse_output,
+            **deepse_kwargs,
+        )
     scores["leakage"] = leak_scores
 
     # XAI
