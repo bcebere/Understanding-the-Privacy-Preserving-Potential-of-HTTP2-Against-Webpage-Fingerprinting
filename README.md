@@ -64,9 +64,11 @@ print("ML scores ---> ", scores["ML"])
 print("Leakage scores ---> ", scores["leakage"])
 ```
 
+Refer to the [experiments benchmark example](experiments/example_benchmarks/) for more details.
+
 ## ⚡ Proof-of-Concept HTTP/2 client/servers
 
-The [h2deflib](h2deflib) folder contains the HTTP/2 client and servers used to replay the browser traces with various defenses enabled.
+The [h2deflib](./h2deflib) folder contains the HTTP/2 client and servers used to replay the browser traces with various defenses enabled.
 
 The library can be installed from source using
 ```bash
@@ -74,6 +76,10 @@ cd h2deflib
 pip install .
 ```
 
+The library includes unit tests in [tests][h2deflib/tests] and a [client defense demo](h2deflib/tests/demo/).
+
+
+Refer to the [experiments replay example](experiments/example_replay/) for more examples on configuring the client and the server defenses using the `h2deflib` library.
 
 ## :hammer: Tests
 

@@ -25,47 +25,7 @@ openssl req -new -x509 -key "$KEY_FILE" -out "$CERT_FILE" -days 365 \
 
 ## Demo for simulating the HTTP2 datasets
 [example_replay](./example_replay) illustrates how to replay browser traces, using various defenses (server or client side).
-For full datasets, replace the `data` folder with the contents (`bin`, `client_trace`, `server_trace`) of one of the datasets from [website datasets](../datasets/).
-
-- Start the Docker containers
-```bash
-# Start client and server Docker containers
-
-bash docker_image/run_container.sh http2_server
-
-bash docker_image/run_container.sh http2_client
-```
-
-- Connect to the server Docker container and navigate to the example folder
-```bash
-docker exec -it http2_server /bin/bash
-
-ifconfig # Get the SERVER_IP, which will be used by the client from the other container
-
-# Navigate to the demo folder
-cd /experiments/example_replay
-
-# Start a basic server on port 9999
-bash ./run_server_dummy.sh 9999
-```
-
-- Connect to the client Docker container and test the connection
-```bash
-docker exec -it http2_client /bin/bash
-
-# Navigate to the demo folder
-cd /experiments/demo
-
-# Connect a basic client to SERVER_IP and port 9999. This should finish without any errors.
-python ./client_test.py --dst_ip $SERVER_IP --dst_port 9999
-
-# Collect traces
-rm -rf workspace
-bash ./run_client_dummy.sh $SERVER_IP 9999 eth0
-
-# If successful, this script will store in "workspace/traces" the PCAPs for 3 unique pages, 150 repeats per page.
-# The "workspace/traces" path can be further passed to wfaudit -> "process_raw_pcaps" in the "traces" parameter.
-```
+For full datasets, replace the `data` folder with the contents of one of the `browser_original_traces` (`bin`, `client_trace`, `server_trace`) from [the datasets repository](https://i62nextcloud.tm.kit.edu/public.php/dav/files/6ga8tgFyiXo4ZAf/?accept=zip).
 
 
 ### Client defenses
@@ -132,3 +92,38 @@ bash ./client_srvdefs.sh --dst_ip $SERVER_IP --dst_port 9999 --capture 0 --reque
 ### Docker images (optional)
 For isolating multiple experiments, we used docker containers for each the server and the client. The scripts for building and running the container are available [here](./docker_image).
 The build create an image `http2_datasets`, which we use for both server and client sides.
+
+- Start the Docker containers
+```bash
+# Start client and server Docker containers
+
+bash docker_image/run_container.sh http2_server
+
+bash docker_image/run_container.sh http2_client
+```
+
+- Connect to the server Docker container and navigate to the example folder
+```bash
+docker exec -it http2_server /bin/bash
+
+ifconfig # Get the SERVER_IP, which will be used by the client from the other container
+
+# Navigate to the demo folder
+cd /experiments/example_replay
+
+# Start a basic server on port 9999
+bash ./nop_server_nop.sh --dst_port 9999
+```
+
+- Connect to the client Docker container and test the connection
+```bash
+docker exec -it http2_client /bin/bash
+
+# Navigate to the demo folder
+cd /experiments/example_replay/
+
+# Connect a basic client to SERVER_IP and port 9999. This should finish without any errors.
+bash ./client_nop.sh --dst_ip $SERVER_IP --dst_port 9999
+
+# If successful, this script will store in "workspace/traces" the PCAPs for 3 unique pages, 500 repeats per page.
+```
