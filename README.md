@@ -64,7 +64,7 @@ print("ML scores ---> ", scores["ML"])
 print("Leakage scores ---> ", scores["leakage"])
 ```
 
-Refer to the [experiments benchmark example](experiments/example_benchmarks/) for more details.
+Refer to the [experiments benchmark example](experiments/example_benchmarks/) for more usage examples.
 
 ## ⚡ Proof-of-Concept HTTP/2 client/servers
 
