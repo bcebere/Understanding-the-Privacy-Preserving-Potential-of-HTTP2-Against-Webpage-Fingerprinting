@@ -317,7 +317,7 @@ class H2Server(asyncio.Protocol):
             self.max_outbound_frame_size = self.config.fixed_out_window_size
         elif self.config.enable_random_out_window:
             self.max_outbound_frame_size = random.randint(2**12, 2**14)
-            print(f"[h2lib][out-window] {self.max_outbound_frame_size}")
+            print(f"[h2deflib][out-window] {self.max_outbound_frame_size}")
         else:
             self.max_outbound_frame_size = 16384
 
@@ -373,7 +373,7 @@ class H2Server(asyncio.Protocol):
             try:
                 self._dispatch_event(event)
             except Exception as exc:  # noqa: BLE001
-                print(f"[h2lib] error handling {type(event).__name__}: {exc}")
+                print(f"[h2deflib] error handling {type(event).__name__}: {exc}")
             self._flush(swallow=True)
 
     # ------------------------------------------------------------------ #
@@ -439,12 +439,12 @@ class H2Server(asyncio.Protocol):
         ):
             big = random.randint(2**12 + 1, 2**14)
             self.server_name = "#" * big
-            print(f"[h2lib][hpack] big server header = {big}")
+            print(f"[h2deflib][hpack] big server header = {big}")
 
         # Random frame-delay threshold (if enabled dynamically)
         if self.defense_active and self.config.enable_random_frame_delay:
             self.frame_delay_threshold = random.randint(2**8, 2**10)
-            print(f"[h2lib][shape] threshold = {self.frame_delay_threshold}")
+            print(f"[h2deflib][shape] threshold = {self.frame_delay_threshold}")
 
         # Inject synthetic noise resources for random-push / random-hints.
         if self.defense_active and (
@@ -457,6 +457,7 @@ class H2Server(asyncio.Protocol):
             self._prepare_multiplexing()
 
         hints_on = self.config.enable_103_hints or self.config.enable_global_103_hints
+        print(f"[h2deflib] HINTS toggle {self.connection_id} -> {hints_on}")
         if self.defense_active and (hints_on or self.config.enable_random_103_hints):
             self._send_103_early_hints(stream_id)
 
@@ -518,7 +519,7 @@ class H2Server(asyncio.Protocol):
     ) -> Tuple[bytes, Dict[str, str], str, float, float]:
         spec = self.store.get(path) if self.store else None
         if spec is None:
-            print(f"[h2lib] path not in store: {path}")
+            print(f"[h2deflib] path not in store: {path}")
             return b"", {}, "application/text", 0.0, 0.0
 
         body = spec.body
@@ -563,7 +564,7 @@ class H2Server(asyncio.Protocol):
             frame_delay = self.config.fixed_frame_delay
 
         print(
-            f"[h2lib][data] path={path} delay={response_delay} "
+            f"[h2deflib][data] path={path} delay={response_delay} "
             f"frame_delay={frame_delay} size={len(body)}"
         )
         return body, resp_headers, content_type, response_delay, frame_delay
@@ -573,8 +574,13 @@ class H2Server(asyncio.Protocol):
     # ------------------------------------------------------------------ #
 
     def _send_103_early_hints(self, stream_id: int):
+        print(
+            f"[h2deflib][103] SEND HINTS for stream {self.connection_id} - {stream_id}"
+        )  # <-- add
+
         candidates = self._hint_candidates()
         if not candidates:
+            print(f"[h2deflib][103] NO CANDIDATES for stream {stream_id}")
             return
 
         k = random.randint(self.config.hints_count_lo, self.config.hints_count_hi)
@@ -584,7 +590,7 @@ class H2Server(asyncio.Protocol):
         for path in sampled:
             hints_headers.append(("link", f"<{path}>; rel=preload; as=image"))
 
-        print(f"[h2lib][103] sending {len(sampled)} hints")
+        print(f"[h2deflib][103] sending {len(sampled)} hints")
         self.conn.send_headers(stream_id, hints_headers)
 
     def _hint_candidates(self) -> List[str]:
@@ -610,7 +616,7 @@ class H2Server(asyncio.Protocol):
         count = random.randrange(1, len(candidates))
         candidates = list(candidates)
         random.shuffle(candidates)
-        print(f"[h2lib][push] pushing {count}/{len(candidates)}")
+        print(f"[h2deflib][push] pushing {count}/{len(candidates)}")
 
         streams: List[tuple] = []
         for path in candidates[:count]:
@@ -687,7 +693,7 @@ class H2Server(asyncio.Protocol):
         ckp = sorted({c for c in ckp if c != 0})
         strategy["checkpoints"] = ckp
         self.multiplexing_strategy = strategy
-        print(f"[h2lib][mux] {strategy}")
+        print(f"[h2deflib][mux] {strategy}")
 
     def _check_handle_multiplexing(self):
         if self.multiplexing_strategy is None:
@@ -765,7 +771,7 @@ class H2Server(asyncio.Protocol):
         if response_delay > 0:
             await asyncio.sleep(response_delay)
             print(
-                f"[h2lib][stream {stream_id}] delay {response_delay} at {time.time()}"
+                f"[h2deflib][stream {stream_id}] delay {response_delay} at {time.time()}"
             )
 
         if len(data) == 0:
@@ -773,7 +779,7 @@ class H2Server(asyncio.Protocol):
                 self.conn.send_data(stream_id, data, end_stream=True)
                 self._flush(swallow=True)
             except Exception as exc:  # noqa: BLE001
-                print(f"[h2lib] empty send failed: {exc}")
+                print(f"[h2deflib] empty send failed: {exc}")
             return
 
         while data:
@@ -803,7 +809,7 @@ class H2Server(asyncio.Protocol):
             try:
                 self._flush()
             except (BrokenPipeError, ConnectionResetError, OSError) as exc:
-                print(f"[h2lib] write failed on stream {stream_id}: {exc}")
+                print(f"[h2deflib] write failed on stream {stream_id}: {exc}")
                 return
 
             data = data[chunk_size:]

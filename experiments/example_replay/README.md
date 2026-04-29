@@ -73,7 +73,7 @@ On the server side, we use always use the same implementation, provided using `.
 
 Start the server using
 ```bash
-DST_PORT=9999 bash ./server_nop.sh
+bash ./server_nop.sh --dst_port 9999
 ```
 
 On the client side, run
@@ -82,26 +82,27 @@ On the client side, run
 # Preparation
 rm -rf workspace
 SERVER_IP=... # from ifconfig from the server-side
+SERVER_PORT=9999
 ```
 
 - HTTPOS defense
 ```bash
-bash ./client_httpos.sh --dst_ip $SERVER_IP --dst_port 9999 --capture 0 # provide ifname also for capture=1
+bash ./client_tamaraw.sh --dst_ip $SERVER_IP --dst_port $SERVER_PORT --capture 0 # provide ifname also for capture=1
 ```
 
 - FRONT defense
 ```bash
-bash ./client_front.sh --dst_ip $SERVER_IP --dst_port 9999 --capture 0 # provide ifname also for capture=1
+bash ./client_front.sh --dst_ip $SERVER_IP --dst_port $SERVER_PORT --capture 0 # provide ifname also for capture=1
 ```
 
 - Tamaraw defense
 ```bash
-bash ./client_tamaraw.sh --dst_ip $SERVER_IP --dst_port 9999 --capture 0 # provide ifname also for capture=1
+bash ./client_tamaraw.sh --dst_ip $SERVER_IP --dst_port $SERVER_PORT --capture 0 # provide ifname also for capture=1
 ```
 
 - H2PC defense
 ```bash
-bash ./client_h2pc.sh --dst_ip $SERVER_IP --dst_port 9999 --capture 0 # provide ifname also for capture=1
+bash ./client_h2pc.sh --dst_ip $SERVER_IP --dst_port $SERVER_PORT --capture 0 # provide ifname also for capture=1
 ```
 
 
@@ -111,22 +112,22 @@ On the server side, run:
 
 - ALPACA defense
 ```bash
-bash ./run_server_def_alpaca.sh 9999
+bash ./server_alpaca.sh --dst_port 9999
 ```
 
 - TAMARAW defense
 ```bash
-bash ./run_server_def_tamaraw.sh 9999
+bash ./server_tamaraw.sh --dst_port 9999
 ```
 
 - H2PS defense
 ```bash
-bash ./run_server_def_h2ps.sh 9999
+bash ./server_h2ps.sh --dst_port 9999
 ```
 
 On the client side, request defense for the 'en.wikipedia.org' server using
 ```bash
-bash ./run_client_srvdefs.sh $SERVER_IP 9999 eth0 en.wikipedia.org
+bash ./client_srvdefs.sh --dst_ip $SERVER_IP --dst_port 9999 --capture 0 --request_server_defense en.wikipedia.org
 ```
 ### Docker images (optional)
 For isolating multiple experiments, we used docker containers for each the server and the client. The scripts for building and running the container are available [here](./docker_image).

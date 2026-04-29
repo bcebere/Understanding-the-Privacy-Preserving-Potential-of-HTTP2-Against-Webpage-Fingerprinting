@@ -127,6 +127,7 @@ def prepare_requests(
                 connection_id=conn_id,
             )
         )
+    print(out)
 
     if (
         request_server_defense is not None

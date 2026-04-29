@@ -22,12 +22,12 @@ from __future__ import annotations
 
 # stdlib
 import asyncio
-from copy import deepcopy
 import io
 import json
 import random
 import ssl
 import time
+from copy import deepcopy
 from typing import Any, Dict, List, Optional
 
 # third party
@@ -47,7 +47,6 @@ from h2.events import (
 )
 from h2.exceptions import ProtocolError, StreamClosedError
 from h2.settings import SettingCodes
-from pydantic import BaseModel
 
 # h2deflib absolute
 from h2deflib.client_defenses.front import FRONT_DEFENSE
@@ -56,6 +55,7 @@ from h2deflib.client_defenses.httpos import HTTPOS_DEFENSE
 from h2deflib.client_defenses.llama import LLAMA_DEFENSE
 from h2deflib.client_defenses.nop import NOP_DEFENSE
 from h2deflib.client_defenses.tamaraw_qcsd import TAMARAW_QCSD_DEFENSE
+from pydantic import BaseModel
 
 DEFAULT_TEST_TIMEOUT = 60
 
@@ -485,6 +485,7 @@ class H2Client(asyncio.Protocol):
             except Exception as e:
                 print(f"[103] parse failure: {e}")
 
+        print(f"[HINTS] Server sent hints {len(self.server_hints)}")
         if self.server_hints:
             asyncio.create_task(self._handle_hints_async(list(self.server_hints)))
 
