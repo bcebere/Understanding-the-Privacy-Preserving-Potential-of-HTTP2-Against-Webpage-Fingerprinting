@@ -76,10 +76,10 @@ cd h2deflib
 pip install .
 ```
 
-The library includes unit tests in [tests][h2deflib/tests] and a [client defense demo](h2deflib/tests/demo/).
+The library includes unit tests in [tests](h2deflib/tests) and a [client defense demo](h2deflib/tests/demo/).
 
 
-Refer to the [experiments replay example](experiments/example_replay/) for more examples on configuring the client and the server defenses using the `h2deflib` library.
+Refer to the [experiments replay examples](experiments/example_replay/) for more usage examples for configuring the client and the server defenses using the `h2deflib` library.
 
 ## :hammer: Tests
 
