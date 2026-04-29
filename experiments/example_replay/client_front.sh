@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run client.py with the nop defense.
+# Run client.py with the FRONT defense.
 # Set CAPTURE=0 to skip pcap recording (no sudo needed).
 set -euo pipefail
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
