@@ -1,12 +1,7 @@
-# Repository layout
-
-The HTTP/2 client and server have been extracted into a reusable package,
-`h2deflib`. The experimental entry points (`experimental_server.py` and
-`experimental_client.py`) are now thin — they just parse CLI flags, load
-the testcase JSON, and hand everything to `h2deflib`.
+# HTTP/2 Defense Library layout
 
 ```
-h2deflib/
+src/h2deflib/
 ├── __init__.py        # public API
 ├── server.py          # H2Server, H2ServerConfig, ResourceStore, ResponseSpec
 └── client.py          # H2Client, Request, ConnectionDetails, get_defense, run_test_case
@@ -40,3 +35,6 @@ client_defenses/       # one defense strategy per file
   "front" | "httpos" | "llama" | "h2pc"` into a defense instance.
 - **`send_single_request`**, **`send_requests`**, **`run_test_case`** —
   runners for the experimental code.
+
+
+More usage examples are available in the [experiments folder](../experiments/example_replay).
