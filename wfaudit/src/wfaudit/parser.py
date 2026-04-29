@@ -473,7 +473,7 @@ def prepare_all_datasets(
     deepse_testtypes=["real", "sanity"],
     wefde_folder: str = "output_wefde",
     wefde_feats_folder: str = "output_features",
-    prepare_raw_wefde_traces=False,
+    prepare_raw_wefde_traces=True,
     ts_limit=1000,
 ):
     if prepare_raw_wefde_traces:

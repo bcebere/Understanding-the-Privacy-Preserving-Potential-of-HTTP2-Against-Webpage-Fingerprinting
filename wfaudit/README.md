@@ -8,7 +8,6 @@ The library can be installed from source using
 ```bash
 cd wfaudit
 pip install .
-# TODO: publish to PyPI
 ```
 
 ## 💥 Example usage:
@@ -41,7 +40,6 @@ prepare_all_datasets(
 ml_output_folder = workspace / "eval_ml"
 wefde_output_folder = workspace / "eval_wefde"
 deepse_output = workspace / "eval_deepse/results.csv"
-xai_output_folder = workspace / "eval_xai"
 
 wefde_feats_folder = workspace / "output_features"
 deepse_dataset = workspace / "output_deepse" / "real" / "dataset.npz"
@@ -54,19 +52,26 @@ scores = audit(
     ml_output_folder=ml_output_folder,
     wefde_feats_folder=wefde_feats_folder,
     deepse_dataset=deepse_dataset,
-    ml_arch_2D=["xgboost"],
+    ml_arch_2D=["kfp"],
     ml_arch_3D=[],
     # leakage
     wefde_output_folder=wefde_output_folder,
     deepse_output=deepse_output,
-    # xai
-    xai_output_folder=xai_output_folder,
 )
 
 print("ML scores ---> ", scores["ML"])
 print("Leakage scores ---> ", scores["leakage"])
-print("XAI scores ---> ", scores["xai"])
 ```
+
+Additional examples are available in the [unit tests](./tests).
+## 🌀 Available estimators
+
+The Machine-Learning estimators can be configured through the parameters:
+ - `ml_arch_2D`. Available values: `kfp` (k-Fingerprinting), `rf` (Random Forest), `xgboost` (XGBoost).
+ - `ml_arch_3D`. Available values: `holmes` (Holmes), `varcnn` (VarCNN), `df` (Deep-Fingerprinting), `robustfp` (Robust Fingerprinting).
+
+The Information-Leakage estimators can be configured using the parameter:
+ - `leakage_estimators`. Available values: `wefde` (WeFDE), `deepse` (DeepSE-WF).
 
 ## :hammer: Tests
 For more examples on how to use the library, please refer to the [unit tests](./tests).
