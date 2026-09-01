@@ -1,22 +1,6 @@
-"""Server-side defense intensity ladders.  mid1 = the submitted configuration.
-
-Each defense scales every mechanism it owns, since they all move cost in the
-same direction:
-
-    alpaca      padding granularity, fake-object count and push probability
-    tamaraw     padding multiple, pacing (window/delay/threshold), fake objects
-    h2ps        "103 Early Hints" per response, PING padding
-
-The noise pool is sized in multiples of the padding constant, so its resource
-sizes already scale with pad; push_max and push_prob scale how many of them
-are actually delivered.
-
-L, Tamaraw's packet-count padding parameter, has no counterpart here -- the
-emulation reproduces the rate and the byte padding but not the partitioning
-that produces the original's anonymity sets.
+"""Server-side defense intensity ladders.
 """
 
-# LEVELS = ("vlow", "low", "lomid", "mid1", "mid2", "high")
 LEVELS = ("vlow", "low", "lomid", "mid1", "mid2", "high", "vhigh", "vvhigh")
 
 
@@ -82,9 +66,6 @@ SRV_TAMARAW = {
     ),
 }
 
-# Hints are emitted once per connection, on stream 1, as in the submitted
-# server.  Only the count scales; noise objects are drawn from the page's own
-# size distribution, so each one costs about what a real resource costs.
 H2PS = {
     "vlow": dict(hints_lo=1, hints_hi=1, pings=0, hpack=0),
     "low": dict(hints_lo=1, hints_hi=2, pings=1, hpack=0),
@@ -108,7 +89,6 @@ def params(defense: str, level: str = "mid1") -> dict:
 
 
 if __name__ == "__main__":
-    print("mid1 matches submitted config: OK\n")
     print("levels:", ", ".join(LEVELS), "\n")
     for d, t in TABLES.items():
         keys = sorted(t["mid1"])

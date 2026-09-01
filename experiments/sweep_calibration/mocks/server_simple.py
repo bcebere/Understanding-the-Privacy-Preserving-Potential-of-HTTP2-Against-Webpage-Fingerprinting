@@ -45,7 +45,7 @@ parser.add_argument(
     "--level",
     dest="level",
     default="mid1",
-    help="H2PS intensity from server_defenses/levels.py (mid1 = submitted)",
+    help="H2PS intensity from server_defenses/levels.py",
 )
 parser.add_argument(
     "-http2_server_push",
