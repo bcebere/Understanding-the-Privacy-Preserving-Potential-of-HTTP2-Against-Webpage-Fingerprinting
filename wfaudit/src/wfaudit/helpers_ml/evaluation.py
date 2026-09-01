@@ -1,13 +1,14 @@
 # stdlib
 import copy
-import random
+import hashlib
+import json
 from pathlib import Path
+import random
 from typing import Any, Dict, List, Tuple, Union
 
 # third party
 import numpy as np
 import pandas as pd
-import wfaudit.logger as log
 from sklearn.metrics import (
     f1_score,
     matthews_corrcoef,
@@ -28,6 +29,7 @@ from wfaudit.helpers_ml.robustfp import RobustFingerprintingClassifier
 from wfaudit.helpers_ml.serialization import load_from_file, save_to_file
 from wfaudit.helpers_ml.varcnn import VarCNNClassifier
 from wfaudit.helpers_ml.xgb import XGBoostClassifier
+import wfaudit.logger as log
 
 clf_extras = [
     "acc_top5",
@@ -70,8 +72,13 @@ class classifier_metrics:
         y_pred = np.argmax(np.asarray(y_pred_proba), axis=1)
 
         if len(classes) > 2:  # multiclass
+            # The label space is defined by the score columns, not by the labels
+            # present in this fold; a fold missing a class would otherwise raise.
+            proba_labels = np.arange(np.asarray(y_pred_proba).shape[1])
             for k in [5, 10, 20]:
-                results[f"acc_top{k}"] = top_k_accuracy_score(y_test, y_pred_proba, k=k)
+                results[f"acc_top{k}"] = top_k_accuracy_score(
+                    y_test, y_pred_proba, k=k, labels=proba_labels
+                )
                 results[f"f1_top{k}"] = self.topk_recall(y_test, y_pred_proba, k=k)
             (
                 H_cond,
@@ -187,7 +194,7 @@ def evaluate_classifier(
     estimator: Any,
     X: np.ndarray,
     Y: np.ndarray,
-    n_folds: int = 5,
+    n_folds: int = 3,
     seed: int = 0,
     classes: Any = None,
 ) -> Dict:
@@ -274,13 +281,13 @@ def evaluate_classifier(
 
 def _get_arch_mode(arch: str, **kwargs):
     if arch == "xgboost":
-        return XGBoostClassifier()
+        return XGBoostClassifier(**kwargs)
     elif arch == "lr":
-        return LinearClassifier()
+        return LinearClassifier(**kwargs)
     elif arch == "rf":
-        return RFClassifier()
+        return RFClassifier(**kwargs)
     elif arch == "kfp":
-        return KFingerprintingForestClassifier()
+        return KFingerprintingForestClassifier(**kwargs)
     elif arch == "varcnn":
         return VarCNNClassifier(**kwargs)
     elif arch == "holmes":
@@ -307,6 +314,42 @@ def _dataframe_hash(df: pd.DataFrame) -> str:
     return str(abs(hashes.sum()))
 
 
+def _array_hash(data: np.ndarray, labels) -> str:
+    """Order-dependent content hash, computed without copying the array.
+
+    Used for sequence data, where building a DataFrame of the flattened traces
+    costs roughly three times the size of the data itself.
+    """
+    h = hashlib.blake2b(digest_size=8)
+    for part in (np.ascontiguousarray(data), np.ascontiguousarray(labels)):
+        h.update(f"{part.shape}|{part.dtype.str}|".encode())
+        view = memoryview(part.reshape(-1)).cast("B")
+        chunk = 1 << 24
+        for i in range(0, len(view), chunk):
+            h.update(view[i : i + chunk])
+    return h.hexdigest()
+
+
+def _params_signature(params: Dict[str, Any]) -> str:
+    """Stable suffix identifying a hyper-parameter configuration.
+
+    Returns the empty string for an empty configuration, so cache files written
+    before hyper-parameters were part of the key remain valid.
+    """
+    if not params:
+        return ""
+    unstable = sorted(k for k, v in params.items() if callable(v))
+    if unstable:
+        # ``str`` of a function embeds its memory address, which would change
+        # the cache key on every run and silently disable the cache.
+        raise ValueError(
+            f"cannot build a stable cache key from callable parameters {unstable}; "
+            f"remove them before evaluating"
+        )
+    blob = json.dumps(params, sort_keys=True, default=str)
+    return "_" + hashlib.md5(blob.encode()).hexdigest()[:8]
+
+
 def _evaluate_static_models_cv(
     arch: str,  # = "xgboost"
     testname: str,
@@ -316,11 +359,20 @@ def _evaluate_static_models_cv(
     use_cache: bool = True,
     **kwargs,
 ):
-    hash_data = pd.DataFrame(np.asarray(input_data).reshape(len(input_data), -1)).copy()
-    hash_data["label"] = labels
-    hash_data.columns = hash_data.columns.astype(str)
-    data_hash = _dataframe_hash(hash_data)
-    bkp_file = workspace / f"eval_{data_hash}_{arch}_{testname}.json"
+    array_data = np.asarray(input_data)
+    if array_data.ndim == 3:
+        # Sequence data is hashed directly; flattening it into a DataFrame first
+        # would allocate several times its own size.
+        data_hash = _array_hash(array_data, np.asarray(labels))
+    else:
+        hash_data = pd.DataFrame(array_data.reshape(len(array_data), -1)).copy()
+        hash_data["label"] = labels
+        hash_data.columns = hash_data.columns.astype(str)
+        data_hash = _dataframe_hash(hash_data)
+    bkp_file = (
+        workspace
+        / f"eval_{data_hash}_{arch}_{testname}{_params_signature(kwargs)}.json"
+    )
 
     score = None
     if bkp_file.exists() and use_cache:

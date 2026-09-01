@@ -1,1 +1,0 @@
-../mocks/run_server_allmods_global.sh

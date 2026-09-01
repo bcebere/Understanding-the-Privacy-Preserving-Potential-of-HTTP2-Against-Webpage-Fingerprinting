@@ -1,5 +1,5 @@
 # stdlib
-from typing import Any
+from typing import Any, Optional
 
 # third party
 import numpy as np
@@ -11,11 +11,22 @@ from sklearn.ensemble import RandomForestClassifier
 class RFClassifier:
     def __init__(
         self,
-        max_depth: int = 4,
+        max_depth: Optional[int] = 4,
         random_state: int = 0,
+        n_estimators: int = 100,
+        max_features="sqrt",
+        min_samples_leaf: int = 1,
+        min_samples_split: int = 2,
+        n_jobs: int = 4,
     ) -> None:
         self.model = RandomForestClassifier(
-            max_depth=max_depth, random_state=random_state
+            max_depth=max_depth,
+            random_state=random_state,
+            n_estimators=n_estimators,
+            max_features=max_features,
+            min_samples_leaf=min_samples_leaf,
+            min_samples_split=min_samples_split,
+            n_jobs=n_jobs,
         )
 
     def fit(self, X: np.ndarray, y: np.ndarray) -> "RFClassifier":

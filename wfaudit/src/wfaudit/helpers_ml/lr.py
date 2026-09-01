@@ -1,11 +1,11 @@
 # stdlib
-from typing import Any
+from typing import Any, Optional
 
 # third party
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
-from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
 
 
 class LinearClassifier:
@@ -32,17 +32,26 @@ class LinearClassifier:
     classes = ["auto", "ovr", "multinomial"]
     weights = ["balanced", None]
 
+    scalers = {"minmax": MinMaxScaler, "standard": StandardScaler}
+
     def __init__(
         self,
         C: float = 1.0,
         max_iter: int = 10000,
         random_state: int = 0,
-        **kwargs: Any,
+        solver: str = "lbfgs",
+        class_weight: Optional[str] = None,
+        scaler: str = "minmax",
     ) -> None:
+        if scaler not in LinearClassifier.scalers:
+            raise ValueError(f"unknown scaler {scaler}")
+        self.scaler_name = scaler
         self.model = LogisticRegression(
             C=C,
             max_iter=max_iter,
             random_state=random_state,
+            solver=solver,
+            class_weight=class_weight,
             n_jobs=4,
             verbose=0,
         )
@@ -51,7 +60,7 @@ class LinearClassifier:
         X = np.asarray(X)
         y = np.asarray(y)
 
-        self.scaler = MinMaxScaler().fit(X)
+        self.scaler = LinearClassifier.scalers[self.scaler_name]().fit(X)
         X = self.scaler.transform(X)
 
         self.model.fit(X, y)

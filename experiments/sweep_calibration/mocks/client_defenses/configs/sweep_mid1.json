@@ -1,0 +1,47 @@
+{
+  "level": "mid1",
+  "note": "AS SUBMITTED -- reproduces the paper's Tables 3-10 exactly",
+  "measured_overhead": {
+    "front": null,
+    "tamaraw_qcsd": null,
+    "all_mods": null
+  },
+  "defenses": {
+    "front": {
+      "name": "front",
+      "send_dummy_packet_strategy": "front",
+      "send_dummy_packet_interval": "front",
+      "send_dummy_packet_loop": true,
+      "send_dummy_min": 1,
+      "front_window_min": 0.0,
+      "front_window_max": 1.0,
+      "send_dummy_max": 200
+    },
+    "tamaraw_qcsd": {
+      "name": "tamaraw_qcsd",
+      "send_dummy_packet_strategy": "random_per_connection",
+      "send_dummy_packet_loop": true,
+      "recv_threshold_resample": false,
+      "initial_window_size_strategy": 4096,
+      "recv_delay_threshold": 4096,
+      "recv_interval_strategy": 0.01,
+      "send_dummy_packet_interval": 0.02
+    },
+    "all_mods": {
+      "name": "all_mods",
+      "initial_window_size_strategy": "random",
+      "request_batch": false,
+      "request_shuffle": true,
+      "send_dummy_packet_strategy": "random_batch",
+      "send_dummy_packet_loop": false,
+      "recv_threshold_resample": false,
+      "send_dummy_packet_limit": 1,
+      "random_pings": true,
+      "ping_probability": 0.5,
+      "ping_count_min": 1,
+      "ping_count_max": 3,
+      "recv_interval_strategy": 0.0001,
+      "recv_delay_threshold": 10000
+    }
+  }
+}

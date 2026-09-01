@@ -1,6 +1,14 @@
 # Understanding the Privacy-Preserving Potential of HTTP2 Against Webpage Fingerprinting (WF)
 In this repository, we provide the code to reproduce the results in the "Understanding the Privacy-Preserving Potential of HTTP2 Against Webpage Fingerprinting" paper.
 
+## 🛡️ Defense Calibration
+
+The [defense sweep_calibration](experiments/sweep_calibration) folder contains the logic for calibrating both the client-side and server-side defenses.
+The calibration intensities are implemented as follows: [here for the client-side defenses](experiments/sweep_calibration/mocks/client_defenses/levels.py), and [here for the server-side defenses](experiments/sweep_calibration/mocks/server_defenses/levels.py).
+
+The calibrated defenses are evaluated in the [calibrated_benchmarks](experiments/calibrated_benchmarks/) folder. The selected configurations for each (dataset, defense) pair are available [here](experiments/calibrated_benchmarks/mocks/main_table_config.py).
+
+
 ## 🚀 Website Fingerprinting Audit Tool
 
 The [wfaudit](./wfaudit/README.md) library provides a framework for evaluating the security of a WF defense, through fingerprinting accuracy, information leakage, and feature importance measurements.
@@ -86,7 +94,7 @@ pip install .
 The library includes unit tests in [tests](h2deflib/tests) and a [client defense demo](h2deflib/tests/demo/).
 
 
-Refer to the [experiments replay examples](experiments/example_replay/) for more usage examples for configuring the client and the server defenses using the `h2deflib` library. 
+Refer to the [experiments replay examples](experiments/example_replay/) for more usage examples for configuring the client and the server defenses using the `h2deflib` library.
 
 ## :hammer: Tests
 
@@ -98,10 +106,22 @@ The tests can be executed using
 ```bash
 pytest -vsx
 ```
+
 ## 🔑 Datasets
+
 Refer to [datasets section](./datasets/README.md) for the necessary steps preparing the resources for the experiments.
 
-The full collected browser traces and the replayed HTTP/2 traces are available in the [datasets repository](https://i62nextcloud.tm.kit.edu/public.php/dav/files/6ga8tgFyiXo4ZAf/?accept=zip).
 
 ## 💥 Experiments
+
 Refer to [experiments section](./experiments/README.md) for examples in replaying the collected datasets using various defenses, as well as evaluating the security of the defenses.
+
+## Citing
+
+If you use this code, please cite the associated paper:
+
+```
+@article{
+    TODO
+}
+```

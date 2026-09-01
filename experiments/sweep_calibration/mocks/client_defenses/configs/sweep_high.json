@@ -1,0 +1,47 @@
+{
+  "level": "high",
+  "note": "heaviest configuration on each ladder",
+  "measured_overhead": {
+    "front": null,
+    "tamaraw_qcsd": null,
+    "all_mods": null
+  },
+  "defenses": {
+    "front": {
+      "name": "front",
+      "send_dummy_packet_strategy": "front",
+      "send_dummy_packet_interval": "front",
+      "send_dummy_packet_loop": true,
+      "send_dummy_min": 1,
+      "front_window_min": 0.0,
+      "front_window_max": 1.0,
+      "send_dummy_max": 500
+    },
+    "tamaraw_qcsd": {
+      "name": "tamaraw_qcsd",
+      "send_dummy_packet_strategy": "random_per_connection",
+      "send_dummy_packet_loop": true,
+      "recv_threshold_resample": false,
+      "initial_window_size_strategy": 1024,
+      "recv_delay_threshold": 1024,
+      "recv_interval_strategy": 0.04,
+      "send_dummy_packet_interval": 0.005
+    },
+    "all_mods": {
+      "name": "all_mods",
+      "initial_window_size_strategy": "random",
+      "request_batch": false,
+      "request_shuffle": true,
+      "send_dummy_packet_strategy": "random_batch",
+      "send_dummy_packet_loop": false,
+      "recv_threshold_resample": false,
+      "send_dummy_packet_limit": 3,
+      "random_pings": true,
+      "ping_probability": 1.0,
+      "ping_count_min": 2,
+      "ping_count_max": 8,
+      "recv_interval_strategy": 0.0005,
+      "recv_delay_threshold": 2500
+    }
+  }
+}
