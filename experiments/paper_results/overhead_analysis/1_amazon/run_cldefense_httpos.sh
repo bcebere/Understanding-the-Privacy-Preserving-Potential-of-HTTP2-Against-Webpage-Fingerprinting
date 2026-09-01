@@ -1,1 +1,0 @@
-../mocks/run_cldefense_httpos.sh
