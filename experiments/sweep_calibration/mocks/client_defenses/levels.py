@@ -1,20 +1,5 @@
 """
 Defense intensity ladders for the sweep.
-
-Six levels per defense.  mid1 carries the parameters used in the submitted
-paper; the module checks that at import against the *_DEFENSE objects, so a
-ladder cannot silently drift away from them.
-
-One knob moves per defense, so its six points lie on a single trade-off curve:
-
-    front     send_dummy_max              dummy request budget
-    tamaraw   send_dummy_packet_interval  dummy send rate
-    h2pc      send_dummy_packet_limit     guard streams (+ ping volume)
-    httpos    ranged_splits_min/max       overlapping chunks per resource
-    llama     llama_dummy_probability     dummy after each request/response
-
-vlow is an ablation rather than a scaled-down defense: h2pc has no guard
-streams and no pings, llama has no dummies (delays only).
 """
 
 import os
@@ -43,12 +28,7 @@ def _field_names(cls):
 
 
 def _require_patched_defense():
-    """The ladders set knobs that only exist in the patched DEFENSE.
-
-    Pydantic drops unknown keyword arguments silently, so without this check
-    an unpatched class would yield levels that look fine and differ from each
-    other in none of the intended ways.
-    """
+    """The ladders set knobs that only exist in the patched DEFENSE."""
     needed = {
         "max_dummy_time",
         "dummy_min_resource_size",
@@ -102,7 +82,7 @@ FRONT_LEVELS = {
     for lv, cap in zip(LEVELS, (20, 50, 110, 200, 350, 500))
 }
 
-# Dummy send rate only; shaping strength held at the submitted values.
+# Dummy send rate only;
 _TAM_FIXED = dict(
     initial_window_size_strategy=4096,
     recv_delay_threshold=4096,
@@ -309,7 +289,6 @@ def cells(defenses=SWEPT, levels=LEVELS):
 
 
 if __name__ == "__main__":
-    print("mid1 matches submitted config (global ladder): OK\n")
     knob = {
         "front": "send_dummy_max",
         "tamaraw": "send_dummy_packet_interval",

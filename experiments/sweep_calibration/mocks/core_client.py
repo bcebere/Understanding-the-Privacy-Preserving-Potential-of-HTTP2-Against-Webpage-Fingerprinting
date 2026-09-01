@@ -41,7 +41,7 @@ TEST_TIMEOUT = 60
 # than the undefended baseline.
 PUMP_PING = b"\x00" * 8
 NOISE_PING = b"\xa5" * 8
-PUMP_PING_INTERVAL = 0.5  # unchanged from the submitted behaviour
+PUMP_PING_INTERVAL = 0.5
 
 # Marks a send_dummy_packet call triggered by an arriving response rather
 # than an outgoing request.

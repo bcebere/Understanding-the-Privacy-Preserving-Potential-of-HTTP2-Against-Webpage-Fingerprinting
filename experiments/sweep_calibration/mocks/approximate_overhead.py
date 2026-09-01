@@ -36,7 +36,7 @@ parser.add_argument(
     dest="level",
     default="mid1",
     choices=["vlow", "low", "lomid", "mid1", "mid2", "high", "vhigh", "vvhigh"],
-    help="Defense intensity level (mid1 = the submitted configuration)",
+    help="Defense intensity level",
 )
 parser.add_argument(
     "-workspace",
