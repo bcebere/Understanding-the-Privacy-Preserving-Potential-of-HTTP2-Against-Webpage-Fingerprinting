@@ -7,11 +7,7 @@ This section provides scripts for creating the datasets in the paper.
 
 [browser_crawlers](browser_crawlers) provides the scripts for recreating the browser traces.
 
-The collected traces are available in the `browser_original_traces` folder in the [datasets repository](https://i62nextcloud.tm.kit.edu/public.php/dav/files/6ga8tgFyiXo4ZAf/?accept=zip).
-
-## Replayed HTTP/2 Traces
-
-The replayed traces using various HTTP/2 defenses are available in the `http2_replayed_traces` in the [datasets repository](https://i62nextcloud.tm.kit.edu/public.php/dav/files/6ga8tgFyiXo4ZAf/?accept=zip).
-
-As a toy example, the code repository includes the undefended Amazon dataset in the [replays](replays) folder.
-Further, the [experiments/example_benchmarks](../experiments/example_benchmarks) folder contains the scripts for evaluating this (or any other) replayed trace --- just replace the dataset.
+All datasets are available at  https://drive.google.com/drive/folders/1WAHwUJq44IQcHiTpsyAl8bgUvORlD2xR?usp=sharing
+ - `broswe_traces`: The baseline browser trace (order of downloads, downloaded images etc). These browser traces are replayed using various defenses on top of them.
+ - `replays_sweeps_calibration`: All the calibration traces for all datasets.
+ - `replays_calibrated_defendes`: All the defense variants applied to each dataset.
