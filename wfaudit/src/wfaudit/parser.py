@@ -27,7 +27,7 @@ np.set_printoptions(suppress=True)
 def process_raw_pcaps(
     traces=Path("traces"),
     workspace=Path("workspace"),
-    unlink_after_processing=False,
+    unlink_after_processing=True,
     buffer_tcp: bool = True,
     n_jobs=8,
     files=None,
@@ -75,6 +75,7 @@ def process_raw_pcaps(
             else:
                 session = process_pcap(filename, buffer_tcp=buffer_tcp)
         except BaseException as e:
+
             log.error(
                 f"failed to parse pcap. moving to graveyard {filename}, error = {e}"
             )
@@ -84,6 +85,8 @@ def process_raw_pcaps(
         static_data, temporal_data = session.temporal_stats_per_flow()
         if len(static_data) == 0:
             log.error(f"empty dataset {filename}")
+            if unlink_after_processing:
+                filename.unlink()
             return
 
         static_data["label"] = label
@@ -208,7 +211,7 @@ def merge_pcap_csvs(
     return static_ds, temporal_ds
 
 
-def _prepare_time_series_arrow(
+def _prepare_time_series_arrow_nodns(
     static_ds: ds.Dataset,
     ts_ds: ds.Dataset,
     ts_limit: Optional[int] = 50_000,
@@ -287,6 +290,79 @@ def _prepare_time_series_arrow(
         f"min len={np.min(lens)}, max len={np.max(lens)}"
     )
 
+    return static_df, ts_data_clean, (lens, sizes, rel_times)
+
+
+def _prepare_time_series_arrow(
+    static_ds,
+    ts_ds,
+    ts_limit=50_000,
+    ts_pad=0,
+    ID_COL="file_order",
+    batch_rows=10000,
+):
+    # Pull id domain mapping from static
+    static_df = static_ds.to_table(columns=[ID_COL, "label", "id", "domain"]).to_pandas(
+        split_blocks=True, self_destruct=True
+    )
+
+    # Encode domain as integer
+    domain_vocab = {
+        d: i + 1 for i, d in enumerate(static_df["domain"].dropna().unique())
+    }
+    static_df["domain_enc"] = (
+        static_df["domain"].map(domain_vocab).fillna(0).astype("int32")
+    )
+
+    # id (connection-level) domain_enc lookup
+    id_to_domain = static_df.set_index("id")["domain_enc"].to_dict()
+
+    static_df = static_df.drop_duplicates(ID_COL)
+    static_ids = set(static_df[ID_COL].values)
+
+    pending = defaultdict(list)
+    ts_data_clean, final_ids = [], []
+    lens, sizes, rel_times = [], [], []
+
+    for batch in tqdm(ts_ds.to_batches(batch_size=batch_rows)):
+        pdf = batch.to_pandas(split_blocks=True, self_destruct=True)
+
+        # Join domain_enc onto temporal rows by connection id
+        pdf["domain_enc"] = pdf["id"].map(id_to_domain).fillna(0).astype("int32")
+
+        for idx, grp in pdf.groupby(ID_COL):
+            if idx not in static_ids:
+                continue
+            pending[idx].append(
+                grp.drop(columns=["id", "full_id", "duration"], errors="ignore")
+            )
+            if ts_limit is not None and sum(len(x) for x in pending[idx]) >= ts_limit:
+                _ts_helper_flush_id(
+                    idx,
+                    pending,
+                    ts_data_clean,
+                    final_ids,
+                    lens,
+                    sizes,
+                    rel_times,
+                    ts_limit,
+                    ts_pad,
+                )
+
+    for idx in list(pending):
+        _ts_helper_flush_id(
+            idx,
+            pending,
+            ts_data_clean,
+            final_ids,
+            lens,
+            sizes,
+            rel_times,
+            ts_limit,
+            ts_pad,
+        )
+
+    static_df = static_df.set_index(ID_COL).reindex(final_ids)
     return static_df, ts_data_clean, (lens, sizes, rel_times)
 
 
@@ -433,11 +509,12 @@ def prepare_wefde_raw(
         timestamps[timestamps > 1000] = 0  # Parsing bug
 
         local_ts = timestamps.values
+        domain_enc = clean_ts_data[real_idx]["domain_enc"].values
 
         assert len(local_ts) == len(local_sizes)
         assert (local_ts >= 0).all(), timestamps.values
 
-        new_local_data = pd.DataFrame(np.asarray([local_ts, local_sizes]).T)
+        new_local_data = pd.DataFrame(np.asarray([local_ts, local_sizes, domain_enc]).T)
         new_local_data.to_csv(output / outfile, sep=" ", index=False, header=False)
 
         real_idx += 1
@@ -472,21 +549,23 @@ def prepare_all_datasets(
     deepse_testtypes=["real", "sanity"],
     wefde_folder: str = "output_wefde",
     wefde_feats_folder: str = "output_features",
-    prepare_raw_wefde_traces=True,
     ts_limit=1000,
 ):
-    if prepare_raw_wefde_traces:
-        print("merge raw datasets")
-        static_data, ts_data = merge_pcap_csvs(workspace=workspace)
 
-        print("prepare WeFDE data")
-        prepare_wefde_raw(
-            static_data,
-            ts_data,
-            workspace=workspace,
-            wefde_folder=wefde_folder,
-            ts_limit=ts_limit,
-        )
+    if (workspace / "output_deepse" / "real" / "dataset.npz").exists():
+        return
+
+    print("merge raw datasets")
+    static_data, ts_data = merge_pcap_csvs(workspace=workspace)
+
+    print("prepare WeFDE data")
+    prepare_wefde_raw(
+        static_data,
+        ts_data,
+        workspace=workspace,
+        wefde_folder=wefde_folder,
+        ts_limit=ts_limit,
+    )
     prepare_wefde_dataset(
         workspace=workspace,
         wefde_folder=wefde_folder,

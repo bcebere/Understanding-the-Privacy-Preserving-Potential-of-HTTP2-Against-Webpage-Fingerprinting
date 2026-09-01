@@ -218,24 +218,3 @@ def prepare_deepse_dataset(
     assert min(cls_count) > 0, cls_count
 
     np.savez_compressed(path_out, traces=X, labels=y)
-
-
-def main(args):
-    print("Running dataset")
-    return prepare_deepse_dataset(
-        path_wefde=args.in_path,  # WeFDE dataset path
-        path_out=args.out_path,  # DeepSE dataset path
-        n_websites=args.n_websites,  # Maximum website count
-        n_traces=args.n_traces,  # Maximum samples per website
-        feature_length=args.feature_length,  # Maximum time-series length to keep
-        debug_mode=args.debug_mode,  # Shuffle labels for sanity checks
-    )
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        "Utility to create the dataset used in DeepSE-WF", parents=[get_args_parser()]
-    )
-    args = parser.parse_args()
-
-    main(args)

@@ -60,19 +60,30 @@ class KFingerprintingForestClassifier(BaseEstimator, ClassifierMixin):
         n_neighbours: int = 2,
         n_jobs=4,
         random_state=42,
+        n_estimators: int = 150,
+        max_depth: Optional[int] = None,
+        max_features="sqrt",
+        min_samples_leaf: int = 1,
     ):
         if forest is not None:
             self.forest = forest
         else:
             self.forest = RandomForestClassifier(
-                n_estimators=150,
-                max_depth=None,
+                n_estimators=n_estimators,
+                max_depth=max_depth,
+                max_features=max_features,
+                min_samples_leaf=min_samples_leaf,
                 oob_score=True,
                 random_state=random_state,
                 n_jobs=n_jobs,
             )
         self.n_jobs = n_jobs
         self.n_neighbours = n_neighbours
+        self.random_state = random_state
+        self.n_estimators = n_estimators
+        self.max_depth = max_depth
+        self.max_features = max_features
+        self.min_samples_leaf = min_samples_leaf
 
     def fit(self, X: np.ndarray, y: np.ndarray):
         """Fit the estimator according to the given training data."""
@@ -144,7 +155,9 @@ class KFingerprintingForestClassifier(BaseEstimator, ClassifierMixin):
 
         For the probability of a class we use the number of times that
         class appears in the the neighbourhood, divided by the the number
-        of neighbours.
+        of neighbours. The resolution of the returned probabilities is
+        therefore ``1 / n_neighbours``, which constrains any metric derived
+        from them (top-k accuracy, entropy, mean confidence).
         """
         X = np.asarray(X)
         neighbourhoods = self._predict(X, n_neighbors)

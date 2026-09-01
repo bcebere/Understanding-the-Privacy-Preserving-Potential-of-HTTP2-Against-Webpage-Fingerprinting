@@ -2,14 +2,15 @@
 # future
 from __future__ import division
 
-import json
-import os
-import re
-
 # stdlib
 from collections import OrderedDict
+import json
+import os
 from pathlib import Path
+import re
 
+# third party
+from joblib import Parallel, delayed
 import pandas as pd
 
 # wfaudit absolute
@@ -17,9 +18,6 @@ import wfaudit.helpers_wefde.preprocess.features.Burst as Burst
 import wfaudit.helpers_wefde.preprocess.features.Cumul as Cumul
 import wfaudit.helpers_wefde.preprocess.features.PktNum as PktNum
 import wfaudit.helpers_wefde.preprocess.features.Time as Time
-
-# third party
-from joblib import Parallel, delayed
 from wfaudit.helpers_wefde.preprocess.util import FEATURE_EXT
 
 

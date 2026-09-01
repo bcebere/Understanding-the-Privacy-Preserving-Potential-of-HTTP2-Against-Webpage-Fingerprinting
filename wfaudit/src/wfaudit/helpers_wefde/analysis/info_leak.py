@@ -27,7 +27,7 @@ def _individual_measure(modeler, n_procs: int, n_samples: int):
     Parameters
     ----------
     modeler : WebsiteFingerprintModeler
-        initialized fingerprinting engie
+        initialized fingerprinting engine
     Returns
     -------
     list

@@ -1,5 +1,6 @@
 # stdlib
 import math
+from typing import Optional
 
 # third party
 import numpy as np
@@ -44,7 +45,7 @@ class Encoder1d(nn.Module):
     A stack of ConvBlock1d layers, each optionally followed by MaxPool1d and dropout.
     """
 
-    def __init__(self, in_channels, out_channels, conv_num_layers=4):
+    def __init__(self, in_channels, out_channels, conv_num_layers=4, dropout=0.3):
         super(Encoder1d, self).__init__()
 
         # Build channel progression: double from 128 up to out_channels,
@@ -58,7 +59,7 @@ class Encoder1d(nn.Module):
             layers.append(ConvBlock1d(current_in, ch, 3))
             if i < conv_num_layers - 1:
                 layers.append(nn.MaxPool1d(3))
-                layers.append(nn.Dropout(0.3))
+                layers.append(nn.Dropout(dropout))
             current_in = ch
 
         self.layers = nn.Sequential(*layers)
@@ -68,17 +69,24 @@ class Encoder1d(nn.Module):
 
 
 class Holmes(nn.Module):
-    def __init__(self, in_channels: int, num_classes: int):
+    def __init__(
+        self,
+        in_channels: int,
+        num_classes: int,
+        emb_size: int = 128,
+        conv_num_layers: int = 4,
+        dropout: float = 0.3,
+    ):
         super().__init__()
-        emb_size = 128
         self.encoder1d = Encoder1d(
             in_channels=in_channels,
             out_channels=emb_size,
-            conv_num_layers=4,
+            conv_num_layers=conv_num_layers,
+            dropout=dropout,
         )
         self.global_pool = nn.AdaptiveAvgPool1d(1)
         self.classifier = nn.Sequential(
-            nn.Dropout(0.3),
+            nn.Dropout(dropout),
             nn.Linear(emb_size, num_classes),
         )
         self._initialize_weights()
@@ -111,33 +119,87 @@ class HolmesClassifier:
         self,
         batch_size: int = 200,
         device=DEVICE,
-        epochs: int = 50,
+        epochs: int = 1000,
+        dropout: float = 0.3,
+        emb_size: int = 128,
+        conv_num_layers: int = 4,
+        lr: float = 0.002,
+        weight_decay: float = 0.0,
+        optimizer_name: str = "adam",
+        scheduler_name: str = "none",
+        label_smoothing: float = 0.0,
+        grad_clip: Optional[float] = None,
+        patience: int = 10,
+        monitor: str = "val_loss",
+        random_state: int = 42,
+        verbose: bool = True,
+        on_epoch_end=None,
     ) -> None:
         self.batch_size = batch_size
         self.device = device
         self.epochs = epochs
+        self.dropout = dropout
+        self.emb_size = emb_size
+        self.conv_num_layers = conv_num_layers
+        self.lr = lr
+        self.weight_decay = weight_decay
+        self.optimizer_name = optimizer_name
+        self.scheduler_name = scheduler_name
+        self.label_smoothing = label_smoothing
+        self.grad_clip = grad_clip
+        self.patience = patience
+        self.monitor = monitor
+        self.random_state = random_state
+        self.verbose = verbose
+        self.on_epoch_end = on_epoch_end
         self.model = None
 
     def fit(self, X: np.ndarray, y: np.ndarray) -> "HolmesClassifier":
         X = np.asarray(X)
         y = np.asarray(y)
-        print("Training Holmes with", X.shape, y.shape)
+        if self.verbose:
+            print("Training Holmes with", X.shape, y.shape)
+
+        # Each encoder stage after the first pools by 3, so the trace must be
+        # long enough for the requested depth.
+        min_length = 3 ** (self.conv_num_layers - 1)
+        if X.shape[2] < min_length:
+            raise ValueError(
+                f"conv_num_layers={self.conv_num_layers} pools the input to zero "
+                f"length: traces are {X.shape[2]} long, at least {min_length} needed"
+            )
 
         n_websites = len(np.unique(y))
         self.model = train_model(
-            model=Holmes(in_channels=X.shape[1], num_classes=n_websites),
+            model=Holmes(
+                in_channels=X.shape[1],
+                num_classes=n_websites,
+                emb_size=self.emb_size,
+                conv_num_layers=self.conv_num_layers,
+                dropout=self.dropout,
+            ),
             X=X,
             y=y,
             batch_size=self.batch_size,
             device=self.device,
             epochs=self.epochs,
+            patience=self.patience,
+            random_state=self.random_state,
+            lr=self.lr,
+            weight_decay=self.weight_decay,
+            optimizer_name=self.optimizer_name,
+            scheduler_name=self.scheduler_name,
+            label_smoothing=self.label_smoothing,
+            grad_clip=self.grad_clip,
+            monitor=self.monitor,
+            verbose=self.verbose,
+            on_epoch_end=self.on_epoch_end,
         )
         return self
 
     def predict_proba(self, X: np.ndarray, batch_size=100) -> np.ndarray:
         if self.model is None:
             raise RuntimeError("Fit the model first")
-        # Move model to device — train_model returns it on CPU (best_state is cpu-cloned)
         self.model.to(self.device)
         self.model.eval()
         X = torch.from_numpy(np.asarray(X)).float()

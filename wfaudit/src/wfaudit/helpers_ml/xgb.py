@@ -35,8 +35,6 @@ class XGBoostClassifier:
             Boosting learning rate
         booster: str
             Specify which booster to use: gbtree, gblinear or dart.
-        min_child_weight: int
-            Minimum sum of instance weight(hessian) needed in a child.
         max_bin: int
             Number of bins for histogram construction.
         random_state: float
@@ -61,7 +59,7 @@ class XGBoostClassifier:
         max_bin: int = 256,
         booster: int = 0,
         grow_policy: int = 0,
-        nthread: int = -1,
+        nthread: int = 4,
         random_state: int = 0,
         eta: float = 0.3,
         **kwargs: Any,

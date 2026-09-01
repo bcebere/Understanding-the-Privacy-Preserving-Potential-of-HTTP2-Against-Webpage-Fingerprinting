@@ -5,6 +5,7 @@
 
 # stdlib
 import math
+from typing import Optional
 
 # third party
 import numpy as np
@@ -16,11 +17,11 @@ from wfaudit.helpers_ml._core_nn import DEVICE, train_model
 
 
 class RF(nn.Module):
-    def __init__(self, features, num_classes=95, init_weights=True):
+    def __init__(self, features, num_classes=95, init_weights=True, dropout_first=0.1):
         super(RF, self).__init__()
         self.first_layer_in_channel = 1
         self.first_layer_out_channel = 32
-        self.first_layer = make_first_layers()
+        self.first_layer = make_first_layers(dropout=dropout_first)
         self.features = features
         self.class_num = num_classes
         self.classifier = nn.AdaptiveAvgPool1d(1)
@@ -55,12 +56,12 @@ class RF(nn.Module):
                 m.bias.data.zero_()
 
 
-def make_layers(cfg, in_channels=32):
+def make_layers(cfg, in_channels=32, dropout=0.3):
     layers = []
 
     for i, v in enumerate(cfg):
         if v == "M":
-            layers += [nn.MaxPool1d(3), nn.Dropout(0.3)]
+            layers += [nn.MaxPool1d(3), nn.Dropout(dropout)]
         else:
             conv1d = nn.Conv1d(in_channels, v, kernel_size=3, stride=1, padding=1)
             layers += [
@@ -73,7 +74,7 @@ def make_layers(cfg, in_channels=32):
     return nn.Sequential(*layers)
 
 
-def make_first_layers(in_channels=1, out_channel=32):
+def make_first_layers(in_channels=1, out_channel=32, dropout=0.1):
     layers = []
     conv2d1 = nn.Conv2d(
         in_channels, out_channel, kernel_size=(3, 6), stride=1, padding=(1, 1)
@@ -93,7 +94,7 @@ def make_first_layers(in_channels=1, out_channel=32):
         nn.ReLU(),
     ]
 
-    layers += [nn.MaxPool2d((1, 3)), nn.Dropout(0.1)]
+    layers += [nn.MaxPool2d((1, 3)), nn.Dropout(dropout)]
 
     conv2d3 = nn.Conv2d(out_channel, 64, kernel_size=(3, 6), stride=1, padding=(1, 1))
     layers += [
@@ -109,16 +110,28 @@ def make_first_layers(in_channels=1, out_channel=32):
         nn.ReLU(),
     ]
 
-    layers += [nn.MaxPool2d((2, 2)), nn.Dropout(0.1)]
+    layers += [nn.MaxPool2d((2, 2)), nn.Dropout(dropout)]
 
     return nn.Sequential(*layers)
 
 
-cfg = {"N": [128, 128, "M", 256, 256, "M", 512]}
+# "base" is the channel configuration from the original paper.
+WIDTH_PRESETS = {
+    "narrow": [64, 64, "M", 128, 128, "M", 256],
+    "base": [128, 128, "M", 256, 256, "M", 512],
+    "wide": [192, 192, "M", 384, 384, "M", 768],
+}
+
+cfg = {"N": WIDTH_PRESETS["base"]}
 
 
-def getRF(num_classes):
-    model = RF(make_layers(cfg["N"] + [num_classes]), num_classes=num_classes)
+def getRF(num_classes, dropout_conv=0.3, dropout_first=0.1, width_preset="base"):
+    widths = list(WIDTH_PRESETS[width_preset])
+    model = RF(
+        make_layers(widths + [num_classes], dropout=dropout_conv),
+        num_classes=num_classes,
+        dropout_first=dropout_first,
+    )
     return model
 
 
@@ -128,31 +141,77 @@ class RobustFingerprintingClassifier:
         batch_size: int = 200,
         device=DEVICE,
         epochs: int = 1000,
+        dropout_conv: float = 0.3,
+        dropout_first: float = 0.1,
+        width_preset: str = "base",
+        lr: float = 0.002,
+        weight_decay: float = 0.0,
+        optimizer_name: str = "adam",
+        scheduler_name: str = "none",
+        label_smoothing: float = 0.0,
+        grad_clip: Optional[float] = None,
+        patience: int = 10,
+        monitor: str = "val_loss",
+        random_state: int = 42,
+        verbose: bool = True,
+        on_epoch_end=None,
     ) -> None:
         self.batch_size = batch_size
         self.device = device
         self.epochs = epochs
+        self.dropout_conv = dropout_conv
+        self.dropout_first = dropout_first
+        self.width_preset = width_preset
+        self.lr = lr
+        self.weight_decay = weight_decay
+        self.optimizer_name = optimizer_name
+        self.scheduler_name = scheduler_name
+        self.label_smoothing = label_smoothing
+        self.grad_clip = grad_clip
+        self.patience = patience
+        self.monitor = monitor
+        self.random_state = random_state
+        self.verbose = verbose
+        self.on_epoch_end = on_epoch_end
         self.model = None
 
     def fit(self, X: np.ndarray, y: np.ndarray) -> "RobustFingerprintingClassifier":
         X = np.asarray(X)
         y = np.asarray(y)
-        print("Training RF with", X.shape, y.shape)
+        if self.verbose:
+            print("Training RF with", X.shape, y.shape)
 
         n_websites = len(np.unique(y))
         self.model = train_model(
-            model=getRF(n_websites),
+            model=getRF(
+                n_websites,
+                dropout_conv=self.dropout_conv,
+                dropout_first=self.dropout_first,
+                width_preset=self.width_preset,
+            ),
             X=X,
             y=y,
             batch_size=self.batch_size,
             device=self.device,
             epochs=self.epochs,
+            patience=self.patience,
+            random_state=self.random_state,
+            lr=self.lr,
+            weight_decay=self.weight_decay,
+            optimizer_name=self.optimizer_name,
+            scheduler_name=self.scheduler_name,
+            label_smoothing=self.label_smoothing,
+            grad_clip=self.grad_clip,
+            monitor=self.monitor,
+            verbose=self.verbose,
+            on_epoch_end=self.on_epoch_end,
         )
         return self
 
     def predict_proba(self, X: np.ndarray, batch_size=100) -> np.ndarray:
         if self.model is None:
             raise RuntimeError("Fit the model first")
+        self.model.to(self.device)
         self.model.eval()
         X = torch.from_numpy(np.asarray(X)).float()
         num_samples = X.shape[0]
