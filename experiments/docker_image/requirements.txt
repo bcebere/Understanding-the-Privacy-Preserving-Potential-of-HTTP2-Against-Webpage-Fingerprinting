@@ -1,0 +1,14 @@
+numpy
+pydantic
+statsmodels
+scipy
+scikit-learn
+pathos
+matplotlib
+hdbscan
+tqdm
+h2
+httpx
+sslkeylog
+tldextract
+pyOpenSSL
