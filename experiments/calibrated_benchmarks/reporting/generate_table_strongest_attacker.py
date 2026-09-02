@@ -21,8 +21,12 @@ METRIC = "f1_score_macro"
 if "--metric" in sys.argv:
     METRIC = sys.argv[sys.argv.index("--metric") + 1]
 
-workspace_name = Path.cwd().parent.name
-WORKSPACE = f"/http2/experiments/{workspace_name}/"
+_here = Path(__file__).parent  # dir of the (possibly symlinked) script
+WORKSPACE = (
+    Path(sys.argv[1])
+    if len(sys.argv) > 1 and not sys.argv[1].startswith("-")
+    else _here / "workspace"
+)
 
 
 PRETTY_DATASET = {
