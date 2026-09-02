@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """Attacker evaluation for the main tables.
 
-    python3 benchmark_process_3_evaluate.py                  # kfp + robustfp, tuned
-    python3 benchmark_process_3_evaluate.py --arch all
-    python3 benchmark_process_3_evaluate.py --no-tune
-    python3 benchmark_process_3_evaluate.py --cell h2pc
+python3 benchmark_process_3_evaluate.py [workspace]      # kfp + robustfp, tuned
+python3 benchmark_process_3_evaluate.py --arch all
+python3 benchmark_process_3_evaluate.py --no-tune
+python3 benchmark_process_3_evaluate.py --cell h2pc --dataset 4_udemy
 
-Tuning uses wfaudit.helpers_ml.tuning: an Optuna study per (arch, dataset),
-scoped by a content hash of the data, so every cell gets its own search and
-studies resume across invocations.  The winning configuration is then passed
-to evaluate_multiclass on the full data.
+Per cell it reads <defense>/wefdetraces and <defense>/deepsetraces/real/dataset.npz
+and writes <defense>/benchmarks/{eval_ml,eval_ml_nn,hpo}, creating them if the
+benchmark results are not there yet.
+
 """
 
 import json
@@ -24,7 +24,9 @@ from wfaudit.helpers_wefde.analysis.data_utils import load_wefde_features
 
 ARCH_2D = {"kfp", "xgboost"}
 
-TUNE_ARCHS = {"kfp", "robustfp", "holmes", "varcnn", "df"}
+TUNE_ARCHS = {"kfp", "robustfp", "holmes"}
+NO_TUNE_CELLS = {}
+
 NN_ARCHS = {"varcnn", "holmes", "robustfp", "df"}
 PRESETS = {
     "fast": ["kfp", "robustfp", "holmes"],
@@ -33,10 +35,18 @@ PRESETS = {
 
 parser = ArgumentParser()
 parser.add_argument(
+    "workspace",
+    nargs="?",
+    default=None,
+    help="workspace root holding <dataset>/<defense>/ (default: ./workspace "
+    "next to this script)",
+)
+parser.add_argument("-dataset", "--dataset", dest="dataset", default=None)
+parser.add_argument(
     "-arch",
     "--arch",
     dest="arch",
-    default="all",
+    default="fast",
     help="fast | all | comma-separated list",
 )
 parser.add_argument("-cell", "--cell", dest="cell", default=None)
@@ -83,9 +93,27 @@ args = parser.parse_args()
 ARCHS = PRESETS.get(args.arch, args.arch.split(","))
 TUNE_ARCHS = set(a.strip() for a in args.tune_archs.split(",") if a.strip())
 
-testcase = Path(__file__).parent.name
-cat = Path(__file__).parent.parent.name
-RESULTS = Path(f"/http2/experiments/{cat}/{testcase}/results")
+WORKSPACE = (
+    Path(args.workspace) if args.workspace else Path(__file__).parent / "workspace"
+)
+
+
+def find_cells(workspace, dataset=None, cell=None):
+    """-> [<workspace>/<dataset>/<defense>] that hold input traces.
+
+    Keyed on the trace dirs, not on benchmarks/, so cells whose results have
+    not been produced (or extracted) yet are still picked up.
+    """
+    out = []
+    for ds in sorted(p for p in workspace.iterdir() if p.is_dir()):
+        if dataset and ds.name != dataset:
+            continue
+        for d in sorted(p for p in ds.iterdir() if p.is_dir()):
+            if cell and d.name != cell:
+                continue
+            if (d / "deepsetraces").is_dir() or (d / "wefdetraces").is_dir():
+                out.append(d)
+    return out
 
 
 def load_deepse_data(path):
@@ -122,11 +150,11 @@ def tuned_params(arch, X, Y, hpo_dir, tag):
     return load_best_params(arch, workspace=hpo_dir, X=X, y=Y, dataset_tag=tag)
 
 
-cells = sorted(d for d in RESULTS.iterdir() if (d / "tcp_repr").is_dir())
-if args.cell:
-    cells = [d for d in cells if d.name == args.cell]
+if not WORKSPACE.is_dir():
+    sys.exit(f"no workspace at {WORKSPACE}")
+cells = find_cells(WORKSPACE, args.dataset, args.cell)
 if not cells:
-    sys.exit(f"no cells under {RESULTS}")
+    sys.exit(f"no cells under {WORKSPACE}")
 
 if args.tune:
     tuned = [a for a in ARCHS if a in TUNE_ARCHS]
@@ -143,21 +171,23 @@ print(f"{len(cells)} cells x {len(ARCHS)} attackers  ({mode})\n")
 log = []
 
 for i, cell in enumerate(cells, 1):
-    workspace = cell / "tcp_repr"
-    hpo_dir = workspace / "hpo"
+    dataset_name = cell.parent.name
+    label = f"{dataset_name}/{cell.name}"
+    bench = cell / "benchmarks"
+    hpo_dir = bench / "hpo"
 
     for arch in ARCHS:
         is2d = arch in ARCH_2D
-        out = workspace / ("eval_ml" if is2d else "eval_ml_nn")
+        out = bench / ("eval_ml" if is2d else "eval_ml_nn")
         out.mkdir(parents=True, exist_ok=True)
-        do_tune = args.tune and arch in TUNE_ARCHS
+        do_tune = args.tune and arch in TUNE_ARCHS and cell.name not in NO_TUNE_CELLS
         suffix = "tuned" if do_tune else "topk"
         backup = out / f"scores_rawts_{arch}_{suffix}.bkp"
 
         if backup.exists():
             score = load_from_file(backup)
             print(
-                f"[{i}/{len(cells)}] {cell.name:18s} {arch:9s} cached  "
+                f"[{i}/{len(cells)}] {label:24s} {arch:9s} cached  "
                 f"{score.get('str', {}).get('f1_score_macro', '?')}",
                 flush=True,
             )
@@ -165,32 +195,32 @@ for i, cell in enumerate(cells, 1):
 
         try:
             if is2d:
-                features = workspace / "output_features"
+                features = cell / "wefdetraces"
                 if not (features / "FeaturePositions.json").exists():
                     print(
-                        f"[{i}/{len(cells)}] {cell.name:18s} {arch:9s} "
+                        f"[{i}/{len(cells)}] {label:24s} {arch:9s} "
                         f"SKIP - no features",
                         flush=True,
                     )
                     continue
                 X, Y = load_wefde_features(features)
             else:
-                dataset = workspace / "output_deepse/real/dataset.npz"
+                dataset = cell / "deepsetraces/real/dataset.npz"
                 if not dataset.exists():
                     print(
-                        f"[{i}/{len(cells)}] {cell.name:18s} {arch:9s} "
+                        f"[{i}/{len(cells)}] {label:24s} {arch:9s} "
                         f"SKIP - no dataset.npz",
                         flush=True,
                     )
                     continue
                 X, Y = load_deepse_data(dataset)
 
-            print(f"[{i}/{len(cells)}] {cell.name:18s} {arch:9s} {X.shape}", flush=True)
+            print(f"[{i}/{len(cells)}] {label:24s} {arch:9s} {X.shape}", flush=True)
 
             best = {}
             if do_tune:
                 hpo_dir.mkdir(parents=True, exist_ok=True)
-                best = tuned_params(arch, X, Y, hpo_dir, f"{testcase}_{cell.name}")
+                best = tuned_params(arch, X, Y, hpo_dir, f"{dataset_name}_{cell.name}")
                 print(f"      -> {best}", flush=True)
 
             score = evaluate_multiclass(
@@ -212,25 +242,31 @@ for i, cell in enumerate(cells, 1):
                         workspace=hpo_dir,
                         X=X,
                         y=Y,
-                        dataset_tag=f"{testcase}_{cell.name}",
+                        dataset_tag=f"{dataset_name}_{cell.name}",
                     )
                 except BaseException:
                     shortlist = []
                 log.append(
-                    dict(cell=cell.name, arch=arch, selected=best, top_trials=shortlist)
+                    dict(
+                        dataset=dataset_name,
+                        cell=cell.name,
+                        arch=arch,
+                        selected=best,
+                        top_trials=shortlist,
+                    )
                 )
 
             print(
-                f"    {cell.name:18s} {arch:9s} "
+                f"    {label:24s} {arch:9s} "
                 f"{score.get('str', {}).get('f1_score_macro', '?')}",
                 flush=True,
             )
 
         except BaseException as exc:
-            print(f"    {cell.name:18s} {arch:9s} FAILED: {exc}", flush=True)
+            print(f"    {label:24s} {arch:9s} FAILED: {exc}", flush=True)
 
 if log:
-    path = RESULTS.parent / "tuning_log.json"
+    path = WORKSPACE / "tuning_log.json"
     existing = []
     if path.exists():
         try:

@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """Leakage estimators for the main tables: WeFDE and DeepSE-WF.
 
-    python3 benchmark_process_4_mi_estimators.py
+    python3 benchmark_process_4_mi_estimators.py [workspace]
     python3 benchmark_process_4_mi_estimators.py --only deepse --device cuda
-    python3 benchmark_process_4_mi_estimators.py --cell h2pc
+    python3 benchmark_process_4_mi_estimators.py --cell h2pc --dataset 4_udemy
 
-Reads tcp_repr/output_features and tcp_repr/output_deepse/real/dataset.npz;
-writes results next to eval_ml / eval_ml_nn:
+Per cell it reads <defense>/wefdetraces and <defense>/deepsetraces/real/dataset.npz;
+writes results next to eval_ml / eval_ml_nn, creating benchmarks/ if missing:
 
-    tcp_repr/eval_wefde/leakage.csv          MI_TOTAL, per-category MI
-    tcp_repr/eval_deepse/results_df.csv      MI_TOTAL, BER_LO, BER_HI, ACC
+    <defense>/benchmarks/eval_wefde/leakage.csv       MI_TOTAL, per-category MI
+    <defense>/benchmarks/eval_deepse/results_df.csv   MI_TOTAL, BER_LO, BER_HI, ACC
 
 evaluate_leakage_from_wefde returns a DataFrame and writes nothing, so the
 result is saved here.
@@ -26,7 +26,15 @@ import psutil
 from wfaudit import evaluate_leakage_from_deepse, evaluate_leakage_from_wefde
 
 parser = ArgumentParser()
+parser.add_argument(
+    "workspace",
+    nargs="?",
+    default=None,
+    help="workspace root holding <dataset>/<defense>/ (default: ./workspace "
+    "next to this script)",
+)
 parser.add_argument("-cell", "--cell", dest="cell", default=None)
+parser.add_argument("-dataset", "--dataset", dest="dataset", default=None)
 parser.add_argument(
     "-only",
     "--only",
@@ -40,15 +48,34 @@ parser.add_argument("-epochs", "--epochs", dest="epochs", type=int, default=1000
 parser.add_argument("-n_procs", "--n_procs", dest="n_procs", type=int, default=10)
 args = parser.parse_args()
 
-testcase = Path(__file__).parent.name
-cat = Path(__file__).parent.parent.name
-RESULTS = Path(f"/http2/experiments/{cat}/{testcase}/results")
+WORKSPACE = (
+    Path(args.workspace) if args.workspace else Path(__file__).parent / "workspace"
+)
 
-cells = sorted(d for d in RESULTS.iterdir() if (d / "tcp_repr").is_dir())
-if args.cell:
-    cells = [d for d in cells if d.name == args.cell]
+
+def find_cells(workspace, dataset=None, cell=None):
+    """-> [<workspace>/<dataset>/<defense>] that hold input traces.
+
+    Keyed on the trace dirs, not on benchmarks/, so cells whose results have
+    not been produced (or extracted) yet are still picked up.
+    """
+    out = []
+    for ds in sorted(p for p in workspace.iterdir() if p.is_dir()):
+        if dataset and ds.name != dataset:
+            continue
+        for d in sorted(p for p in ds.iterdir() if p.is_dir()):
+            if cell and d.name != cell:
+                continue
+            if (d / "deepsetraces").is_dir() or (d / "wefdetraces").is_dir():
+                out.append(d)
+    return out
+
+
+if not WORKSPACE.is_dir():
+    sys.exit(f"no workspace at {WORKSPACE}")
+cells = find_cells(WORKSPACE, args.dataset, args.cell)
 if not cells:
-    sys.exit(f"no cells under {RESULTS}")
+    sys.exit(f"no cells under {WORKSPACE}")
 
 print(f"{len(cells)} cells  ({args.only}, device={args.device})\n")
 
@@ -72,22 +99,24 @@ def get_cpu_count():
 
 
 for i, cell in enumerate(cells, 1):
-    ws = cell / "tcp_repr"
-    tag = f"[{i}/{len(cells)}] {cell.name:18s}"
+    bench = cell / "benchmarks"
+    label = f"{cell.parent.name}/{cell.name}"
+    tag = f"[{i}/{len(cells)}] {label:24s}"
 
     if args.only in ("both", "wefde"):
-        feats = ws / "output_features"
-        target = ws / "eval_wefde/leakage.csv"
+        feats = cell / "wefdetraces"
+        target = bench / "eval_wefde/leakage.csv"
         available_cpus = get_cpu_count()
 
         if target.exists():
             print(f"{tag} wefde  cached", flush=True)
         elif not (feats / "FeaturePositions.json").exists():
-            print(f"{tag} wefde  SKIP - no output_features", flush=True)
+            print(f"{tag} wefde  SKIP - no wefdetraces", flush=True)
         else:
             print(f"{tag} wefde", flush=True)
+            target.parent.mkdir(parents=True, exist_ok=True)
             df = evaluate_leakage_from_wefde(
-                wefde_output_folder=ws / "eval_wefde",
+                wefde_output_folder=bench / "eval_wefde",
                 wefde_feats_folder=feats,
                 n_procs=min(max(10, available_cpus), 60),
                 topn=20,
@@ -95,14 +124,13 @@ for i, cell in enumerate(cells, 1):
             )
             assert df is not None
 
-            target.parent.mkdir(parents=True, exist_ok=True)
             df.to_csv(target, index=False)
             mi = df["MI_TOTAL"].values[0] if "MI_TOTAL" in df else float("nan")
             print(f"    wefde MI_TOTAL={mi:.3f} -> {target}", flush=True)
 
     if args.only in ("both", "deepse"):
-        dataset = ws / "output_deepse/real/dataset.npz"
-        target = ws / f"eval_deepse/results_{args.model}.csv"
+        dataset = cell / "deepsetraces/real/dataset.npz"
+        target = bench / f"eval_deepse/results_{args.model}.csv"
         if target.exists():
             print(f"{tag} deepse cached", flush=True)
         elif not dataset.exists():
