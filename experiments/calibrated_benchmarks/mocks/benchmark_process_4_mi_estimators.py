@@ -23,6 +23,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import psutil
+import torch
 from wfaudit import evaluate_leakage_from_deepse, evaluate_leakage_from_wefde
 
 parser = ArgumentParser()
@@ -42,9 +43,16 @@ parser.add_argument(
     default="deepse",
     choices=["both", "wefde", "deepse"],
 )
-parser.add_argument("-device", "--device", dest="device", default="cuda")
+parser.add_argument(
+    "-device",
+    "--device",
+    dest="device",
+    default="cuda" if torch.cuda.is_available() else "cpu",
+)
 parser.add_argument("-model", "--model", dest="model", default="df")
-parser.add_argument("-epochs", "--epochs", dest="epochs", type=int, default=1000)
+parser.add_argument(
+    "-epochs", "--epochs", dest="epochs", type=int, default=2
+)  # TODO 1000
 parser.add_argument("-n_procs", "--n_procs", dest="n_procs", type=int, default=10)
 args = parser.parse_args()
 
@@ -109,7 +117,8 @@ for i, cell in enumerate(cells, 1):
         available_cpus = get_cpu_count()
 
         if target.exists():
-            print(f"{tag} wefde  cached", flush=True)
+            mi = pd.read_csv(target)["MI_TOTAL"].values[0]
+            print(f"{tag} wefde  cached MI_TOTAL={mi:.3f}", flush=True)
         elif not (feats / "FeaturePositions.json").exists():
             print(f"{tag} wefde  SKIP - no wefdetraces", flush=True)
         else:
@@ -132,7 +141,13 @@ for i, cell in enumerate(cells, 1):
         dataset = cell / "deepsetraces/real/dataset.npz"
         target = bench / f"eval_deepse/results_{args.model}.csv"
         if target.exists():
-            print(f"{tag} deepse cached", flush=True)
+            df = pd.read_csv(target)
+            print(
+                f"{tag} deepse cached MI={df['MI_TOTAL'].mean():.3f} "
+                f"BER={df['BER_LO'].mean():.3f}-{df['BER_HI'].mean():.3f}",
+                flush=True,
+            )
+
         elif not dataset.exists():
             print(f"{tag} deepse SKIP - no dataset.npz", flush=True)
         else:

@@ -188,13 +188,15 @@ for dataset in DATASETS:
 print("\n" + "=" * 66)
 print("LATEX (aggregated)")
 print("=" * 66)
-print(r"""\begin{tabular}{@{}lrrr@{}}
+print(
+    r"""\begin{tabular}{@{}lrrr@{}}
 \toprule
 \textbf{Defense} &
 \multicolumn{1}{c}{$\Delta\text{Up}$} &
 \multicolumn{1}{c}{$\Delta\text{Down}$} &
 \multicolumn{1}{c}{$\Delta T$} \\
-\midrule""")
+\midrule"""
+)
 for defense in CLIENT_ORDER + SERVER_ORDER:
     if defense not in agg:
         continue

@@ -24,9 +24,8 @@ from wfaudit.helpers_wefde.analysis.data_utils import load_wefde_features
 
 ARCH_2D = {"kfp", "xgboost"}
 
-TUNE_ARCHS = {"kfp", "robustfp", "holmes"}
+TUNE_ARCHS = {"kfp", "robustfp", "holmes", "varcnn", "df"}
 NO_TUNE_CELLS = {}
-
 NN_ARCHS = {"varcnn", "holmes", "robustfp", "df"}
 PRESETS = {
     "fast": ["kfp", "robustfp", "holmes"],
@@ -116,6 +115,23 @@ def find_cells(workspace, dataset=None, cell=None):
     return out
 
 
+# Raw WeFDE traces (wefdetraces/, files like "0-1") are not features: the 2D
+# attackers need the extracted set that carries FeaturePositions.json, which
+# benchmark_process_2_create_datasets.py writes.
+FEATURE_DIRS = (
+    "wefdetraces/output_features",  # shipped alongside the raw traces
+    "benchmarks/output_features",  # produced locally by step 2
+    "wefdetraces",  # features archived on their own
+)
+
+
+def feature_dir(cell):
+    for rel in FEATURE_DIRS:
+        if (cell / rel / "FeaturePositions.json").exists():
+            return cell / rel
+    return None
+
+
 def load_deepse_data(path):
     data = np.load(path)
     return data["traces"].astype("float32"), data["labels"].astype("float32")
@@ -163,6 +179,7 @@ if args.tune:
         f"tuned: {' '.join(tuned) or 'none'} "
         f"({args.trials} trials, {args.per_class}/class)"
         + (f"; defaults: {' '.join(plain)}" if plain else "")
+        + f"; {'/'.join(sorted(NO_TUNE_CELLS))} always at defaults"
     )
 else:
     mode = "defaults for every attacker"
@@ -195,11 +212,12 @@ for i, cell in enumerate(cells, 1):
 
         try:
             if is2d:
-                features = cell / "wefdetraces"
-                if not (features / "FeaturePositions.json").exists():
+                features = feature_dir(cell)
+                if features is None:
                     print(
                         f"[{i}/{len(cells)}] {label:24s} {arch:9s} "
-                        f"SKIP - no features",
+                        f"SKIP - no extracted features "
+                        f"(run benchmark_process_2_create_datasets.py)",
                         flush=True,
                     )
                     continue

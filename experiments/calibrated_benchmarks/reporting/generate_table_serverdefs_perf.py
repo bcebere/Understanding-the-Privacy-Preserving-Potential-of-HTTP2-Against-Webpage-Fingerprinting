@@ -161,7 +161,9 @@ def cell(v, underline, bold):
     return (
         f"$\\mathbf{{{s}}}$"
         if bold
-        else f"$\\underline{{{s}}}$" if underline else f"${s}$"
+        else f"$\\underline{{{s}}}$"
+        if underline
+        else f"${s}$"
     )
 
 
