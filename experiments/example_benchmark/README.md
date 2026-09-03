@@ -45,6 +45,11 @@ bash ./prepare_workspace.sh 4_udemy srvtamaraw_all <ARCHIVES PATH> ./workspace -
 bash ./prepare_workspace.sh 4_udemy <defense> <ARCHIVES PATH> ./workspace --benchmarks
 #
 ```
+
+Valid datasets: `1_amazon`, `2_bbc`, `3_reddit`, `4_udemy`, `5_wiki`.
+Valid defenses: `nop` (undefended), `front`, `httpos`, `llama`, `tamaraw`, `h2pc`, `srvalpaca_1st`, `srvalpaca_3rd_1`, `srvalpaca_all`, `srvtamaraw_1st`, `srvtamaraw_3rd_1`, `srvtamaraw_all`, `srvh2ps1p`.
+
+
 `<defense>` is one name, a comma-separated list, or `all`. Without `--benchmarks` you get only the inputs (`deepsetraces/`, `wefdetraces/`), which
 is what you want if you intend to recompute the results rather than inspect the published ones.
 
@@ -94,3 +99,17 @@ In order to run evaluation for a model, dataset and defense from scratch, first 
 | an untuned attacker | `<WORKSPACE>/benchmarks/eval_ml*/scores_rawts_<arch>_topk.bkp` |
 | WeFDE leakage | `<WORKSPACE>/benchmarks/eval_wefde/leakage.csv` |
 | DeepSE leakage | `<WORKSPACE>/benchmarks/eval_deepse/results_df.csv` |
+
+
+Next, in order to re-evaluate the ML or MI experiments
+
+```
+# ML
+python3 benchmark_process_3_evaluate.py --dataset <dataset> --cell <defense> --arch <model>
+python3 benchmark_process_3_evaluate.py --dataset 4_udemy --cell srvtamaraw_all --arch kfp
+
+# Mutual information
+python3 benchmark_process_4_mi_estimators.py --dataset <dataset> --cell <defense>
+python3 benchmark_process_4_mi_estimators.py --dataset 4_udemy --cell srvtamaraw_all
+
+```
