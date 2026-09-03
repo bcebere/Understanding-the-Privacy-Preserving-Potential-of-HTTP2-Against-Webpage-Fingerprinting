@@ -1,12 +1,21 @@
 # Understanding the Privacy-Preserving Potential of HTTP2 Against Webpage Fingerprinting (WF)
-In this repository, we provide the code to reproduce the results in the "Understanding the Privacy-Preserving Potential of HTTP2 Against Webpage Fingerprinting" paper.
+In this repository, we provide the code to reproduce the results in the "Understanding the Privacy-Preserving Potential of HTTP2 Against Webpage Fingerprinting (WF)" paper.
 
-## 🛡️ Defense Calibration
+
+## 💡 Experiments and Examples
+The experiments folder contains details examples for [replaying a website under various defenses (client and server)](experiments/example_replay/README.md), as well as step-by-step example for [evaluatiang the security of the defenses and creating reports](experiments/example_benchmarks/README.md)
+
+
+## 🛡️ Defenses and Calibration
+The available WF defenses are:
+ - Client-side defenses: FRONT, HTTPOS, Llama, Tamaraw, H2PC (detailed [here](experiments/calibrated_benchmarks/mocks/client_defenses/)).
+ - Server-side: Alpaca, Tamaraw, H2PS (detailed [here](experiments/calibrated_benchmarks/mocks/server_defenses/)).
+
 
 The [defense sweep_calibration](experiments/sweep_calibration) folder contains the logic for calibrating both the client-side and server-side defenses.
 The calibration intensities are implemented as follows: [here for the client-side defenses](experiments/sweep_calibration/mocks/client_defenses/levels.py), and [here for the server-side defenses](experiments/sweep_calibration/mocks/server_defenses/levels.py).
 
-The calibrated defenses are evaluated in the [calibrated_benchmarks](experiments/calibrated_benchmarks/) folder. The selected configurations for each (dataset, defense) pair are available [here](experiments/calibrated_benchmarks/mocks/main_table_config.py).
+The calibrated defenses are integrated in the [calibrated_benchmarks](experiments/calibrated_benchmarks/) folder. The selected configurations for each (dataset, defense) pair are available [here](experiments/calibrated_benchmarks/mocks/main_table_config.py).
 
 
 ## 🚀 Website Fingerprinting Audit Tool
