@@ -1,11 +1,9 @@
 #!/usr/bin/env bash
-set -euo pipefail
 # Usage:
 #   ./prepare_workspace.sh <dataset> <defense|all|d1,d2,...> <arch_workspace> [out_workspace] [--benchmarks]
 #
 # Examples:
 #   ./prepare_workspace.sh 4_udemy front ./archives
-#   ./prepare_workspace.sh 4_udemy front,tamaraw ./archives ./workspace
 #   ./prepare_workspace.sh 4_udemy all ./archives ./workspace --benchmarks
 #
 # Expected Zenodo archives in <arch_workspace>:
