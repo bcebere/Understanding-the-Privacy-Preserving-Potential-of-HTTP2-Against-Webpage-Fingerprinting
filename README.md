@@ -3,13 +3,13 @@ In this repository, we provide the code to reproduce the results in the "Underst
 
 
 ## 💡 Experiments and Examples
-The experiments folder contains details examples for [replaying a website under various defenses (client and server)](experiments/example_replay/README.md), as well as step-by-step example for [evaluatiang the security of the defenses and creating reports](experiments/example_benchmarks/README.md)
+The experiments folder contains details examples for [replaying a website under various defenses (client and server)](experiments/example_replay/README.md), as well as step-by-step example for [evaluatiang the security of the defenses and creating reports](experiments/example_benchmark/README.md)
 
 
 ## 🛡️ Defenses and Calibration
 The available WF defenses are:
- - Client-side defenses: FRONT, HTTPOS, Llama, Tamaraw, H2PC (detailed [here](experiments/calibrated_benchmarks/mocks/client_defenses/)).
- - Server-side: Alpaca, Tamaraw, H2PS (detailed [here](experiments/calibrated_benchmarks/mocks/server_defenses/)).
+ - Client-side defenses: FRONT, HTTPOS, Llama, Tamaraw, H2PC (detailed [here](experiments/sweep_calibration/mocks/client_defenses/)).
+ - Server-side: Alpaca, Tamaraw, H2PS (detailed [here](experiments/sweep_calibration/mocks/server_defenses/)).
 
 
 The [defense sweep_calibration](experiments/sweep_calibration) folder contains the logic for calibrating both the client-side and server-side defenses.
@@ -88,7 +88,7 @@ The Machine-Learning estimators can be configured through the parameters:
 The Information-Leakage estimators can be configured using the parameter:
  - `leakage_estimators`. Available values: `wefde` (WeFDE), `deepse` (DeepSE-WF).
 
-Refer to the [experiments benchmark example](experiments/example_benchmarks/) for more usage examples.
+Refer to the [experiments benchmark example](experiments/example_benchmark/) for more usage examples.
 
 ## ⚡ Proof-of-Concept HTTP/2 client/servers
 
