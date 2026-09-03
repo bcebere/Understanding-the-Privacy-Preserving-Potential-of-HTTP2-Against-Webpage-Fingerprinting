@@ -70,8 +70,8 @@ scores = audit(
     ml_output_folder=ml_output_folder,
     wefde_feats_folder=wefde_feats_folder,
     deepse_dataset=deepse_dataset,
-    ml_arch_2D=["xgboost"],
-    ml_arch_3D=[],
+    ml_arch_2D=["kpf"],
+    ml_arch_3D=["robustfp"],
     # leakage
     wefde_output_folder=wefde_output_folder,
     deepse_output=deepse_output,
@@ -82,11 +82,8 @@ print("Leakage scores ---> ", scores["leakage"])
 ```
 
 The Machine-Learning estimators can be configured through the parameters:
- - `ml_arch_2D`. Available values: `kfp` (k-Fingerprinting), `rf` (Random Forest), `xgboost` (XGBoost).
+ - `ml_arch_2D`. Available values: `kfp` (k-Fingerprinting).
  - `ml_arch_3D`. Available values: `holmes` (Holmes), `varcnn` (VarCNN), `df` (Deep-Fingerprinting), `robustfp` (Robust Fingerprinting).
-
-The Information-Leakage estimators can be configured using the parameter:
- - `leakage_estimators`. Available values: `wefde` (WeFDE), `deepse` (DeepSE-WF).
 
 Refer to the [experiments benchmark example](experiments/example_benchmark/) for more usage examples.
 
