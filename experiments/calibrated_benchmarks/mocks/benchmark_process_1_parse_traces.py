@@ -1,4 +1,5 @@
 # stdlib
+import sys
 import time
 from argparse import ArgumentParser
 from pathlib import Path
@@ -8,6 +9,13 @@ import psutil
 from wfaudit import process_raw_pcaps
 
 parser = ArgumentParser()
+parser.add_argument(
+    "workspace",
+    nargs="?",
+    default=None,
+    help="workspace root holding <dataset>/<cell>/traces " "(default: ./workspace)",
+)
+parser.add_argument("-dataset", "--dataset", dest="dataset", default=None)
 parser.add_argument("-use_json", "--use_json", dest="use_json", default=1)
 parser.add_argument("-jobs", "--jobs", dest="jobs", type=int, default=0)
 parser.add_argument(
@@ -29,9 +37,14 @@ else:
     N_JOBS = max(20, min(50, sum(1 for u in usage if u < 40) - 1))
 print(f"Total CPUs: {psutil.cpu_count()}  Using: {N_JOBS}")
 
-testcase = Path(__file__).parent.name
-cat = Path(__file__).parent.parent.name
-RESULTS = Path(f"/http2/experiments/{cat}/{testcase}/results")
+WORKSPACE = Path(args.workspace or "workspace")
+if not WORKSPACE.is_dir():
+    sys.exit(f"no workspace at {WORKSPACE}")
+DATASETS = (
+    [args.dataset]
+    if args.dataset
+    else sorted(p.name for p in WORKSPACE.iterdir() if p.is_dir())
+)
 
 
 def process(traces):
@@ -48,7 +61,7 @@ def process(traces):
 
 
 while True:
-    files = list(RESULTS.glob("*/traces"))
+    files = [t for ds in DATASETS for t in (WORKSPACE / ds).glob("*/traces")]
     shuffle(files)
     for cell in files:
         n = len(list(cell.glob("*.pcap")))

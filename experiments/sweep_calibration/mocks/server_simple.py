@@ -37,7 +37,8 @@ from h2.exceptions import ProtocolError, StreamClosedError
 from h2.settings import SettingCodes
 from server_defenses.levels import params
 
-SERVER_PATH = Path(__file__).parent.parent / "mocks"
+SERVER_PATH = Path(__file__).parent
+
 parser = ArgumentParser()
 parser.add_argument("-dst_port", "--dst_port", dest="dst_port", help="Destination Port")
 parser.add_argument(

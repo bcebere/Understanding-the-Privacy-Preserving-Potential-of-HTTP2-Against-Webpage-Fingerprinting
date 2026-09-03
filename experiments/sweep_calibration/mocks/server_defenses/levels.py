@@ -1,5 +1,4 @@
-"""Server-side defense intensity ladders.
-"""
+"""Server-side defense intensity ladders."""
 
 LEVELS = ("vlow", "low", "lomid", "mid1", "mid2", "high", "vhigh", "vvhigh")
 

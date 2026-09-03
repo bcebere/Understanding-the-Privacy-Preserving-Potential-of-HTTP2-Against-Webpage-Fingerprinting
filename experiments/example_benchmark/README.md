@@ -1,115 +1,174 @@
-## Benchmarks example
+# Benchmarks example
 
-In this folder, we provide an example for running and reporting the defense performance numbers.
+This folder provides an example for running the evaluation and reporting the defense performance results.
 
-### wfaudit setup
+## `wfaudit` setup
 
-First, make sure to install the auditing tool. Example for setting up the env.
+First, install the auditing tool. For example, create a clean Conda environment:
 
 ```bash
-# Conda env
+# Conda environment
 conda create -n pubhttp2-clean python=3.10 -y
 conda activate pubhttp2-clean
 
+# Prevent packages from the user-level Python installation from leaking
+# into the environment.
 export PYTHONNOUSERSITE=1
 unset PYTHONPATH
 
 python -m pip install --upgrade pip
 
-# wfaudit
+# Install wfaudit
 cd wfaudit
 python -m pip install -e .
 
-# Optionally, check that the unit tests pass
-python -m pip install -e .[testing]
+# Optional: install the test dependencies and run the unit tests
+python -m pip install -e '.[testing]'
 cd tests
 python -m pip check
 python -m pytest -vvsx
 cd ../../
 ```
-### Existing Datasets
 
-Our datasets are available at the following share: TODO.
+## Existing datasets
 
-The existing collected datasets or benchmarks can be reused for visualization/re-evalution using the `prepare_workspace.sh` script.
+The published evaluation datasets are available from the accompanying [Zenodo dataset](https://zenodo.org/records/22229611?token=eyJhbGciOiJIUzUxMiJ9.eyJpZCI6ImNhYjc0MTliLTUxNjctNDFmOC04MWE2LTE1Y2E0ZTc3YTI0YiIsImRhdGEiOnt9LCJyYW5kb20iOiJjOWMxNWVhMmM1ZGU4NTg0YWZmNTFlYzM3YWQ2NDU0ZiJ9.ww1UZVlkv4a6c7dAt7l4E0Db8S5ep0hIJJw0tVdvuu6i69kvh4N11VwOzT547gqUgmPdFe8vKtwf42-nbhvvEw).
+
+Existing evaluation datasets and benchmark results can be prepared for visualization or re-evaluation using `prepare_workspace.sh`.
 
 Examples:
 
 ```bash
-# Get all defended datasets for the Udemy dataset
-bash ./prepare_workspace.sh 4_udemy all <ZENODO ARCHIVES LOCAL PATH> --benchmarks
+# Prepare all defended datasets for Udemy, including published benchmark results
+bash ./prepare_workspace.sh 4_udemy all <ZENODO_ARCHIVES_PATH> --benchmarks
 
-# Get only the defense-specific datasets for the Udemy dataset
-bash ./prepare_workspace.sh 4_udemy front <ARCHIVES LOCAL PATH> --benchmarks
-bash ./prepare_workspace.sh 4_udemy srvtamaraw_all <ARCHIVES PATH> ./workspace --benchmarks
-bash ./prepare_workspace.sh 4_udemy <defense> <ARCHIVES PATH> ./workspace --benchmarks
-#
+# Prepare one specific defense
+bash ./prepare_workspace.sh 4_udemy front <ZENODO_ARCHIVES_PATH> --benchmarks
+
+# Explicitly specify the output workspace
+bash ./prepare_workspace.sh 4_udemy srvtamaraw_all \
+  <ZENODO_ARCHIVES_PATH> ./workspace --benchmarks
+
+# Generic form
+bash ./prepare_workspace.sh <dataset> <defense> \
+  <ZENODO_ARCHIVES_PATH> ./workspace --benchmarks
 ```
 
-Valid datasets: `1_amazon`, `2_bbc`, `3_reddit`, `4_udemy`, `5_wiki`.
-Valid defenses: `nop` (undefended), `front`, `httpos`, `llama`, `tamaraw`, `h2pc`, `srvalpaca_1st`, `srvalpaca_3rd_1`, `srvalpaca_all`, `srvtamaraw_1st`, `srvtamaraw_3rd_1`, `srvtamaraw_all`, `srvh2ps1p`.
+Valid datasets are:
 
-
-`<defense>` is one name, a comma-separated list, or `all`. Without `--benchmarks` you get only the inputs (`deepsetraces/`, `wefdetraces/`), which
-is what you want if you intend to recompute the results rather than inspect the published ones.
-
-A prepared cell looks like:
-
+```text
+1_amazon
+2_bbc
+3_reddit
+4_udemy
+5_wiki
 ```
+
+Valid defenses are:
+
+```text
+nop
+front
+httpos
+llama
+tamaraw
+h2pc
+srvalpaca_1st
+srvalpaca_3rd_1
+srvalpaca_all
+srvtamaraw_1st
+srvtamaraw_3rd_1
+srvtamaraw_all
+srvh2ps1p
+```
+
+`nop` denotes the undefended baseline.
+
+The `<defense>` argument can be a single defense, a comma-separated list of defenses, or `all`.
+
+Without `--benchmarks`, the script extracts only the evaluation inputs (`deepsetraces/` and `wefdetraces/`) together with the dataset-specific overhead measurements.
+This is sufficient when recomputing the evaluation results rather than inspecting the published benchmark outputs.
+
+With `--benchmarks`, a prepared defense directory looks like:
+
+```text
 workspace/4_udemy/srvtamaraw_all/
-├── deepsetraces/real/dataset.npz        input: DF, VarCNN, Holmes, RobustFP, DeepSE
-├── wefdetraces/output_features/         input: k-FP, XGBoost, WeFDE
-├── wefdetraces/output_wefde/            raw traces, not read by steps 3-4
-└── benchmarks/                          outputs: eval_ml, eval_ml_nn, eval_wefde,
-                                                  eval_deepse, hpo
+├── deepsetraces/
+│   └── real/dataset.npz              input: DF, VarCNN, Holmes, RobustFP-CNN, DeepSE
+├── wefdetraces/
+│   ├── output_features/              input: k-FP, XGBoost, WeFDE
+│   └── output_wefde/                 intermediate WeFDE traces
+└── benchmarks/                       published evaluation outputs
+    ├── eval_ml/
+    ├── eval_ml_nn/
+    ├── eval_wefde/
+    ├── eval_deepse/
+    └── hpo/
 ```
 
+The dataset-specific overhead measurements are extracted separately under:
 
-### Generate tables and plots
+```text
+workspace/4_udemy/overhead/
+```
 
-The folder contains helper scripts for aggregating and reporting the security and overhead of each defense.
+## Generate tables and plots
 
-❗Note: The script aggregate only the available benchmark results in the 'workspace' folder.
+This folder contains helper scripts for aggregating and reporting the security and overhead results of the available defenses.
 
+**Note:** These scripts aggregate only benchmark results that are present in the `workspace` directory.
 
 ```bash
+# Summarize the performance of the available client-side defenses
+python3 generate_table_clientdefs_perf.py
 
-# Summarize the performance of each client-side defense (available in the "workspace" folder)
-python generate_table_clientdefs_perf.py
+# Summarize the performance of the available server-side defenses
+python3 generate_table_serverdefs_perf.py
 
-# Summarize the performance of each server-side defense (available in the "workspace" folder)
-python generate_table_serverdefs_perf.py
+# Summarize defense overhead per dataset and across datasets
+python3 generate_table_overheads.py
 
-# Summarize the overhead of each defense: per dataset and aggregated.
-python generate_table_overheads.py
-
-# Summarize bests attacker, and its hypertuned parameters
-python generate_table_strongest_attacker.py
-python generate_table_attacker_params.py
-
+# Report the strongest attacker and its tuned hyperparameters
+python3 generate_table_strongest_attacker.py
+python3 generate_table_attacker_params.py
 ```
 
+## Run evaluation from scratch
 
-### Run evaluation from scratch
-In order to run evaluation for a model, dataset and defense from scratch, first cleanup any caches in the workspace `WORKSPACE = workspace/<DATASET>/<DEFENSE>/`.
+To rerun an evaluation for a model, dataset, and defense, first remove the corresponding cached result from:
+
+```text
+WORKSPACE=workspace/<DATASET>/<DEFENSE>/
+```
+
 | To rerun | Delete |
 |---|---|
-| one attacker, keeping its tuned params | `<WORKSPACE>/benchmarks/eval_ml/scores_rawts_<arch>_tuned.bkp` |
-| one attacker, redoing the search too | the `.bkp` **and** `<WORKSPACE>/benchmarks/hpo/` |
-| an untuned attacker | `<WORKSPACE>/benchmarks/eval_ml*/scores_rawts_<arch>_topk.bkp` |
+| One attacker while keeping its tuned parameters | `<WORKSPACE>/benchmarks/eval_ml/scores_rawts_<arch>_tuned.bkp` |
+| One attacker and redo hyperparameter search | the `.bkp` file and `<WORKSPACE>/benchmarks/hpo/` |
+| An untuned attacker | `<WORKSPACE>/benchmarks/eval_ml*/scores_rawts_<arch>_topk.bkp` |
 | WeFDE leakage | `<WORKSPACE>/benchmarks/eval_wefde/leakage.csv` |
 | DeepSE leakage | `<WORKSPACE>/benchmarks/eval_deepse/results_df.csv` |
 
+Then rerun the desired ML or mutual-information evaluation.
 
-Next, in order to re-evaluate the ML or MI experiments
+### ML evaluation
 
+```bash
+python3 benchmark_process_3_evaluate.py \
+  --dataset <dataset> --cell <defense> --arch <model>
+
+# Example
+python3 benchmark_process_3_evaluate.py \
+  --dataset 4_udemy --cell srvtamaraw_all --arch kfp
 ```
-# ML
-python3 benchmark_process_3_evaluate.py --dataset <dataset> --cell <defense> --arch <model>
-python3 benchmark_process_3_evaluate.py --dataset 4_udemy --cell srvtamaraw_all --arch kfp
 
-# Mutual information
-python3 benchmark_process_4_mi_estimators.py --dataset <dataset> --cell <defense>
-python3 benchmark_process_4_mi_estimators.py --dataset 4_udemy --cell srvtamaraw_all
+### Mutual-information evaluation
 
+```bash
+python3 benchmark_process_4_mi_estimators.py \
+  --dataset <dataset> --cell <defense>
+
+# Example
+python3 benchmark_process_4_mi_estimators.py \
+  --dataset 4_udemy --cell srvtamaraw_all
 ```

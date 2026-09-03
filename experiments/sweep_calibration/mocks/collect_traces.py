@@ -73,6 +73,14 @@ parser.add_argument(
     help="Legacy alias for --defense h2pc",
 )
 parser.add_argument(
+    "-workspace",
+    "--workspace",
+    dest="workspace",
+    default=None,
+    help="workspace root; captures go to <workspace>/<dataset>/<cell>/ "
+    "(default: ./workspace)",
+)
+parser.add_argument(
     "-request_server_defense",
     "--request_server_defense",
     dest="request_server_defense",
@@ -91,10 +99,7 @@ assert args.ifname is not None
 # __file__ (this script is a symlink into mocks/, so resolving it would
 # report "mocks" for every dataset).
 # ----------------------------------------------------------------------
-testcase = Path(__file__).parent.name  # e.g. 5_udemy
-cat = Path(__file__).parent.parent.name  # e.g. calibration
-
-DATASET = args.dataset or testcase
+DATASET = args.dataset or Path(__file__).parent.name
 # read by client_defenses.levels.get_defense() at call time
 os.environ["WF_DATASET"] = DATASET
 
@@ -133,10 +138,10 @@ conf.route_autoload = False
 conf.route6_autoload = False
 conf.bufsize = 50 * 1024 * 1024  # 50 MB buffer size
 
-WORKSPACE = Path(f"/http2/experiments/{cat}/{testcase}")
+WORKSPACE = Path(args.workspace or "workspace")
 
-# one directory per (defense, level) cell
-CELL_PATH = WORKSPACE / "results" / CELL
+# one directory per (defense, level) cell, laid out like example_benchmark
+CELL_PATH = WORKSPACE / DATASET / CELL
 TRACE_PATH = CELL_PATH / "traces"
 OUTPUT_CSV = CELL_PATH / "tcp_repr/output_csv_single"
 OUTPUT_CSV_ARCH = CELL_PATH / f"tcp_repr/{CELL}_rawtraces.tar.zst"

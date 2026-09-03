@@ -1,13 +1,17 @@
 h2
 hdbscan
 httpx
+loguru
 matplotlib
 numpy
 pathos
 pydantic
 pyOpenSSL
+pyshark
+scapy==2.5.0
 scikit-learn
 scipy
+selenium
 sslkeylog
 statsmodels
 tldextract

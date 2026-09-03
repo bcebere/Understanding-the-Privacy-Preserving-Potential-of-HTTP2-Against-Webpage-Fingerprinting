@@ -12,6 +12,7 @@ Scenario tags carry both placement and level, so nothing overwrites:
     ovh_srvalpaca_3rd_1_mid1.csv
     ovh_srvalpaca_all_mid1.csv
 """
+
 import argparse
 import os
 import socket

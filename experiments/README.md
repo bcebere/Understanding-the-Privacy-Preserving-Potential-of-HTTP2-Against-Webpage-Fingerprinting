@@ -1,6 +1,12 @@
 # Experiments examples
 Helpers scripts for creating the traces and datasets required for the  `Understanding the Privacy-Preserving Potential of HTTP/2 Against Webpage Fingerprinting` paper.
 
+## Examples
+
+Folder [example_benchmark](example_benchmark/README.md) contains the complete steps for running the machine-learning, mutual-information, and overhead analysis.
+
+
+
 ## Defense calibration
 
 The code for calibrating a defense is available in [sweep_calibration](sweep_calibration/mocks).
