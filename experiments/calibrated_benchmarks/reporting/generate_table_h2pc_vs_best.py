@@ -13,6 +13,7 @@ Three rows per dataset:
 Overhead is used to pick the closest-cost row but is not reported here; the
 cost figures live in the separate overhead table, so they are not duplicated.
 """
+
 import csv
 import sys
 from pathlib import Path
@@ -20,15 +21,20 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-sys.path.insert(0, str(Path.cwd().parent / "mocks"))
+_here = Path(__file__).parent  # main_table_config.py symlink sits next to it
+sys.path.insert(0, str(_here))
+sys.path.insert(0, str(_here.resolve().parent / "mocks"))  # or ../mocks from reporting/
 from helpers import ml_models, security_results  # noqa: E402
 from main_table_config import CLIENT  # noqa: E402
 
-workspace_name = Path.cwd().parent.name
-WORKSPACE = f"/http2/experiments/{workspace_name}/"
+WORKSPACE = (
+    Path(sys.argv[1])
+    if len(sys.argv) > 1 and not sys.argv[1].startswith("-")
+    else _here / "workspace"
+)
 
 
-CALIBRATION = Path("/http2/experiments/sweep_calibration")
+CALIBRATION = WORKSPACE  # <workspace>/<dataset>/overhead/overhead_summary.csv
 
 DATASETS = ["1_amazon", "2_bbc", "3_reddit", "4_udemy", "5_wiki"]
 PRETTY_DATASET = {

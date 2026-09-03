@@ -27,7 +27,6 @@ from pathlib import Path
 
 from main_table_config import SERVER, SERVER_ORDER, port
 
-DATASET = Path.cwd().name
 LOGDIR = Path("logs/servers")
 
 
@@ -54,7 +53,13 @@ def main():
     parser = ArgumentParser()
     parser.add_argument("action", choices=["start", "stop", "status", "ports"])
     parser.add_argument("--replicas", type=int, default=4)
+    parser.add_argument(
+        "--dataset", default=None, help="dataset name (default: current directory)"
+    )
     args = parser.parse_args()
+
+    global DATASET
+    DATASET = args.dataset or Path.cwd().name
 
     if args.action == "ports":
         for defense, level, r, p in plan(args.replicas):
@@ -96,7 +101,13 @@ def main():
             continue
         log = open(LOGDIR / f"{defense}_{level}_r{r}.log", "w")
         subprocess.Popen(
-            ["bash", "./run_server_level.sh", str(p), defense, level],
+            [
+                "bash",
+                str(Path(__file__).parent / "run_server_level.sh"),
+                str(p),
+                defense,
+                level,
+            ],
             stdout=log,
             stderr=subprocess.STDOUT,
             start_new_session=True,
@@ -107,7 +118,14 @@ def main():
     if started:
         time.sleep(3)
     print()
-    sys.argv = [sys.argv[0], "status", "--replicas", str(args.replicas)]
+    sys.argv = [
+        sys.argv[0],
+        "status",
+        "--replicas",
+        str(args.replicas),
+        "--dataset",
+        DATASET,
+    ]
     main()
 
 

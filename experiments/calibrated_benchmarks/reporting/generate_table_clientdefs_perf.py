@@ -1,11 +1,16 @@
+import sys
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 from helpers import security_results
 
-workspace_name = Path.cwd().parent.name
-workspace = f"/http2/experiments/{workspace_name}/"
+_here = Path(__file__).parent  # dir of the (possibly symlinked) script
+workspace = (
+    Path(sys.argv[1])
+    if len(sys.argv) > 1 and not sys.argv[1].startswith("-")
+    else _here / "workspace"
+)
 
 
 enabled_datasets = ["1_amazon", "2_bbc", "3_reddit", "4_udemy", "5_wiki"]
@@ -212,7 +217,8 @@ rows.append(r"\toprule")
 rows.append(
     r"\multicolumn{1}{c}{\textbf{Dataset}} & \textbf{Metric} "
     r"& \multicolumn{1}{c}{\textbf{HTTPOS}} & \multicolumn{1}{c}{\textbf{LLaMA}} "
-    r"& \multicolumn{1}{c}{\textbf{FRONT}} & \multicolumn{1}{c}{\textbf{CL-TAM}} \\ \midrule"
+    r"& \multicolumn{1}{c}{\textbf{FRONT}} & \multicolumn{1}{c}{\textbf{CL-TAM}} "
+    r"& \multicolumn{1}{c}{\textbf{H2PC}} \\ \midrule"
 )
 
 for dataset in dataset_order:

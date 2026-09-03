@@ -9,12 +9,16 @@ summary in hpo/ for the parameters it ran with.  A cell whose winning attacker
 was not tuned reports "defaults"; one where the search lost to the defaults
 reports "defaults kept", which is the distinction the rebuttal needs.
 """
+
 import json
 import sys
 from pathlib import Path
 
-from main_table_config import cells
-from wfaudit.helpers_ml import load_from_file
+_here = Path(__file__).parent  # main_table_config.py symlink sits next to it
+sys.path.insert(0, str(_here))
+sys.path.insert(0, str(_here.resolve().parent / "mocks"))  # or ../mocks from reporting/
+from helpers import load_from_file  # noqa: E402
+from main_table_config import cells  # noqa: E402
 
 DATASETS = ["1_amazon", "2_bbc", "3_reddit", "4_udemy", "5_wiki"]
 if "--dataset" in sys.argv:
@@ -22,7 +26,12 @@ if "--dataset" in sys.argv:
 
 ARCHS = ["kfp", "xgboost", "robustfp", "varcnn", "df", "holmes"]
 EVAL_DIRS = ("eval_ml_nn", "eval_ml")
-ROOT = Path("/http2/experiments/calibrated_benchmarks")
+ROOT = (
+    Path(sys.argv[1])
+    if len(sys.argv) > 1 and not sys.argv[1].startswith("-")
+    else _here / "workspace"
+)
+SETUP = "benchmarks"  # was tcp_repr
 
 PRETTY_DATASET = {
     "1_amazon": "Amazon",
@@ -87,7 +96,7 @@ def winner_of(cell):
     best, best_v, tuned = None, -1.0, False
     for arch in ARCHS:
         for sub in EVAL_DIRS:
-            base = cell / "tcp_repr" / sub
+            base = cell / SETUP / sub
             if not base.is_dir():
                 continue
             for label in ("tuned", "topk"):
@@ -107,7 +116,7 @@ def winner_of(cell):
 def params_of(cell, arch, tuned):
     if not tuned:
         return "defaults"
-    hpo = cell / "tcp_repr" / "hpo"
+    hpo = cell / SETUP / "hpo"
     hits = sorted(hpo.glob(f"best_params_{arch}_*.json")) if hpo.is_dir() else []
     if not hits:
         return "tuned (summary missing)"
@@ -141,11 +150,13 @@ rows = []
 for dataset in DATASETS:
     results = ROOT / dataset / "results"
     if not results.is_dir():
+        results = ROOT / dataset  # new layout: no results/ level
+    if not results.is_dir():
         print(f"WARNING: no results for {dataset}")
         continue
     for kind, _, _, tag, _ in cells(dataset):
         cell = results / tag
-        if not (cell / "tcp_repr").is_dir():
+        if not (cell / SETUP).is_dir():
             continue
         arch, f1, tuned = winner_of(cell)
         if arch is None:

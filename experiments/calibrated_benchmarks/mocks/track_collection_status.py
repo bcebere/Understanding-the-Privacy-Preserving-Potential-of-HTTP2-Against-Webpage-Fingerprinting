@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Collection and processing progress for the main tables.
 
-    python3 track_collection_status.py [expected_traces]
+    python3 track_collection_status.py [workspace] [--dataset 4_udemy]
 
 Run from a dataset dir.  Expected cells come from main_table_config, so a cell
 that has not started is reported rather than silently absent.
@@ -12,19 +12,25 @@ archive is slow, so the count is cached in <cell>_rawtraces.count.
 """
 
 import subprocess
-import sys
 import time
+from argparse import ArgumentParser
 from pathlib import Path
 
 from main_table_config import cells
 
-EXPECTED = int(sys.argv[1]) if len(sys.argv) > 1 else 500
+parser = ArgumentParser()
+parser.add_argument("workspace", nargs="?", default=None)
+parser.add_argument("-dataset", "--dataset", dest="dataset", default=None)
+parser.add_argument("-expected", "--expected", dest="expected", type=int, default=500)
+args = parser.parse_args()
+
+EXPECTED = args.expected
 PAGES = 100
 TARGET = EXPECTED * PAGES
 
-DATASET = Path.cwd().name
-CATEGORY = Path.cwd().parent.name
-RESULTS = Path(f"/http2/experiments/{CATEGORY}/{DATASET}/results")
+WORKSPACE = Path(args.workspace or "workspace")
+DATASET = args.dataset or Path.cwd().name
+RESULTS = WORKSPACE / DATASET
 
 
 def run(cmd):

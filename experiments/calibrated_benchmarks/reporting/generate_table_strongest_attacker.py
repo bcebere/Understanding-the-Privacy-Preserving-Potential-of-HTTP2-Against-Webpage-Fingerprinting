@@ -21,9 +21,12 @@ METRIC = "f1_score_macro"
 if "--metric" in sys.argv:
     METRIC = sys.argv[sys.argv.index("--metric") + 1]
 
-workspace_name = Path.cwd().parent.name
-WORKSPACE = f"/http2/experiments/{workspace_name}/"
-
+_here = Path(__file__).parent  # dir of the (possibly symlinked) script
+WORKSPACE = (
+    Path(sys.argv[1])
+    if len(sys.argv) > 1 and not sys.argv[1].startswith("-")
+    else _here / "workspace"
+)
 
 PRETTY_DATASET = {
     "1_amazon": "Amazon",
@@ -33,23 +36,45 @@ PRETTY_DATASET = {
     "5_wiki": "Wikipedia",
 }
 PRETTY_MODEL = {
-    "xgboost": "XGBoost",
     "kfp": "k-FP",
-    "kfpv2": "k-FP",
     "varcnn": "VarCNN",
     "df": "DF",
     "holmes": "Holmes",
     "robustfp": "RobustFP",
 }
 PRETTY_DEFENSE = {
-    "undefended": "Baseline",
     "cldef_httpos": "HTTPOS",
     "cldef_llama": "LLaMA",
     "cldef_front": "FRONT",
     "cldef_tamaraw": "CL-Tamaraw",
     "cldef_h2pc": "H2PC",
+    "srvdef_alpaca_html": "ALPaCA (1st)",
+    "srvdef_alpaca_cdn1": "ALPaCA (CDN)",
+    "srvdef_alpaca_cdn2": "ALPaCA (CDN2)",
+    "srvdef_alpaca_all": "ALPaCA (all)",
+    "srvdef_tamaraw_html": "SRV-TAM (1st)",
+    "srvdef_tamaraw_cdn1": "SRV-TAM (CDN)",
+    "srvdef_tamaraw_cdn2": "SRV-TAM (CDN2)",
+    "srvdef_tamaraw_all": "SRV-TAM (all)",
+    "srvdef_h2ps": "H2PS (1st)",
 }
-CLIENT_ONLY = [d for d in PRETTY_DEFENSE]
+CLIENT_DEFENSES = [
+    "cldef_httpos",
+    "cldef_llama",
+    "cldef_front",
+    "cldef_tamaraw",
+    "cldef_h2pc",
+]
+SERVER_DEFENSES = [d for d in PRETTY_DEFENSE if d.startswith("srvdef_")]
+
+
+def side_of(defense):
+    if defense in SERVER_DEFENSES:
+        return "server"
+    if defense in CLIENT_DEFENSES:
+        return "client"
+    return "other"
+
 
 res = security_results(WORKSPACE)
 
@@ -68,6 +93,7 @@ for _, r in res.iterrows():
         dict(
             dataset=r["dataset"],
             defense=r["defense"],
+            side=side_of(r["defense"]),
             winner=winner,
             best=scores[winner],
             margin=(second[0] - second[1]) if len(second) > 1 else np.nan,
@@ -80,7 +106,9 @@ df = pd.DataFrame(rows)
 if df.empty:
     sys.exit("no scored cells found")
 
-client = df[df["defense"].isin(CLIENT_ONLY)].copy()
+df = df[df["side"] != "other"].copy()
+client = df[df["side"] == "client"].copy()
+server = df[df["side"] == "server"].copy()
 
 
 def counts(sub, index):
@@ -91,48 +119,66 @@ def counts(sub, index):
     return tab
 
 
-print("=" * 70)
-print(f"Strongest attacker by {METRIC} -- wins per dataset (client defenses)")
-print("=" * 70)
-per_ds = counts(client, "dataset")
-per_ds.index = [PRETTY_DATASET.get(i, i) for i in per_ds.index]
-print(per_ds.to_string())
+for label, sub in (
+    ("client defenses", client),
+    ("server defenses", server),
+    ("all defenses", df),
+):
+    if sub.empty:
+        continue
+    print("\n" + "=" * 70)
+    print(f"Strongest attacker by {METRIC} -- wins per dataset ({label})")
+    print("=" * 70)
+    t = counts(sub, "dataset")
+    t.index = [PRETTY_DATASET.get(i, i) for i in t.index]
+    print(t.to_string())
+    if label == "client defenses":
+        per_ds = t
 
-print("\n" + "=" * 70)
-print("Wins per defense")
-print("=" * 70)
-per_def = counts(client, "defense")
-per_def.index = [PRETTY_DEFENSE.get(i, i) for i in per_def.index]
-print(per_def.to_string())
+for label, sub in (("client defenses", client), ("server defenses", server)):
+    if sub.empty:
+        continue
+    print("\n" + "=" * 70)
+    print(f"Wins per defense ({label})")
+    print("=" * 70)
+    t = counts(sub, "defense")
+    t.index = [PRETTY_DEFENSE.get(i, i) for i in t.index]
+    print(t.to_string())
 
-print("\n" + "=" * 70)
-print("Global (client defenses)")
-print("=" * 70)
-tally = Counter(client["winner"])
-total = sum(tally.values())
-for m, n in tally.most_common():
-    print(f"  {PRETTY_MODEL.get(m, m):16s} {n:3d} / {total}  ({100*n/total:.0f}%)")
-
-print(
-    "\n  mean margin over runner-up: "
-    f"{client['margin'].mean():.3f}  (median {client['margin'].median():.3f})"
-)
-never = [
-    PRETTY_MODEL.get(m, m)
-    for m in ml_models
-    if m not in tally and any(not pd.isna(client[m]).all() for _ in [0])
-]
-if never:
-    print(f"  never strongest: {', '.join(never)}")
+for label, sub in (
+    ("client defenses", client),
+    ("server defenses", server),
+    ("all defenses", df),
+):
+    if sub.empty:
+        continue
+    print("\n" + "=" * 70)
+    print(f"Global ({label})")
+    print("=" * 70)
+    tally = Counter(sub["winner"])
+    total = sum(tally.values())
+    for m, n in tally.most_common():
+        print(f"  {PRETTY_MODEL.get(m, m):16s} {n:3d} / {total}  ({100*n/total:.0f}%)")
+    print(
+        "\n  mean margin over runner-up: "
+        f"{sub['margin'].mean():.3f}  (median {sub['margin'].median():.3f})"
+    )
+    never = [
+        PRETTY_MODEL.get(m, m)
+        for m in ml_models
+        if m not in tally and m in sub.columns and not sub[m].isna().all()
+    ]
+    if never:
+        print(f"  never strongest: {', '.join(never)}")
 
 print("\n" + "=" * 70)
 print("Per cell: winner and its margin")
 print("=" * 70)
-show = client[["dataset", "defense", "winner", "best", "margin", "n_models"]].copy()
+show = df[["side", "dataset", "defense", "winner", "best", "margin", "n_models"]].copy()
 show["dataset"] = show["dataset"].map(lambda x: PRETTY_DATASET.get(x, x))
 show["defense"] = show["defense"].map(lambda x: PRETTY_DEFENSE.get(x, x))
 show["winner"] = show["winner"].map(lambda x: PRETTY_MODEL.get(x, x))
-print(show.sort_values(["dataset", "defense"]).to_string(index=False))
+print(show.sort_values(["side", "dataset", "defense"]).to_string(index=False))
 
 # ---- latex ---------------------------------------------------------------
 print("\n" + "=" * 70)

@@ -20,10 +20,12 @@ from pathlib import Path
 
 import pandas as pd
 
-sys.path.insert(0, str(Path.cwd().parent / "mocks"))
+_here = Path(__file__).parent  # main_table_config.py symlink sits next to it
+sys.path.insert(0, str(_here))
+sys.path.insert(0, str(_here.resolve().parent / "mocks"))  # or ../mocks from reporting/
 from main_table_config import CLIENT, SERVER  # noqa: E402
 
-BASE = Path("/http2/experiments/sweep_calibration")
+BASE = Path(sys.argv[1] if len(sys.argv) > 1 else _here / "workspace")
 DATASETS = ["1_amazon", "2_bbc", "3_reddit", "4_udemy", "5_wiki"]
 
 PRETTY_DATASET = {

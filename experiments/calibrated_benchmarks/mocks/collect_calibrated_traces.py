@@ -20,8 +20,6 @@ from pathlib import Path
 
 from main_table_config import cells, port
 
-DATASET = Path.cwd().name
-
 
 def stamp():
     return time.strftime("%F %T")
@@ -35,11 +33,11 @@ def reachable(ip, tcp_port, timeout=2):
         return False
 
 
-def collect(tag, extra, repeats, ip, tcp_port, iface):
+def collect(tag, extra, repeats, ip, tcp_port, iface, common=()):
     print(f"=== {tag}  {stamp()}", flush=True)
     cmd = [
         sys.executable,
-        "./collect_traces.py",
+        str(Path(__file__).parent / "collect_traces.py"),
         "--dst_ip",
         str(ip),
         "--dst_port",
@@ -50,6 +48,7 @@ def collect(tag, extra, repeats, ip, tcp_port, iface):
         tag,
         "--repeats",
         str(repeats),
+        *common,
         *extra,
     ]
     rc = subprocess.run(cmd).returncode
@@ -65,6 +64,12 @@ def main():
     )
     parser.add_argument("--repeats", type=int, default=500)
     parser.add_argument(
+        "--dataset", default=None, help="dataset name (default: current directory)"
+    )
+    parser.add_argument(
+        "--workspace", default=None, help="workspace root passed to collect_traces.py"
+    )
+    parser.add_argument(
         "--replicas",
         type=int,
         default=1,
@@ -74,6 +79,8 @@ def main():
     )
     args = parser.parse_args()
 
+    global DATASET
+    DATASET = args.dataset or Path.cwd().name
     os.environ["WF_DATASET"] = DATASET
     plan = [c for c in cells(DATASET) if c[0] == args.side]
     random.shuffle(plan)
@@ -82,6 +89,10 @@ def main():
         f"dataset {DATASET}   side {args.side}   "
         f"repeats {args.repeats}   {len(plan)} cells\n"
     )
+
+    common = ["--dataset", DATASET]
+    if args.workspace:
+        common += ["--workspace", args.workspace]
 
     if args.side == "client":
         if len(args.rest) != 2:
@@ -95,6 +106,7 @@ def main():
                 args.ip,
                 tcp_port,
                 iface,
+                common,
             )
     else:
         if len(args.rest) != 1:
@@ -121,6 +133,7 @@ def main():
                 args.ip,
                 tcp_port,
                 iface,
+                common,
             )
 
 

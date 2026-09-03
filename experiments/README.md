@@ -1,88 +1,103 @@
-# Experiments examples
-Helpers scripts for creating the traces and datasets required for the  `Understanding the Privacy-Preserving Potential of HTTP/2 Against Webpage Fingerprinting` paper.
+# Experiment examples
 
-## Defense calibration
+Helper scripts and examples for reproducing the experiments from **"Understanding the Privacy-Preserving Potential of HTTP/2 Against Webpage Fingerprinting."**
 
-The code for calibrating a defense is available in [sweep_calibration](sweep_calibration/mocks).
+## Reproduction examples
 
-In order to calibrate a defense, first create the workspace for a dataset, e.g. `1_amazon` folder.
+The repository provides two end-to-end examples:
 
-Then, in the `1_amazon` folder, create symlinks to (1) the scripts inside the sweepo_calibration/mocks folder, and (2) to the `data` folder from the `browser_traces` dataset.
-
-Example folder structure for reference
-
-```
-1_amazon/
-├── approximate_overhead.py -> ../mocks/approximate_overhead.py
-├── calibrate.py -> ../mocks/calibrate.py
-├── calibrate.sh -> ../mocks/calibrate.sh
-├── calibration_collect_all_cldefenses.sh
-│   -> ../mocks/calibration_collect_all_cldefenses.sh
-├── calibration_collect_all_srvdefenses.sh
-│   -> ../mocks/calibration_collect_all_srvdefenses.sh
-├── calibration_process_1_parse_traces.py
-│   -> ../mocks/calibration_process_1_parse_traces.py
-├── calibration_process_2_create_datasets.py
-│   -> ../mocks/calibration_process_2_create_datasets.py
-├── calibration_process_3_eval_sensitivities.py
-│   -> ../mocks/calibration_process_3_eval_sensitivities.py
-├── client_defenses -> ../mocks/client_defenses
-├── code_selfcheck.py -> ../mocks/code_selfcheck.py
-├── collect_srvdefenses.sh -> ../mocks/collect_srvdefenses.sh
-├── collect_traces.py -> ../mocks/collect_traces.py
-├── compute_overhead_all_srvdefenses.sh
-│   -> ../mocks/compute_overhead_all_srvdefenses.sh
-├── compute_overhead_cldefenses.sh
-│   -> ../mocks/compute_overhead_cldefenses.sh
-├── compute_overhead_srvdefenses.sh
-│   -> ../mocks/compute_overhead_srvdefenses.sh
-├── compute_overhead_srvdefenses_placement.py
-│   -> ../mocks/compute_overhead_srvdefenses_placement.py
-├── core_client.py -> ../mocks/core_client.py
-├── data -> ../../realworld_datasets/1_amazon/data
-│   ├── bin/
-│   ├── client_trace/
-│   └── server_trace/
-├── requirements.txt -> ../mocks/requirements.txt
-├── run_server.sh -> ../mocks/run_server.sh
-├── run_server_level.sh -> ../mocks/run_server_level.sh
-├── server_defenses -> ../mocks/server_defenses/
-├── server_simple.py -> ../mocks/server_simple.py
-├── server_with_defs.py -> ../mocks/server_with_defs.py
-├── start_calibration_servers.sh
-│   -> ../mocks/start_calibration_servers.sh
-├── track_calibration_collect_status.sh
-│   -> ../mocks/track_calibration_collect_status.sh
-├── track_calibration_results.py
-│   -> ../mocks/track_calibration_results.py
-
-```
-
-Then, in order to run the experiments, first start the server(s):
- - for client defenses, the standard server `run_server.sh`
- - for server defenses, the calibration servers using `start_calibration_servers.sh`.
-
-Next, one can do the calibration sweeps:
- - for client defenses : `bash ./calibration_collect_all_cldefenses.sh <SRV IP> <SRV PORT> <CAPTURE INTERFACE>`.
- - for server defenses: `bash calibration_collect_all_srvdefenses.sh <SRV IP> <CAPTURE INTERFACE>`.
-
-Once finished, the raw PCAP traces can be analyzed by following the steps:
-1. Convert to CSVs: `calibration_process_1_parse_traces.py`.
-2. Convert to ML datasets: `calibration_process_2_create_datasets.py`.
-3. Benchmark `calibration_process_3_eval_sensitivities.py`.
-
+- [example_replay](example_replay/README.md) contains the complete workflow for replaying webpage content under the evaluated client- and server-side defenses and collecting the resulting PCAP traces.
+- [example_benchmark](example_benchmark/README.md) contains the workflow for preparing the published datasets, running the machine-learning and mutual-information evaluations, and generating the reported security and overhead results.
 
 ## Defense evaluation
 
-The code for running an already calibrated defense is available in [calibrated_benchmarks](calibrated_benchmarks/mocks/).
+The core scripts for evaluating already calibrated defenses are available in [calibrated_benchmarks](calibrated_benchmarks/mocks/).
 
-The dataset folder structure is similar to the calibration sweep example, the only difference being the scripts from [calibrated_benchmarks](calibrated_benchmarks/mocks/).
+The per-dataset directory structure follows the same general organization as the calibration experiments, but uses the calibrated-defense scripts from `calibrated_benchmarks/mocks/`.
 
+To collect traces, first start the appropriate server(s):
 
-First, start the server(s):
- - For client defenses, using `bash run_server.sh`
- - For server defenses, using `python ./start_defended_servers.py`
+- Client-side defenses:
 
-Collect the PCAP traces using either
- - for client defenses, `python3 collect_calibrated_traces.py client <SRV IP> <SRV PORT> <CAPTURE INTERFACE>`
- - for server defenses, `python3 collect_calibrated_traces.py server <SRV IP> <CAPTURE INTERFACE> --replicas 4`
+  ```bash
+  bash run_server.sh <SERVER_PORT>
+  ```
+
+- Server-side defenses:
+
+  ```bash
+  python3 start_defended_servers.py start --replicas 4 --dataset <DATASET>
+  ```
+
+Then collect the PCAP traces:
+
+```bash
+# Client-side defenses
+python3 collect_calibrated_traces.py client \
+  <SERVER_IP> <SERVER_PORT> <CAPTURE_INTERFACE> \
+  --dataset <DATASET>
+
+# Server-side defenses
+python3 collect_calibrated_traces.py server \
+  <SERVER_IP> <CAPTURE_INTERFACE> \
+  --replicas 4 --dataset <DATASET>
+```
+
+See [example_replay](example_replay/README.md) for the complete replay and trace collection procedure.
+
+## Defense calibration
+
+The core scripts for calibrating defenses are available in [sweep_calibration](sweep_calibration/mocks/).
+
+To prepare a calibration workspace for a dataset, create a dataset directory, for example `1_amazon`, and add symlinks to:
+
+1. the scripts in `sweep_calibration/mocks/`; and
+2. the corresponding `data` directory extracted from the `browser_traces` dataset.
+
+Start the appropriate server(s):
+
+- Client-side defense calibration:
+
+  ```bash
+  bash run_server.sh <SERVER_PORT>
+  ```
+
+- Server-side defense calibration:
+
+  ```bash
+  bash start_calibration_servers.sh
+  ```
+
+Run the calibration sweeps:
+
+```bash
+# Client-side defenses
+bash calibration_collect_all_cldefenses.sh \
+  <SERVER_IP> <SERVER_PORT> <CAPTURE_INTERFACE>
+
+# Server-side defenses
+bash calibration_collect_all_srvdefenses.sh \
+  <SERVER_IP> <CAPTURE_INTERFACE>
+```
+
+Once collection is complete, process the resulting PCAP traces in three steps:
+
+1. Convert PCAP traces to CSV:
+
+   ```bash
+   python3 calibration_process_1_parse_traces.py
+   ```
+
+2. Create the evaluation datasets:
+
+   ```bash
+   python3 calibration_process_2_create_datasets.py
+   ```
+
+3. Evaluate the calibration sweep:
+
+   ```bash
+   python3 calibration_process_3_eval_sensitivities.py
+   ```
+
+The calibrated configurations used in the paper are recorded in [main_table_config.py](calibrated_benchmarks/mocks/main_table_config.py).

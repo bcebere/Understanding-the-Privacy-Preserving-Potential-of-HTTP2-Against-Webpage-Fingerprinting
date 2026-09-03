@@ -6,14 +6,20 @@
 Prints one pivot per metric and the LaTeX body for
 tab:server_defenses_realworld_f1_score.
 """
+
+import sys
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 from helpers import ml_models, security_results
 
-workspace_name = Path.cwd().parent.name
-WORKSPACE = f"/http2/experiments/{workspace_name}/"
+_here = Path(__file__).parent  # dir of the (possibly symlinked) script
+WORKSPACE = (
+    Path(sys.argv[1])
+    if len(sys.argv) > 1 and not sys.argv[1].startswith("-")
+    else _here / "workspace"
+)
 
 
 DATASETS = ["1_amazon", "2_bbc", "3_reddit", "4_udemy", "5_wiki"]

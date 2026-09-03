@@ -44,6 +44,18 @@ def load_from_file(path: Union[str, Path]) -> Any:
 LOG_LVL = logging.INFO
 
 
+def cache_fits(embeddings, data, embedding_size):
+    """A cached (embeddings, history) pair is only usable if it was produced by
+    the same split and the same embedding size as the current run."""
+    for half in ("test1", "test2"):
+        emb = np.asarray(embeddings[half])
+        if len(emb) != len(data[f"y_{half}"]):
+            return False
+        if emb.ndim > 1 and emb.shape[1] != embedding_size:
+            return False
+    return True
+
+
 def estimate_security(
     data,
     embeddings,
@@ -114,11 +126,31 @@ def estimate_mi_ber(
         )
         data = get_split(x, y, train_idx, test_idx)
 
-        bkp_path = workspace / f"cache_{cv_count}.bkp"
-        if bkp_path.exists():
-            logging.info(f"Loading cached embeddings {bkp_path}")
-            embeddings, history = load_from_file(bkp_path)
-        else:
+        # The cache key carries everything that determines the contents, so
+        # runs with different k_fold (or model / embedding size / seed) no
+        # longer overwrite or silently reuse each other's embeddings.
+        bkp_path = workspace / (
+            f"cache_{model}_k{k_fold}_e{embedding_size}"
+            f"_r{random_state}_{cv_count}.bkp"
+        )
+        # caches written before the key was parameterised
+        legacy_path = workspace / f"cache_{cv_count}.bkp"
+
+        embeddings, history = None, None
+        for path in (bkp_path, legacy_path):
+            if not path.exists():
+                continue
+            cached, cached_history = load_from_file(path)
+            if cache_fits(cached, data, embedding_size):
+                logging.info(f"Loading cached embeddings {path}")
+                embeddings, history = cached, cached_history
+                break
+            logging.info(
+                f"Ignoring {path}: {len(cached['test1'])} cached embeddings vs "
+                f"{len(data['y_test1'])} labels in this split"
+            )
+
+        if embeddings is None:
             embeddings, history = train_models(
                 data=data,
                 n_websites=n_websites,

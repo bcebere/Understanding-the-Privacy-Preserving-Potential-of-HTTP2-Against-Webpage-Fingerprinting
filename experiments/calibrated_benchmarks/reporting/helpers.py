@@ -80,28 +80,32 @@ def cell_to_defense(cell: str) -> str:
     return cell
 
 
-def find_cells(root, datasets=None):
+def find_cells(root, datasets=None, setup="benchmarks"):
     """-> [(dataset, cell, workspace_path)] for the per-dataset results tree:
-    <root>/<dataset>/results/<cell>/tcp_repr/
+    <root>/<dataset>/<cell>/<setup>/        (new layout)
+    <root>/<dataset>/results/<cell>/<setup>/ (old layout, if results/ exists)
     """
     root = Path(root)
     out = []
     print("find cells", root)
     for ds_dir in sorted(root.iterdir()):
-        if not ds_dir.is_dir() or not (ds_dir / "results").is_dir():
+        if not ds_dir.is_dir():
             continue
         if datasets and ds_dir.name not in datasets:
             continue
-        for cell in sorted((ds_dir / "results").iterdir()):
-            if (cell / "tcp_repr").is_dir():
+        container = ds_dir / "results" if (ds_dir / "results").is_dir() else ds_dir
+        for cell in sorted(container.iterdir()):
+            if (cell / setup).is_dir():
                 out.append((ds_dir.name, cell.name, cell))
     return out
 
 
-def security_results(workspace, setup: str = "tcp_repr", n_classes=100, datasets=None):
+def security_results(
+    workspace, setup: str = "benchmarks", n_classes=100, datasets=None
+):
     summaries = []
 
-    for dataset, cell, testcase_workspace in find_cells(workspace, datasets):
+    for dataset, cell, testcase_workspace in find_cells(workspace, datasets, setup):
         print("prcessing dataset", cell, testcase_workspace)
         data = {}
         mod = cell_to_defense(cell)
