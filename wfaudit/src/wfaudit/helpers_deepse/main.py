@@ -263,9 +263,9 @@ if __name__ == "__main__":
     if args.gpu_id is not None:
         gpuid = args.gpu_id
         os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-        os.environ["CUDA_VISIBLE_DEVICES"] = (
-            f"{gpuid}"  # select ID of GPU that shall be used
-        )
+        os.environ[
+            "CUDA_VISIBLE_DEVICES"
+        ] = f"{gpuid}"  # select ID of GPU that shall be used
 
     if args.device == "cuda":
         logging.info(f"Using GPU: {gpuid} ({torch.cuda.is_available()})")

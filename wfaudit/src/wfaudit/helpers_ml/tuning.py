@@ -1,10 +1,10 @@
 """Optuna hyper-parameter search for the wfaudit attack models.
 
-    from wfaudit.helpers_ml.tuning import tune, load_best_params
+from wfaudit.helpers_ml.tuning import tune, load_best_params
 
-    tune("robustfp", X, y, n_trials=25, per_class=150, epoch_budget=60)
-    best = load_best_params("robustfp", X=X, y=y)
-    evaluate_multiclass("robustfp", label="mydata_tuned", data=X, labels=y, **best)
+tune("robustfp", X, y, n_trials=25, per_class=150, epoch_budget=60)
+best = load_best_params("robustfp", X=X, y=y)
+evaluate_multiclass("robustfp", label="mydata_tuned", data=X, labels=y, **best)
 """
 
 # future

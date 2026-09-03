@@ -7,6 +7,7 @@
 
 The original can be found at https://github.com/jhayes14/k-FP.
 """
+
 # stdlib
 from typing import Optional
 

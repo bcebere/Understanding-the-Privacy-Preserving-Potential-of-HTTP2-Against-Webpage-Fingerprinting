@@ -1,7 +1,7 @@
 """End-to-end checks for the tune -> evaluate -> report pipeline on toy data.
 
-    pytest test_pipeline.py -v
-    pytest test_pipeline.py -v -m "not slow"
+pytest test_pipeline.py -v
+pytest test_pipeline.py -v -m "not slow"
 """
 
 # stdlib

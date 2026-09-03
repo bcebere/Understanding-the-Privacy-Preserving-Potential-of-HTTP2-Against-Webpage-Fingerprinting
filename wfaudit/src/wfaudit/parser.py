@@ -458,7 +458,7 @@ def prepare_wefde_raw(
     output.mkdir(parents=True, exist_ok=True)
 
     print("process time series")
-    (clean_static_data, clean_ts_data, _) = _prepare_time_series_arrow(
+    clean_static_data, clean_ts_data, _ = _prepare_time_series_arrow(
         static_data,
         temporal_data,
         ID_COL=ID_COL,
