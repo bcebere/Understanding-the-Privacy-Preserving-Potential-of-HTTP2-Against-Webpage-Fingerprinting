@@ -32,7 +32,7 @@ cd ../../
 
 ## Existing datasets
 
-The published evaluation datasets are available from the accompanying [Zenodo dataset](https://zenodo.org/records/22229611?token=eyJhbGciOiJIUzUxMiJ9.eyJpZCI6ImNhYjc0MTliLTUxNjctNDFmOC04MWE2LTE1Y2E0ZTc3YTI0YiIsImRhdGEiOnt9LCJyYW5kb20iOiJjOWMxNWVhMmM1ZGU4NTg0YWZmNTFlYzM3YWQ2NDU0ZiJ9.ww1UZVlkv4a6c7dAt7l4E0Db8S5ep0hIJJw0tVdvuu6i69kvh4N11VwOzT547gqUgmPdFe8vKtwf42-nbhvvEw).
+The published evaluation datasets are available from the accompanying [Zenodo dataset](https://zenodo.org/records/22229611).
 
 Existing evaluation datasets and benchmark results can be prepared for visualization or re-evaluation using `prepare_workspace.sh`.
 
