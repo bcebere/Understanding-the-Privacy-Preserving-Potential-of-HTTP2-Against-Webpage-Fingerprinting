@@ -9,7 +9,6 @@ The repository contains the software used to replay webpage traces under the eva
 - **Source code:** https://github.com/bcebere/Understanding-the-Privacy-Preserving-Potential-of-HTTP2-Against-Webpage-Fingerprinting
 - **Published evaluation datasets and supporting artifacts:** https://zenodo.org/records/22229611
 - **Full raw replay traces and calibration sweeps:** https://drive.google.com/drive/folders/1WAHwUJq44IQcHiTpsyAl8bgUvORlD2xR?usp=sharing
-- **Permanent source-code snapshot:** TODO
 
 The Zenodo record contains the processed artifacts needed for the recommended evaluation path. The substantially larger raw replay corpus is provided separately because it is not necessary for inspecting or recomputing the published evaluation results.
 
