@@ -141,7 +141,13 @@ python -m pytest -vvsx
 If you use this code, please cite the associated paper:
 
 ```
-@article{
-    TODO
+@inproceedings{cebere2026http2wf,
+  author    = {Bogdan Constantin Cebere and Prateek Kumar and Sylvain Chatel and Wouter Lueks and Christian Rossow},
+  title     = {Understanding the Privacy-Preserving Potential of {HTTP/2} Against Webpage Fingerprinting},
+  booktitle = {Proceedings of the 2026 ACM SIGSAC Conference on Computer and Communications Security (CCS '26)},
+  year      = {2026},
+  publisher = {Association for Computing Machinery},
+  location  = {The Hague, Netherlands}
+  doi       = {10.1145/3830454.3846538}
 }
 ```
