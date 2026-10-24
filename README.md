@@ -1,6 +1,6 @@
 # Understanding the Privacy-Preserving Potential of HTTP/2 Against Webpage Fingerprinting
 
-This repository provides the code and artifacts for reproducing the results in **Understanding the Privacy-Preserving Potential of HTTP/2 Against Webpage Fingerprinting**, published at the **2026 ACM Conference on Computer and Communications Security (ACM CCS 2026)**.
+This repository provides the code and artifacts for reproducing the results in **Understanding the Privacy-Preserving Potential of HTTP/2 Against Webpage Fingerprinting**, published at the **2026 ACM Conference on Computer and Communications Security (ACM CCS 2026)** ([arXiv Version](https://arxiv.org/abs/2609.05119)).
 
 ## 💡 Experiments, Datasets and Examples
 
